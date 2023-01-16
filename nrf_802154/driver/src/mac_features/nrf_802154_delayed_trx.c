@@ -72,7 +72,7 @@
 
 /* Time needed to prepare RX procedure [us]. It does not include RX ramp-up time. */
 #if defined(CONFIG_SOC_NRF5340_CPUNET)
-#define RX_SETUP_TIME 300u
+#define RX_SETUP_TIME 110u
 #else
 #define RX_SETUP_TIME 110u
 #endif
