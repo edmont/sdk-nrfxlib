@@ -115,7 +115,6 @@ typedef struct
 {
     uint8_t                    * p_data;  ///< Pointer to a buffer containing PHR and PSDU of the frame requested to be transmitted.
     nrf_802154_transmit_params_t params;  ///< Transmission parameters.
-    uint8_t                      channel; ///< Channel number on which transmission should be performed.
 
 #if defined(CONFIG_SOC_SERIES_BSIM_NRFXX)
     uint64_t                     time;    ///< Target time of the first bit of the frame.
@@ -602,7 +601,7 @@ static void transmit_attempt(dly_op_data_t * p_dly_op_data)
     nrf_802154_log_function_enter(NRF_802154_LOG_VERBOSITY_HIGH);
 
     // No need to enqueue transmit attempts. Proceed to transmission immediately
-    nrf_802154_pib_channel_set(p_dly_op_data->tx.channel);
+    //nrf_802154_pib_channel_set(p_dly_op_data->tx.channel);
 
     if (nrf_802154_request_channel_update(REQ_ORIG_DELAYED_TRX))
     {
@@ -801,7 +800,7 @@ bool nrf_802154_delayed_trx_transmit(uint8_t                                 * p
         p_dly_tx_data->tx.params.cca                = p_metadata->cca;
         p_dly_tx_data->tx.params.immediate          = true;
         p_dly_tx_data->tx.params.extra_cca_attempts = p_metadata->extra_cca_attempts;
-        p_dly_tx_data->tx.channel                   = p_metadata->channel;
+        p_dly_tx_data->tx.params.channel            = p_metadata->channel;
         p_dly_tx_data->id                           = NRF_802154_RESERVED_DTX_ID;
 
         rsch_dly_ts_param_t dly_ts_param =

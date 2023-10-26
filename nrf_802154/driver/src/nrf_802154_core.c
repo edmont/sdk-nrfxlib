@@ -124,6 +124,7 @@ static uint32_t                        m_ed_time_left;         ///< Remaining ti
 static uint8_t                         m_ed_result;            ///< Result of the current energy detection procedure.
 static uint8_t                         m_last_lqi;             ///< LQI of the last received non-ACK frame, corrected for the temperature.
 static nrf_802154_fal_tx_power_split_t m_tx_power;             ///< Power to be used to transmit the current frame split into components.
+static uint8_t                         m_tx_channel;           ///< Channel to be used to transmit the current frame.
 static int8_t                          m_last_rssi;            ///< RSSI of the last received non-ACK frame, corrected for the temperature.
 
 static nrf_802154_frame_parser_data_t m_current_rx_frame_data; ///< RX frame parser data.
@@ -989,6 +990,8 @@ static void rx_init(nrf_802154_trx_ramp_up_trigger_mode_t ru_tr_mode, bool * p_a
 
     (void)nrf_802154_tx_power_split_pib_power_get(&split_power);
 
+    nrf_802154_trx_channel_set(nrf_802154_pib_channel_get());
+
     nrf_802154_trx_receive_frame(BCC_INIT / 8U,
                                  ru_tr_mode,
                                  m_trx_receive_frame_notifications_mask,
@@ -1060,6 +1063,7 @@ static bool tx_init(const uint8_t                       * p_data,
     }
 #endif
 
+    nrf_802154_trx_channel_set(m_tx_channel);
     m_flags.tx_with_cca = cca;
     nrf_802154_trx_transmit_frame(nrf_802154_tx_work_buffer_get(p_data),
                                   rampup_trigg_mode,
@@ -2324,7 +2328,7 @@ void nrf_802154_trx_receive_ack_received(void)
 
         // Detect Frame Pending field set to one on Ack frame received after a Data Request Command
         bool should_receive = false;
-        const nrf_802154_frame_parser_data_t frame_data;
+        nrf_802154_frame_parser_data_t frame_data;
 
         bool parse_result = nrf_802154_frame_parser_data_init(mp_tx_data,
                                                               mp_tx_data[PHR_OFFSET] + PHR_SIZE,
@@ -2670,8 +2674,9 @@ bool nrf_802154_core_transmit(nrf_802154_term_t              term_lvl,
                     m_coex_tx_request_mode == NRF_802154_COEX_TX_REQUEST_MODE_CCA_DONE;
 
                 state_set(p_params->cca ? RADIO_STATE_CCA_TX : RADIO_STATE_TX);
-                mp_tx_data = p_data;
-                m_tx_power = p_params->tx_power;
+                mp_tx_data   = p_data;
+                m_tx_power   = p_params->tx_power;
+                m_tx_channel = p_params->channel;
 
                 uint8_t cca_attempts = p_params->cca ? (1 + p_params->extra_cca_attempts) : 0;
 

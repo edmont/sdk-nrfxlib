@@ -556,12 +556,33 @@ typedef enum
     (&(tx_power_metadata).use_metadata_value), (&(tx_power_metadata).power)
 
 /**
+ * @brief Spinel data type description for nrf_802154_tx_channel_metadata_t.
+ */
+#define SPINEL_DATATYPE_NRF_802154_TX_CHANNEL_METADATA_S \
+    SPINEL_DATATYPE_BOOL_S  /* use_metadata_value */    \
+    SPINEL_DATATYPE_UINT8_S /* channel */
+
+/**
+ * @brief Encodes an instance of @ref SPINEL_DATATYPE_NRF_802154_TX_CHANNEL_METADATA_S data type.
+ */
+#define NRF_802154_TX_CHANNEL_METADATA_ENCODE(tx_channel_metadata) \
+    ((tx_channel_metadata).use_metadata_value), ((tx_channel_metadata).channel)
+
+/**
+ * @brief Decodes an instance of @ref SPINEL_DATATYPE_NRF_802154_TX_CHANNEL_METADATA_S data type.
+ */
+#define NRF_802154_TX_CHANNEL_METADATA_DECODE(tx_channel_metadata) \
+    (&(tx_channel_metadata).use_metadata_value), (&(tx_channel_metadata).channel)
+
+/**
  * @brief Spinel data type description for nrf_802154_transmit_metadata_t.
  */
 #define SPINEL_DATATYPE_NRF_802154_TRANSMIT_METADATA_S                     \
     SPINEL_DATATYPE_NRF_802154_TRANSMITTED_FRAME_PROPS_S /* frame_props */ \
     SPINEL_DATATYPE_BOOL_S                               /* cca */         \
-    SPINEL_DATATYPE_NRF_802154_TX_POWER_METADATA_S       /* tx_power */
+    SPINEL_DATATYPE_NRF_802154_TX_POWER_METADATA_S       /* tx_power */    \
+    SPINEL_DATATYPE_NRF_802154_TX_CHANNEL_METADATA_S     /* tx_channel */
+
 
 /**
  * @brief Encodes an instance of @ref SPINEL_DATATYPE_NRF_802154_TRANSMIT_METADATA_S data type.
@@ -569,7 +590,8 @@ typedef enum
 #define NRF_802154_TRANSMIT_METADATA_ENCODE(tx_metadata)                  \
     NRF_802154_TRANSMITTED_FRAME_PROPS_ENCODE((tx_metadata).frame_props), \
     ((tx_metadata).cca),                                                  \
-    NRF_802154_TX_POWER_METADATA_ENCODE((tx_metadata).tx_power)
+    NRF_802154_TX_POWER_METADATA_ENCODE((tx_metadata).tx_power),          \
+    NRF_802154_TX_CHANNEL_METADATA_ENCODE((tx_metadata).tx_channel)
 
 /**
  * @brief Decodes an instance of @ref SPINEL_DATATYPE_NRF_802154_TRANSMIT_METADATA_S data type.
@@ -577,28 +599,32 @@ typedef enum
 #define NRF_802154_TRANSMIT_METADATA_DECODE(tx_metadata)                  \
     NRF_802154_TRANSMITTED_FRAME_PROPS_DECODE((tx_metadata).frame_props), \
     (&(tx_metadata).cca),                                                 \
-    NRF_802154_TX_POWER_METADATA_DECODE((tx_metadata).tx_power)
+    NRF_802154_TX_POWER_METADATA_DECODE((tx_metadata).tx_power),          \
+    NRF_802154_TX_CHANNEL_METADATA_DECODE((tx_metadata).tx_channel)
 
 /**
  * @brief Spinel data type description for nrf_802154_transmit_csma_ca_metadata_t.
  */
 #define SPINEL_DATATYPE_NRF_802154_TRANSMIT_CSMA_CA_METADATA_S             \
     SPINEL_DATATYPE_NRF_802154_TRANSMITTED_FRAME_PROPS_S /* frame_props */ \
-    SPINEL_DATATYPE_NRF_802154_TX_POWER_METADATA_S       /* tx_power */
+    SPINEL_DATATYPE_NRF_802154_TX_POWER_METADATA_S       /* tx_power */    \
+    SPINEL_DATATYPE_NRF_802154_TX_CHANNEL_METADATA_S     /* tx_channel */
 
 /**
  * @brief Encodes an instance of @ref SPINEL_DATATYPE_NRF_802154_TRANSMIT_CSMA_CA_METADATA_S data type.
  */
 #define NRF_802154_TRANSMIT_CSMA_CA_METADATA_ENCODE(tx_metadata)          \
     NRF_802154_TRANSMITTED_FRAME_PROPS_ENCODE((tx_metadata).frame_props), \
-    NRF_802154_TX_POWER_METADATA_ENCODE((tx_metadata).tx_power)
+    NRF_802154_TX_POWER_METADATA_ENCODE((tx_metadata).tx_power),          \
+    NRF_802154_TX_CHANNEL_METADATA_ENCODE((tx_metadata).tx_channel)
 
 /**
  * @brief Decodes an instance of @ref SPINEL_DATATYPE_NRF_802154_TRANSMIT_CSMA_CA_METADATA_S data type.
  */
 #define NRF_802154_TRANSMIT_CSMA_CA_METADATA_DECODE(tx_metadata)          \
     NRF_802154_TRANSMITTED_FRAME_PROPS_DECODE((tx_metadata).frame_props), \
-    NRF_802154_TX_POWER_METADATA_DECODE((tx_metadata).tx_power)
+    NRF_802154_TX_POWER_METADATA_DECODE((tx_metadata).tx_power),          \
+    NRF_802154_TX_CHANNEL_METADATA_DECODE((tx_metadata).tx_channel)
 
 /**
  * @brief Spinel data type description for nrf_802154_csma_ca_min_be_set.
