@@ -1533,6 +1533,13 @@ void nrf_802154_csl_writer_period_set(uint16_t period);
 void nrf_802154_csl_writer_anchor_time_set(uint64_t anchor_time);
 
 /**
+ * @brief Sets the RxOnWhenIdle mode value.
+ *
+ * @param[in]  rx_on_when_idle  If RxOnWhenIdle mode should be enabled.
+ */
+void nrf_802154_rx_on_when_idle_set(bool rx_on_when_idle);
+
+/**
  * @}
  * @defgroup nrf_802154_test_modes Test modes
  * @{

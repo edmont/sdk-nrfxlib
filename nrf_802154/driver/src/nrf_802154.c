@@ -781,6 +781,16 @@ void nrf_802154_promiscuous_set(bool enabled)
     nrf_802154_pib_promiscuous_set(enabled);
 }
 
+bool nrf_802154_rx_on_when_idle_get(void)
+{
+    return nrf_802154_pib_rx_on_when_idle_get();
+}
+
+void nrf_802154_rx_on_when_idle_set(bool enabled)
+{
+    nrf_802154_pib_rx_on_when_idle_set(enabled);
+}
+
 void nrf_802154_auto_ack_set(bool enabled)
 {
     nrf_802154_pib_auto_ack_set(enabled);

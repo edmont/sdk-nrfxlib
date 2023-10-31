@@ -459,6 +459,12 @@ typedef enum
     SPINEL_PROP_VENDOR_NORDIC_NRF_802154_PAN_COORD_GET =
         SPINEL_PROP_VENDOR_NORDIC_NRF_802154__BEGIN + 65,
 
+    /**
+     * Vendor property for nrf_802154_rx_on_when_idle_set serialization.
+     */
+    SPINEL_PROP_VENDOR_NORDIC_NRF_802154_RX_ON_WHEN_IDLE_SET =
+        SPINEL_PROP_VENDOR_NORDIC_NRF_802154__BEGIN + 66,
+
 } spinel_prop_vendor_key_t;
 
 /**
@@ -844,6 +850,11 @@ typedef enum
  * @brief Spinel data type description for nrf_802154_promiscuous_set.
  */
 #define SPINEL_DATATYPE_NRF_802154_PROMISCUOUS_SET       SPINEL_DATATYPE_BOOL_S
+
+/**
+ * @brief Spinel data type description for nrf_802154_rx_on_when_idle_set.
+ */
+#define SPINEL_DATATYPE_NRF_802154_RX_ON_WHEN_IDLE_SET   SPINEL_DATATYPE_BOOL_S
 
 /**
  * @brief Spinel data type description for nrf_802154_cca.

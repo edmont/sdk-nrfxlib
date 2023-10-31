@@ -466,6 +466,11 @@ static void notify_rx_timeout(nrf_802154_sl_timer_t * p_timer)
 
         assert(result);
         (void)result;
+
+        if (!nrf_802154_pib_rx_on_when_idle_get())
+        {
+            (void)nrf_802154_request_sleep(NRF_802154_TERM_NONE);
+        }
     }
 
     nrf_802154_log_function_exit(NRF_802154_LOG_VERBOSITY_LOW);
