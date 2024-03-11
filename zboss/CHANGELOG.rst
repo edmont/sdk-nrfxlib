@@ -9,6 +9,26 @@ Changelog
 
 All notable changes to this project in the |NCS| are documented in this file.
 
+nRF Connect SDK v2.4.3
+**********************
+
+Updated
+=======
+
+* The ZBOSS stack to version ``3.11.3.0+5.1.4``.
+  For detailed information, see `ZBOSS stack release notes`_ for the |NCS| v2.6.0 release.
+
+Bug fixes
+=========
+
+* Fixed security vulnerabilities.
+* Fixed an issue with group command with group ID 0xFFF7.
+* Fixed an issue with incorrect access type in Zigbee Discover Attributes Extended Response.
+* Fixed an issue with incorrect handling of two "move to color" commands received in a row.
+* Fixed an issue with incorrect validation of Manufacturer-specific attribute bit.
+* Fixed an issue with incorrect response of ZC to beacon when joining is open.
+* Fixed an issue that prevented defining individual reporting contexts when multiple endpoints are implemented.
+
 nRF Connect SDK v2.3.0
 **********************
 
