@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2020 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -88,6 +88,9 @@ enum zb_zcl_dehumidification_control_attr_e
   ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_RELATIVE_HUMIDITY_DISPLAY_ID   = 0x0015,
 };
 
+/** @brief Default value for Dehumidification Control cluster revision global attribute */
+#define ZB_ZCL_DEHUMIDIFICATION_CONTROL_CLUSTER_REVISION_DEFAULT ((zb_uint16_t)0x0001u)
+
 /** @brief Min value for RHDehumidification Setpoint attribute */
 #define ZB_ZCL_DEHUMIDIFICATION_CONTROL_RHDEHUMIDIFICATION_SETPOINT_MIN_VALUE 0x1e
 
@@ -133,7 +136,7 @@ enum zb_zcl_dehumidification_control_attr_e
 */
 #define ZB_ZCL_DECLARE_DEHUMIDIFICATION_CONTROL_ATTRIB_LIST(attr_list, dehumid_cooling, dehumid_setpoint,         \
                                                dehumid_hysteresis, dehumid_max_cool)                              \
-  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                                                     \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_DEHUMIDIFICATION_CONTROL)                   \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_DEHUMIDIFICATION_COOLING_ID, (dehumid_cooling))       \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_RHDEHUMIDIFICATION_SETPOINT_ID, (dehumid_setpoint))   \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_DEHUMIDIFICATION_HYSTERESIS_ID, (dehumid_hysteresis)) \
@@ -159,7 +162,8 @@ enum zb_zcl_dehumidification_control_attr_e
   ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_DEHUMIDIFICATION_COOLING_ID,                                          \
   ZB_ZCL_ATTR_TYPE_U8,                                                                                       \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY | ZB_ZCL_ATTR_ACCESS_REPORTING,                                               \
-  (void*) data_ptr                                                                                      \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                                        \
+  (void*) data_ptr                                                                                           \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_RHDEHUMIDIFICATION_SETPOINT_ID(data_ptr) \
@@ -167,7 +171,8 @@ enum zb_zcl_dehumidification_control_attr_e
   ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_RHDEHUMIDIFICATION_SETPOINT_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U8,                                                                                       \
   ZB_ZCL_ATTR_ACCESS_READ_WRITE,                                                                             \
-  (void*) data_ptr                                                                                      \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                                        \
+  (void*) data_ptr                                                                                           \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_DEHUMIDIFICATION_HYSTERESIS_ID(data_ptr) \
@@ -175,7 +180,8 @@ enum zb_zcl_dehumidification_control_attr_e
   ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_DEHUMIDIFICATION_HYSTERESIS_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U8,                                                                                       \
   ZB_ZCL_ATTR_ACCESS_READ_WRITE,                                                                             \
-  (void*) data_ptr                                                                                      \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                                        \
+  (void*) data_ptr                                                                                           \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_DEHUMIDIFICATION_MAX_COOL_ID(data_ptr)   \
@@ -183,7 +189,8 @@ enum zb_zcl_dehumidification_control_attr_e
   ZB_ZCL_ATTR_DEHUMIDIFICATION_CONTROL_DEHUMIDIFICATION_MAX_COOL_ID,                                         \
   ZB_ZCL_ATTR_TYPE_U8,                                                                                       \
   ZB_ZCL_ATTR_ACCESS_READ_WRITE,                                                                             \
-  (void*) data_ptr                                                                                      \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                                        \
+  (void*) data_ptr                                                                                           \
 }
 
 /*! @internal Number of attributes mandatory for reporting in Dehumidification Control cluster */

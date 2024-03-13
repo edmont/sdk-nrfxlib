@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -116,6 +116,20 @@ before cluster's check attribute value callback. */
 zb_ret_t zb_zcl_check_attr_value(zb_uint16_t cluster_id, zb_uint8_t cluster_role, zb_uint8_t endpoint, zb_uint16_t attr_id, zb_uint8_t *value)
 {
   zb_ret_t ret;
+
+  TRACE_MSG(TRACE_ZCL1, ">> zb_zcl_check_attr_value cluster_id %d, endpoint %hd, attr_id %d, value %p",
+            (FMT__D_H_D_P, cluster_id, endpoint, attr_id, value));
+
+  ret = zb_zcl_check_attr_value_manuf(cluster_id, cluster_role, endpoint, attr_id, ZB_ZCL_NON_MANUFACTURER_SPECIFIC, value);
+
+  TRACE_MSG(TRACE_ZCL1, "<< zb_zcl_check_attr_value ret 0x%lx", (FMT__L, ret));
+
+  return ret;
+}
+
+zb_ret_t zb_zcl_check_attr_value_manuf(zb_uint16_t cluster_id, zb_uint8_t cluster_role, zb_uint8_t endpoint, zb_uint16_t attr_id, zb_uint16_t manuf_code, zb_uint8_t *value)
+{
+  zb_ret_t ret;
   zb_ret_t cb_ret = RET_IGNORE;
 
   zb_zcl_cluster_check_value_t cluster_check_value;
@@ -125,10 +139,17 @@ zb_ret_t zb_zcl_check_attr_value(zb_uint16_t cluster_id, zb_uint8_t cluster_role
 
   ZB_ASSERT(value);
 
-
-  if (ZCL_CTX().app_check_attr_value_cb != NULL)
+  if (ZCL_CTX().app_check_attr_value_manuf_cb != NULL)
+  {
+    cb_ret = ZCL_CTX().app_check_attr_value_manuf_cb(cluster_id, cluster_role, endpoint, attr_id, manuf_code, value);
+  }
+  else if (ZCL_CTX().app_check_attr_value_cb != NULL)
   {
     cb_ret = ZCL_CTX().app_check_attr_value_cb(cluster_id, cluster_role, endpoint, attr_id, value);
+  }
+  else
+  {
+    TRACE_MSG(TRACE_ZCL1, "application value cb is not set", (FMT__0));
   }
 
   cluster_check_value = zb_zcl_internal_get_cluster_check_value(endpoint,
@@ -152,6 +173,7 @@ zb_ret_t zb_zcl_check_attr_value(zb_uint16_t cluster_id, zb_uint8_t cluster_role
        This callback is invoked before cluster's check attribute value callback. */
   return ret;
 }
+
 /*!
   Hook on Write Attribute command
   @param endpoint - endpoint
@@ -162,7 +184,7 @@ zb_ret_t zb_zcl_check_attr_value(zb_uint16_t cluster_id, zb_uint8_t cluster_role
 */
 void zb_zcl_write_attr_hook(
   zb_uint8_t endpoint, zb_uint16_t cluster_id, zb_uint8_t cluster_role,
-  zb_uint16_t attr_id, zb_uint8_t *new_value)
+  zb_uint16_t attr_id, zb_uint8_t *new_value, zb_uint16_t manuf_code)
 {
   zb_zcl_cluster_write_attr_hook_t cluster_write_attr_hook;
   ZVUNUSED(endpoint);
@@ -178,10 +200,38 @@ void zb_zcl_write_attr_hook(
                                                                         cluster_role);
   if (cluster_write_attr_hook != NULL)
   {
-    cluster_write_attr_hook(endpoint, attr_id, new_value);
+    cluster_write_attr_hook(endpoint, attr_id, new_value, manuf_code);
   }
 
   TRACE_MSG(TRACE_ZCL1, "<< zb_zcl_write_attr_hook", (FMT__0));
+}
+
+/*!
+  Set attribute value cluster specific postprocessing
+  @param cmd_info - cluster role (@ref zcl_cluster_role)
+  @param attr_id - attribute ID
+  @param new_value - new value of attribute
+*/
+void zb_zcl_set_attr_val_post_process_cluster_specific(zb_zcl_parsed_hdr_t *cmd_info,
+                                                       zb_uint16_t attr_id,
+                                                       zb_uint8_t *value)
+{
+  ZVUNUSED(cmd_info);
+  ZVUNUSED(attr_id);
+  ZVUNUSED(value);
+
+  /* Supposedly the bette solution is to add
+   * one more type of the cluster handler */
+  switch (cmd_info->cluster_id)
+  {
+    case ZB_ZCL_CLUSTER_ID_IAS_ZONE:
+#ifdef ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE
+      zb_zcl_ias_set_attr_val_post_process(cmd_info, attr_id, value);
+#endif
+      break;
+    default:
+      break;
+  }
 }
 
 #endif /* ZB_ENABLE_ZCL */

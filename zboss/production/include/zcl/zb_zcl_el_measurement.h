@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2020 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -57,6 +57,9 @@
     @name Electrical Measurement cluster attributes
     @{
 */
+
+/** @brief Default value for Electrical Measurement cluster revision global attribute */
+#define ZB_ZCL_ELECTRICAL_MEASUREMENT_CLUSTER_REVISION_DEFAULT ((zb_uint16_t)0x0003u)
 
 /*! @brief Electrical Measurement cluster attribute identifiers
     @see HA spec, subclause 9.2.2.2
@@ -792,9 +795,10 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_MEASUREMENT_TYPE_ID(data_ptr) \
 {                                                                                               \
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_MEASUREMENT_TYPE_ID,                                       \
-    ZB_ZCL_ATTR_TYPE_32BITMAP,                                          \
+  ZB_ZCL_ATTR_TYPE_32BITMAP,                                                                    \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                                 \
-  (void*) data_ptr                                                                         \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                           \
+  (void*) data_ptr                                                                              \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DCPOWER_ID(data_ptr) \
@@ -802,7 +806,8 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DCPOWER_ID,                                       \
   ZB_ZCL_ATTR_TYPE_S16,                                                                \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY | ZB_ZCL_ATTR_ACCESS_REPORTING,                         \
-  (void*) data_ptr                                                                \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                  \
+  (void*) data_ptr                                                                     \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSVOLTAGE_ID(data_ptr) \
@@ -810,7 +815,8 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSVOLTAGE_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U16,                                                                   \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY | ZB_ZCL_ATTR_ACCESS_REPORTING,                            \
-  (void*) data_ptr                                                                   \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                     \
+  (void*) data_ptr                                                                        \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSCURRENT_ID(data_ptr) \
@@ -818,7 +824,8 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSCURRENT_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U16,                                                                   \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY | ZB_ZCL_ATTR_ACCESS_REPORTING,                            \
-  (void*) data_ptr                                                                   \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                     \
+  (void*) data_ptr                                                                        \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID(data_ptr)     \
@@ -826,7 +833,8 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID,                                           \
   ZB_ZCL_ATTR_TYPE_S16,                                                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY | ZB_ZCL_ATTR_ACCESS_REPORTING,                                  \
-  (void*) data_ptr                                                                         \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                           \
+  (void*) data_ptr                                                                              \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_FACTOR_ID(data_ptr)     \
@@ -834,7 +842,8 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_FACTOR_ID,                                           \
   ZB_ZCL_ATTR_TYPE_S8,                                                                          \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY | ZB_ZCL_ATTR_ACCESS_REPORTING,                                  \
-  (void*) data_ptr                                                                         \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                           \
+  (void*) data_ptr                                                                              \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACPOWER_MULTIPLIER_ID(data_ptr) \
@@ -842,7 +851,8 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACPOWER_MULTIPLIER_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U16,                                                                           \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                                   \
-  (void*) data_ptr                                                                           \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                             \
+  (void*) data_ptr                                                                                \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACPOWER_DIVISOR_ID(data_ptr) \
@@ -850,7 +860,8 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACPOWER_DIVISOR_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U16,                                                                        \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                                \
-  (void*) data_ptr                                                                        \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                          \
+  (void*) data_ptr                                                                             \
 }
 
 /*!
@@ -863,7 +874,7 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
     @param dcpower - pointer to variable to store DCPower attribute value
 */
 #define ZB_ZCL_DECLARE_ELECTRICAL_MEASUREMENT_ATTRIB_LIST(attr_list, measurement_type, dcpower)    \
-  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                                      \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_ELECTRICAL_MEASUREMENT)      \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_MEASUREMENT_TYPE_ID, (measurement_type)) \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DCPOWER_ID, (dcpower))                   \
   ZB_ZCL_FINISH_DECLARE_ATTRIB_LIST

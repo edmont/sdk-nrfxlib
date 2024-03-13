@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -207,6 +207,7 @@ static void zb_zcl_read_attr_handler_continue(zb_uint8_t param)
   zb_uint8_t i;
   zb_uint32_t bytes_avail;
   zb_uint16_t global_cluster_revision_value;
+  zb_uint16_t manuf_code;
   zb_zcl_status_t status;
 
   TRACE_MSG(TRACE_ZCL1, ">>zb_zcl_read_attr_handler_continue param %hd", (FMT__H, param));
@@ -221,8 +222,6 @@ static void zb_zcl_read_attr_handler_continue(zb_uint8_t param)
                                   ZB_ZCL_CLUSTER_SERVER_ROLE : ZB_ZCL_CLUSTER_CLIENT_ROLE);
   /* Cluster existence was checked on command accept - it must be in the list */
   ZB_ASSERT(cluster_desc);
-
-  status = ZB_ZCL_STATUS_SUCCESS;
 
   /* ZCL spec, 2.4.2 Read Attributes Response Command */
   /* Read attribute response
@@ -263,9 +262,11 @@ static void zb_zcl_read_attr_handler_continue(zb_uint8_t param)
 
   for(i = 0; i < attr_num; i++)
   {
+    status = ZB_ZCL_STATUS_SUCCESS;
+    manuf_code = (cmd_info->is_manuf_specific) ? cmd_info->manuf_specific : ZB_ZCL_NON_MANUFACTURER_SPECIFIC;
     ZB_HTOLE16(&attr_id, &read_attr_req->attr_id[i]);
     TRACE_MSG(TRACE_ZCL3, "attr_id %d", (FMT__D, attr_id));
-    attr_desc = zb_zcl_get_attr_desc(cluster_desc, attr_id);
+    attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, attr_id, manuf_code);
     TRACE_MSG(TRACE_ZCL3, "attr_desc %p", (FMT__P, attr_desc));
 
     bytes_avail = ZB_ZCL_GET_BYTES_AVAILABLE(ZCL_CTX().runtime_buf, resp_data,
@@ -279,9 +280,9 @@ static void zb_zcl_read_attr_handler_continue(zb_uint8_t param)
       {
         TRACE_MSG(
           TRACE_ZCL1,
-          "Global revision requested. Return ZB_ZCL_GLOBAL_CLUSTER_VERSION_DEFAULT",
+          "Global revision requested. Return ZB_ZCL_GLOBAL_CLUSTER_REVISION_DEFAULT",
           (FMT__0));
-        global_cluster_revision_value = ZB_ZCL_GLOBAL_CLUSTER_VERSION_DEFAULT;
+        global_cluster_revision_value = ZB_ZCL_GLOBAL_CLUSTER_REVISION_DEFAULT;
         ZB_ZCL_PACKET_PUT_DATA16(resp_data, &attr_id);
         ZB_ZCL_PACKET_PUT_DATA8(resp_data, ZB_ZCL_STATUS_SUCCESS);
         ZB_ZCL_PACKET_PUT_DATA8(resp_data, ZB_ZCL_ATTR_TYPE_U16);
@@ -302,7 +303,9 @@ static void zb_zcl_read_attr_handler_continue(zb_uint8_t param)
     {
       TRACE_MSG(TRACE_ZCL1, "error, attr access mask 0x%hx - isn't readable", (FMT__H, attr_desc->access));
       status = ZB_BIT_IS_SET(attr_desc->access, ZB_ZCL_ATTR_ACCESS_WRITE_ONLY)
-        ? ZB_ZCL_STATUS_WRITE_ONLY
+        /* ZCL8: CCB 2477: use NOT_AUTHORIZED instead of Write-only status*/
+        ?((zb_zcl_get_backward_compatible_statuses_mode() == ZB_ZCL_STATUSES_ZCL8_MODE) ?
+                ZB_ZCL_STATUS_NOT_AUTHORIZED : ZB_ZCL_STATUS_WRITE_ONLY)
         : ZB_ZCL_STATUS_FAIL;
     }
     else
@@ -465,22 +468,38 @@ static void zb_zcl_read_attr_resp_handler(zb_uint8_t param)
 */
 zb_zcl_attr_t* zb_zcl_get_attr_desc(zb_zcl_cluster_desc_t *cluster_desc, zb_uint16_t attr_id)
 {
+  zb_zcl_attr_t *attr_desc;
+
+  TRACE_MSG(TRACE_ZCL3, ">> zb_zcl_get_attr_desc cluster_desc %p, attr_id 0x%x", (FMT__P_D, cluster_desc, attr_id));
+  attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, attr_id, ZB_ZCL_NON_MANUFACTURER_SPECIFIC);
+  TRACE_MSG(TRACE_ZCL3, "<< zb_zcl_get_attr_desc, attr_desc %p", (FMT__P, attr_desc));
+
+  return attr_desc;
+}
+
+zb_zcl_attr_t* zb_zcl_get_attr_desc_manuf(zb_zcl_cluster_desc_t *cluster_desc, zb_uint16_t attr_id, zb_uint16_t manuf_code)
+{
   zb_zcl_attr_t *attr_desc = cluster_desc->attr_desc_list;
+  zb_bool_t is_ms_code_check_required = (manuf_code != ZB_ZCL_NON_MANUFACTURER_SPECIFIC);
   zb_ushort_t i = 0;
 
-  TRACE_MSG(
-      TRACE_ZCL3,
-      ">> zb_zcl_get_attr_desc cluster_desc %p, attr_id %d",
-      (FMT__P_D, cluster_desc, attr_id));
-  TRACE_MSG(TRACE_ZCL3, "cluster id: 0x%x", (FMT__D, cluster_desc->cluster_id));
+  TRACE_MSG(TRACE_ZCL3, ">> zb_zcl_get_attr_desc_manuf cluster_desc %p, attr_id 0x%x, manuf_code 0x%x, cluster id: 0x%x",
+            (FMT__P_D_D_D, cluster_desc, attr_id, manuf_code, cluster_desc->cluster_id));
+
   while (attr_desc != NULL)
   {
-    TRACE_MSG(TRACE_ZCL3, "Looking up attribute with id: 0x%x",
-              (FMT__D, attr_desc->id));
+    zb_bool_t is_ms_bit_set = ZB_BIT_IS_SET(attr_desc->access, ZB_ZCL_ATTR_MANUF_SPEC);
+    /* Manufacturer specific bit set correctly if it is required and set or not required and not set, in other words, when this two variables are equal */
+    zb_bool_t is_ms_bit_set_correctly = (is_ms_code_check_required == is_ms_bit_set);
+    zb_bool_t is_attr_ids_match = (attr_desc->id == attr_id);
+    zb_bool_t is_manuf_codes_match = (manuf_code == attr_desc->manuf_code);
 
-    if (attr_desc->id == attr_id)
+    TRACE_MSG(TRACE_ZCL3, "Checking attribute with id 0x%x: is_attr_ids_match %hd, is_manuf_codes_match %hd, is_ms_bit_set %hd, is_ms_bit_set_correctly %hd",
+              (FMT__D_H_H_H_H, attr_desc->id, is_attr_ids_match, is_manuf_codes_match, is_ms_bit_set, is_ms_bit_set_correctly));
+
+    if (is_attr_ids_match && is_manuf_codes_match && is_ms_bit_set_correctly)
     {
-      /* attribute is found */
+      TRACE_MSG(TRACE_ZCL3, "attribute is found", (FMT__0));
       break;
     }
 
@@ -493,19 +512,23 @@ zb_zcl_attr_t* zb_zcl_get_attr_desc(zb_zcl_cluster_desc_t *cluster_desc, zb_uint
     }
   }
 
-  TRACE_MSG(TRACE_ZCL3, "<< zb_zcl_get_attr_desc, attr_desc %p", (FMT__P, attr_desc));
+  TRACE_MSG(TRACE_ZCL3, "<< zb_zcl_get_attr_desc_manuf, attr_desc %p", (FMT__P, attr_desc));
   return attr_desc;
 }
 
 /* aggregates all calls to find attribute descriptor */
-zb_zcl_attr_t* zb_zcl_get_attr_desc_a(zb_uint8_t ep, zb_uint16_t cluster_id, zb_uint8_t cluster_role, zb_uint16_t attr_id)
+zb_zcl_attr_t* zb_zcl_get_attr_desc_manuf_a(zb_uint8_t ep,
+                                            zb_uint16_t cluster_id,
+                                            zb_uint8_t cluster_role,
+                                            zb_uint16_t attr_id,
+                                            zb_uint16_t manuf_code)
 {
   zb_af_endpoint_desc_t *ep_desc;
   zb_zcl_cluster_desc_t *cluster_desc;
   zb_zcl_attr_t *attr_desc;
 
-  TRACE_MSG(TRACE_ZCL2, ">> zb_zcl_get_attr_desc_a ep %hd, cluster_id %d, attr_id %d",
-            (FMT__H_D_D, ep, cluster_id, attr_id));
+  TRACE_MSG(TRACE_ZCL2, ">> zb_zcl_get_attr_desc_manuf_a ep %hd, cluster_id 0x%x, attr_id 0x%x, manuf_code 0x%x",
+            (FMT__H_D_D_D, ep, cluster_id, attr_id, manuf_code));
 
   ep_desc = zb_af_get_endpoint_desc(ep);
   /* EP existence was checked on command accept - it must be in the list */
@@ -515,193 +538,26 @@ zb_zcl_attr_t* zb_zcl_get_attr_desc_a(zb_uint8_t ep, zb_uint16_t cluster_id, zb_
   /* Cluster existence was checked on command accept - it must be in the list */
   ZB_ASSERT(cluster_desc);
 
-  attr_desc = zb_zcl_get_attr_desc(cluster_desc, attr_id);
-  TRACE_MSG(TRACE_ZCL2, "<< zb_zcl_get_attr_desc_a ret %p", (FMT__P, attr_desc));
+  attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, attr_id, manuf_code);
+  TRACE_MSG(TRACE_ZCL2, "<< zb_zcl_get_attr_desc_manuf_a ret %p", (FMT__P, attr_desc));
   return attr_desc;
 }
 
-
-#ifdef ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE
-static void handle_bind_check_response(zb_bufid_t param)
+zb_zcl_attr_t* zb_zcl_get_attr_desc_a(zb_uint8_t ep, zb_uint16_t cluster_id, zb_uint8_t cluster_role, zb_uint16_t attr_id)
 {
-  zb_aps_check_binding_resp_t *check_binding_resp = NULL;
-
-  check_binding_resp = ZB_BUF_GET_PARAM(param, zb_aps_check_binding_resp_t);
-
-  if (check_binding_resp->exists == ZB_TRUE)
-  {
-    TRACE_MSG(TRACE_ZCL3, "CIE binding already exists!", (FMT__0));
-    zb_buf_free(param);
-  }
-  else
-  {
-    /* zb_zcl_set_attr_val_cmd_post_process put apsme bind request params into the buffer body */
-    ZB_MEMCPY(ZB_BUF_GET_PARAM(param, zb_apsme_binding_req_t),
-              zb_buf_begin(param),
-              sizeof(zb_apsme_binding_req_t));
-
-    zb_apsme_bind_request(param);
-  }
+  return zb_zcl_get_attr_desc_manuf_a(ep, cluster_id, cluster_role, attr_id, ZB_ZCL_NON_MANUFACTURER_SPECIFIC);
 }
-
-
-static void handle_bind_confirm(zb_uint8_t param)
-{
-  if (zb_buf_get_status(param) != RET_OK)
-  {
-    TRACE_MSG(TRACE_ZCL1, "Failed to create CIE apt binding!", (FMT__0));
-  }
-
-  zb_buf_free(param);
-}
-#endif
-
 
 static void zb_zcl_set_attr_val_cmd_post_process(zb_zcl_parsed_hdr_t *cmd_info,
                                                  zb_uint16_t attr_id,
                                                  zb_uint8_t *value)
 {
-  zb_bufid_t buf = ZB_BUF_INVALID;
-
   TRACE_MSG(TRACE_ZCL1, ">>zb_zcl_set_attr_val_cmd_post_process, cmd_info %p", (FMT__P, cmd_info));
 
   ZVUNUSED(attr_id);
   ZVUNUSED(value);
-  ZVUNUSED(buf);
 
-  /* 12/02/2020 EE CR:MAJOR That hard-coded intercept breaks our idea os linking
-   * only required clusters.  If library is built with control4 support, but
-   * application does not use it, control4 lib still will be linked.
-   * Need to define better solution (not in the scope of diagnostic cluster, but in the future).
-   * Add one more type of the cluster handler? */
-
-  /* MISRA Rule 16.6
-   * Switch-case statements must have at least two switch-clauses. This was not verified in the
-   * previous switch when at least one of the switch-clauses was disabled with '#ifdef' guards.
-   * Removed switch and a if-else structure is now used. */
-
-#ifdef ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE
-  /* ZCL 8.2.2.2.3 (Trip-to-Pair, Auto-Enroll-Response, Auto-Enroll-Request):
-   * "The IAS Zone server MAY configure a binding table entry for the IAS CIE’s
-   * address because all of its communication will be directed to the IAS CIE." */
-
-  if (cmd_info->cluster_id == ZB_ZCL_CLUSTER_ID_IAS_ZONE)
-  {
-    if (attr_id == ZB_ZCL_ATTR_IAS_ZONE_IAS_CIE_ADDRESS_ID)
-    {
-      zb_apsme_binding_req_t *aps_bind_req;
-      zb_aps_check_binding_req_t *check_binding_req;
-      zb_zcl_attr_t *attr_desc;
-
-      buf = zb_buf_get_out();
-
-      ZB_ASSERT(buf != ZB_BUF_INVALID);
-
-      if (buf == ZB_BUF_INVALID)
-      {
-        TRACE_MSG(TRACE_ERROR, "Failed to get a buf", (FMT__0));
-      }
-      else
-      {
-        zb_ret_t ret;
-
-        attr_desc = zb_zcl_get_attr_desc_a(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-                                     cmd_info->cluster_id, ZB_ZCL_CLUSTER_SERVER_ROLE, attr_id);
-
-        aps_bind_req = (zb_apsme_binding_req_t *)zb_buf_initial_alloc(buf, sizeof(*aps_bind_req));
-
-        ZB_BZERO(aps_bind_req, sizeof(zb_apsme_binding_req_t));
-
-        /* get "set CIE address" originator's ieee address */
-
-        ret = zb_address_ieee_by_short(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
-                                       aps_bind_req->dst_addr.addr_long);
-
-        /* If address table entry doesn't exist, it should be added */
-
-        if (ret == RET_NOT_FOUND)
-        {
-          zb_address_ieee_ref_t addr_ref;
-          zb_address_update(value, ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr, ZB_TRUE, &addr_ref);
-        }
-        /* Compare "set CIE address" originator's ieee address to
-         * CIE address from request and to current CIE ieee address
-         * in IAS Zone Cluster's attribute */
-
-        if (ret != RET_OK)
-        {
-          TRACE_MSG(TRACE_ZCL2, "Failed to obtain CIE ieee address from addr map, skip addr check!",
-                    (FMT__0));
-
-          ZB_IEEE_ADDR_COPY(aps_bind_req->dst_addr.addr_long, value);
-          ret = RET_OK;
-        }
-        else
-        {
-          if (ZB_MEMCMP(aps_bind_req->dst_addr.addr_long, value,
-                        zb_zcl_get_attribute_size(attr_desc->type, value))
-              != 0)
-          {
-            ret = RET_ERROR;
-          }
-        }
-
-        /* Check the attribute was really updated with the new address value.
-           If not, don't create a new binding */
-        if (ret == RET_OK)
-        {
-          if (ZB_MEMCMP(attr_desc->data_p, value,
-                        zb_zcl_get_attribute_size(attr_desc->type, value))
-              != 0)
-          {
-            ret = RET_ERROR;
-          }
-        }
-
-        if (ret == RET_ERROR)
-        {
-          TRACE_MSG(TRACE_ZCL2, "Originator's ieee check failed!", (FMT__0));
-        }
-
-        ret = zb_zcl_ias_zone_put_cie_address_to_binding_whitelist(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint);
-
-        if (ret == RET_OK)
-        {
-          attr_desc = zb_zcl_get_attr_desc_a(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-                                     cmd_info->cluster_id, ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ZCL_ATTR_CUSTOM_CIE_EP);
-          ZB_ZCL_SET_DIRECTLY_ATTR_VAL8(attr_desc,ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint);
-
-          attr_desc = zb_zcl_get_attr_desc_a(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-                                     cmd_info->cluster_id, ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ZCL_ATTR_CUSTOM_CIE_SHORT_ADDR);
-          ZB_ZCL_SET_DIRECTLY_ATTR_VAL16(attr_desc,ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr);
-
-          /* Fill in the rest fields of binding request */
-          zb_get_long_address(aps_bind_req->src_addr);
-          aps_bind_req->src_endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint;
-          aps_bind_req->dst_endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint;
-          aps_bind_req->clusterid = cmd_info->cluster_id;
-          aps_bind_req->addr_mode = ZB_APS_ADDR_MODE_64_ENDP_PRESENT;
-          aps_bind_req->confirm_cb = handle_bind_confirm;
-
-          check_binding_req = ZB_BUF_GET_PARAM(buf, zb_aps_check_binding_req_t);
-          ZB_BZERO(check_binding_req, sizeof(*check_binding_req));
-
-          check_binding_req->cluster_id = cmd_info->cluster_id;
-          check_binding_req->src_endpoint = ZB_ZCL_BROADCAST_ENDPOINT;
-          check_binding_req->response_cb = handle_bind_check_response;
-
-          zb_aps_check_binding_request(buf);
-          buf = ZB_BUF_INVALID;
-        }
-      }
-    }
-  }
-
-  if (buf != ZB_BUF_INVALID)
-  {
-    zb_buf_free(buf);
-  }
-#endif /* ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE */
+  zb_zcl_set_attr_val_post_process_cluster_specific(cmd_info, attr_id, value);
 
   TRACE_MSG(TRACE_ZCL1, "<<zb_zcl_set_attr_val_cmd_post_process", (FMT__0));
 }
@@ -746,6 +602,7 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
   zb_uint8_t endpoint;
   zb_uint8_t *data_ptr;
   zb_uint32_t buf_len;
+  zb_uint16_t manuf_code;
   zb_bool_t can_write_all_attrs = ZB_TRUE;
 
   TRACE_MSG(
@@ -753,7 +610,7 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
       ">>zb_zcl_write_attr_handler param %d, cmd_info %p",
       (FMT__H_P, param, cmd_info));
 
-  /* ZCL spec, 2.4.3 Write attributes Command Frame */
+  /* ZCL8 spec, 2.5.3.1 Write attributes Command Frame Format */
   /* ZCL header | Write attr record 1 | Write attr record 2 | ...  */
   /* write attr record: | attr id 2b | attr type 1b | data XXb | */
 
@@ -794,6 +651,7 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
 
   data_ptr = zb_buf_begin(param);
   buf_len = zb_buf_len(param);
+  manuf_code = (cmd_info->is_manuf_specific) ? cmd_info->manuf_specific : ZB_ZCL_NON_MANUFACTURER_SPECIFIC;
 
   do
   {
@@ -807,7 +665,7 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
       TRACE_MSG(TRACE_ZCL3, "attr_id %d, attr_type %hd",
                 (FMT__D_H, write_attr_req->attr_id, write_attr_req->attr_type));
 
-      attr_desc = zb_zcl_get_attr_desc(cluster_desc, write_attr_req->attr_id);
+      attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, write_attr_req->attr_id, manuf_code);
       TRACE_MSG(TRACE_ZCL3, "attr_desc %p", (FMT__P, attr_desc));
 
       if (attr_desc == NULL)
@@ -854,11 +712,12 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
       {
         if (ZB_ZCL_CMD_WRITE_ATTRIB_UNDIV != cmd_info->cmd_id)
         {
-          ZVUNUSED(zb_zcl_set_attr_val(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
+          ZVUNUSED(zb_zcl_set_attr_val_manuf(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
                                      cmd_info->cluster_id,
                                      (cmd_info->cmd_direction == ZB_ZCL_FRAME_DIRECTION_TO_SRV) ?
                                      ZB_ZCL_CLUSTER_SERVER_ROLE : ZB_ZCL_CLUSTER_CLIENT_ROLE,
                                      attr_desc->id,
+                                     manuf_code,
                                      write_attr_req->attr_value,
                                      ZB_FALSE));
           zcl_write_attr_post_process(cmd_info, attr_desc, write_attr_req->attr_value);
@@ -885,17 +744,6 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
               >= sizeof(zb_zcl_write_attr_res_t))
           )
           {
-            if (status == ZB_ZCL_STATUS_LIMIT_REACHED)
-            {
-              ZVUNUSED(zb_zcl_set_attr_val(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-                                     cmd_info->cluster_id,
-                                     (cmd_info->cmd_direction == ZB_ZCL_FRAME_DIRECTION_TO_SRV) ?
-                                     ZB_ZCL_CLUSTER_SERVER_ROLE : ZB_ZCL_CLUSTER_CLIENT_ROLE,
-                                     attr_desc->id,
-                                     write_attr_req->attr_value,
-                                     ZB_FALSE));
-              zcl_write_attr_post_process(cmd_info, attr_desc, write_attr_req->attr_value);
-            }
             ZB_ZCL_PACKET_PUT_DATA8(resp_data, status);
             ZB_ZCL_PACKET_PUT_DATA16(resp_data, &write_attr_req->attr_id);
           }
@@ -918,15 +766,16 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
       ZB_ZCL_GENERAL_GET_NEXT_WRITE_ATTR_REQ(data_ptr, buf_len, write_attr_req);
 
       if (write_attr_req != NULL)
-        {
-        attr_desc = zb_zcl_get_attr_desc(cluster_desc, write_attr_req->attr_id);
+      {
+        attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, write_attr_req->attr_id, manuf_code);
         TRACE_MSG(TRACE_ZCL3, "attr_desc %p", (FMT__P, attr_desc));
 
-        ZVUNUSED(zb_zcl_set_attr_val(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
+        ZVUNUSED(zb_zcl_set_attr_val_manuf(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
                                      cmd_info->cluster_id,
                                      (cmd_info->cmd_direction == ZB_ZCL_FRAME_DIRECTION_TO_SRV) ?
                                      ZB_ZCL_CLUSTER_SERVER_ROLE : ZB_ZCL_CLUSTER_CLIENT_ROLE,
                                      attr_desc->id,
+                                     manuf_code,
                                      write_attr_req->attr_value,
                                      ZB_FALSE));
         zcl_write_attr_post_process(cmd_info, attr_desc, write_attr_req->attr_value);
@@ -1030,7 +879,7 @@ static zb_uint8_t check_config_rep_req(zb_zcl_configure_reporting_req_t *config_
     }
     else
     {
-      /* ZCL spec 2.4.7.3 Effect on Receipt: if the attribute type is set to array,
+      /* ZCL8 spec 2.5.7.3 Effect on Receipt: if the attribute type is set to array,
          structure, set or bag, set status to UNSUPPORTED_ATTRIBUTE */
       /* TODO: add other types checking */
       if (attr_desc->type == ZB_ZCL_ATTR_TYPE_OCTET_STRING || attr_desc->type == ZB_ZCL_ATTR_TYPE_ARRAY
@@ -1100,6 +949,7 @@ void zb_zcl_read_report_config_cmd_handler(zb_uint8_t param)
   zb_zcl_attr_t *attr_desc;
   zb_uint16_t free_space = 0;
   zb_uint8_t required_space = 0;
+  zb_uint16_t manuf_code;
   TRACE_MSG(TRACE_ZCL1, ">>zb_zcl_read_report_config_cmd_handler", (FMT__0));
 
   /* ZCL spec, 2.4.10 Read Reporting Configuration Response Command */
@@ -1141,6 +991,8 @@ void zb_zcl_read_report_config_cmd_handler(zb_uint8_t param)
   /* Cluster existence was checked on command accept - it must be in the list */
   ZB_ASSERT(cluster_desc);
 
+  manuf_code = (cmd_info->is_manuf_specific) ? cmd_info->manuf_specific : ZB_ZCL_NON_MANUFACTURER_SPECIFIC;
+
   do
   {
     /*Try to get attribute reporting configuration record from request */
@@ -1163,7 +1015,7 @@ void zb_zcl_read_report_config_cmd_handler(zb_uint8_t param)
 
        /*Get attribute descriptor to undestand, is it supported and
         * reportable or not. Calculate status field*/
-       attr_desc = zb_zcl_get_attr_desc(cluster_desc, read_rep_cfg_req.attr_id);
+       attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, read_rep_cfg_req.attr_id, manuf_code);
 
        if (!attr_desc || !attr_desc->data_p)   /*Unsupported attribute*/
        {
@@ -1179,10 +1031,11 @@ void zb_zcl_read_report_config_cmd_handler(zb_uint8_t param)
        {
          /*Try to get attr_rep_info for attr_id specified in the current
           * request record*/
-         attr_rep_info = zb_zcl_find_reporting_info(ep_desc->ep_id,
-                                                    cluster_desc->cluster_id,
-                                                    cluster_desc->role_mask,
-                                                    read_rep_cfg_req.attr_id);
+         attr_rep_info = zb_zcl_find_reporting_info_manuf(ep_desc->ep_id,
+                                                          cluster_desc->cluster_id,
+                                                          cluster_desc->role_mask,
+                                                          read_rep_cfg_req.attr_id,
+                                                          (cmd_info->is_manuf_specific) ? cmd_info->manuf_specific : ZB_ZCL_NON_MANUFACTURER_SPECIFIC);
 
 
          if(attr_rep_info)       /*If requested attribute reporting info found*/
@@ -1350,6 +1203,7 @@ void zb_zcl_configure_reporting_handler(zb_uint8_t param)
   zb_bool_t error_status = ZB_FALSE;
   zb_zcl_parsed_hdr_t *cmd_info = ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t);
   zb_ret_t ret;
+  zb_uint16_t manuf_code;
 
   TRACE_MSG(
       TRACE_ZCL1,
@@ -1396,7 +1250,8 @@ void zb_zcl_configure_reporting_handler(zb_uint8_t param)
           TRACE_ZCL3,
           "direction %hd, attr_id %d, ",
           (FMT__H_D, config_rep_req->direction, config_rep_req->attr_id));
-      attr_desc = zb_zcl_get_attr_desc(cluster_desc, config_rep_req->attr_id);
+      manuf_code = (cmd_info->is_manuf_specific) ? cmd_info->manuf_specific : ZB_ZCL_NON_MANUFACTURER_SPECIFIC;
+      attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, config_rep_req->attr_id, manuf_code);
       TRACE_MSG(TRACE_ZCL3, "attr_desc %p", (FMT__P, attr_desc));
 
       status = check_config_rep_req(config_rep_req, attr_desc);
@@ -1413,6 +1268,7 @@ void zb_zcl_configure_reporting_handler(zb_uint8_t param)
         addr_info.profile_id = cmd_info->profile_id;
         addr_info.cluster_role = (cmd_info->cmd_direction == ZB_ZCL_FRAME_DIRECTION_TO_SRV) ?
           ZB_ZCL_CLUSTER_SERVER_ROLE : ZB_ZCL_CLUSTER_CLIENT_ROLE;
+        addr_info.manuf_code = (cmd_info->is_manuf_specific) ? cmd_info->manuf_specific : ZB_ZCL_NON_MANUFACTURER_SPECIFIC;
 
         ret = zb_zcl_put_reporting_info_from_req(config_rep_req, &addr_info);
         if (ret != RET_OK)
@@ -1490,7 +1346,12 @@ void zb_zcl_send_report_attr_command(zb_zcl_reporting_info_t *rep_info, zb_uint8
       (FMT__P_H, rep_info, param));
 
   attr_desc =
-    zb_zcl_get_attr_desc_a(rep_info->ep, rep_info->cluster_id, rep_info->cluster_role, rep_info->attr_id);
+    zb_zcl_get_attr_desc_manuf_a(
+      rep_info->ep,
+      rep_info->cluster_id,
+      rep_info->cluster_role,
+      rep_info->attr_id,
+      rep_info->manuf_code);
 
   is_manuf_spec = !!ZB_ZCL_IS_ATTR_MANUF_SPEC(attr_desc);
 
@@ -1512,12 +1373,10 @@ void zb_zcl_send_report_attr_command(zb_zcl_reporting_info_t *rep_info, zb_uint8
 
   if (is_manuf_spec)
   {
-    zb_af_endpoint_desc_t *ep_desc = zb_af_get_endpoint_desc(rep_info->ep);
-    zb_zcl_cluster_desc_t *cluster_desc = get_cluster_desc(ep_desc, rep_info->cluster_id, rep_info->cluster_role);
+    TRACE_MSG(TRACE_ERROR, "rep_info->manuf_code 0x%x", (FMT__D, rep_info->manuf_code));
+    ZB_ASSERT(rep_info->manuf_code != ZB_ZCL_NON_MANUFACTURER_SPECIFIC);
 
-    ZB_ASSERT(ep_desc && cluster_desc && cluster_desc->manuf_code != ZB_ZCL_MANUF_CODE_INVALID);
-
-    ZB_ZCL_CONSTRUCT_COMMAND_HEADER_EXT(cmd_data, ZB_ZCL_GET_SEQ_NUM(), ZB_TRUE, cluster_desc->manuf_code, ZB_ZCL_CMD_REPORT_ATTRIB);
+    ZB_ZCL_CONSTRUCT_COMMAND_HEADER_EXT(cmd_data, ZB_ZCL_GET_SEQ_NUM(), ZB_TRUE, rep_info->manuf_code, ZB_ZCL_CMD_REPORT_ATTRIB);
   }
   else
   {
@@ -1529,7 +1388,7 @@ void zb_zcl_send_report_attr_command(zb_zcl_reporting_info_t *rep_info, zb_uint8
   while (cur_rep_info)
   {
     attr_desc =
-      zb_zcl_get_attr_desc_a(cur_rep_info->ep, cur_rep_info->cluster_id, cur_rep_info->cluster_role, cur_rep_info->attr_id);
+      zb_zcl_get_attr_desc_manuf_a(cur_rep_info->ep, cur_rep_info->cluster_id, cur_rep_info->cluster_role, cur_rep_info->attr_id, cur_rep_info->manuf_code);
     TRACE_MSG(TRACE_ZCL3, "attr_desc %p", (FMT__P, attr_desc));
 
     /* attribute description could not be absent, it is checked while accepting configure report
@@ -1542,8 +1401,8 @@ void zb_zcl_send_report_attr_command(zb_zcl_reporting_info_t *rep_info, zb_uint8
 
     TRACE_MSG(
         TRACE_ZCL3,
-        "attribute: id 0x%x, type 0x%hx",
-        (FMT__D_H, attr_desc->id, attr_desc->type));
+        "attribute: id 0x%x, type 0x%hx, manuf_code 0x%x",
+        (FMT__D_H_D, attr_desc->id, attr_desc->type, attr_desc->manuf_code));
     attr_size = zb_zcl_get_attribute_size(attr_desc->type, attr_desc->data_p);
     TRACE_MSG(TRACE_ZCL3, "attr_size %hd", (FMT__H, attr_size));
 
@@ -1610,7 +1469,7 @@ static void zb_zcl_disc_attr_handler(zb_uint8_t param)
   TRACE_MSG(TRACE_ZCL1, ">>zb_zcl_disc_attr_handler param %hd extended %hd",
             (FMT__H_H, param, extended));
 
-  /* ZCL spec, 2.4.13 Discovery Attributes Response Command
+  /* ZCL8 spec, 2.5.13 Discovery Attributes Response Command
      HA1.2 spec 12.1.6.1 Discovery Attributes Extended Response Command */
   /* Discovery attribute (extended) response
      | Discovery complete 1 b | attribute information 1 4 b | attribute information 1 4 b | ...
@@ -2029,7 +1888,7 @@ static zb_bool_t zb_zcl_handle_default_response_commands(zb_uint8_t param)
    * previous switch when at least one of the switch-clauses was disabled with '#if defined' guards.
    * Removed switch and a if-else structure is now used. */
 
-#if defined ZB_ZCL_ENABLE_DEFAULT_OTA_UPGRADE_PROCESSING && defined ZB_HA_ENABLE_OTA_UPGRADE_SERVER
+#if defined ZB_ZCL_ENABLE_DEFAULT_OTA_UPGRADE_PROCESSING
   if (cmd_info->cluster_id == ZB_ZCL_CLUSTER_ID_OTA_UPGRADE)
   {
     /* There was a call to
@@ -2040,8 +1899,7 @@ static zb_bool_t zb_zcl_handle_default_response_commands(zb_uint8_t param)
     processed = zb_zcl_handle_specific_commands(param);
   }
   else
-#endif /* defined ZB_ZCL_ENABLE_DEFAULT_OTA_UPGRADE_PROCESSING && defined                          \
-          ZB_HA_ENABLE_OTA_UPGRADE_SERVER */
+#endif /* defined ZB_ZCL_ENABLE_DEFAULT_OTA_UPGRADE_PROCESSING */
 #if defined ZB_ZCL_ENABLE_DEFAULT_TUNNEL_PROCESSING
       if (cmd_info->cluster_id == ZB_ZCL_CLUSTER_ID_TUNNEL)
   {

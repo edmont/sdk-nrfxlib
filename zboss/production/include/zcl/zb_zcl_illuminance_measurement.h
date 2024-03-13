@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2020 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -80,6 +80,9 @@ enum zb_zcl_illuminance_measurement_attr_e
   ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_LIGHT_SENSOR_TYPE_ID  = 0x0004,
 };
 
+/** @brief Default value for Illuminance Measurement cluster revision global attribute */
+#define ZB_ZCL_ILLUMINANCE_MEASUREMENT_CLUSTER_REVISION_DEFAULT ((zb_uint16_t)0x0002u)
+
 /** @brief MeasuredValue attribute too-low value */
 #define ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_TOO_LOW       0
 
@@ -123,7 +126,8 @@ enum zb_zcl_illuminance_measurement_attr_e
   ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U16,                                                                        \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY | ZB_ZCL_ATTR_ACCESS_REPORTING,                                 \
-  (void*) data_ptr                                                                        \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                          \
+  (void*) data_ptr                                                                             \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MIN_MEASURED_VALUE_ID(data_ptr) \
@@ -131,7 +135,8 @@ enum zb_zcl_illuminance_measurement_attr_e
   ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MIN_MEASURED_VALUE_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U16,                                                                            \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                                    \
-  (void*) data_ptr                                                                            \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                              \
+  (void*) data_ptr                                                                                 \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MAX_MEASURED_VALUE_ID(data_ptr) \
@@ -139,7 +144,8 @@ enum zb_zcl_illuminance_measurement_attr_e
   ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MAX_MEASURED_VALUE_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U16,                                                                            \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                                    \
-  (void*) data_ptr                                                                            \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                              \
+  (void*) data_ptr                                                                                 \
 }
 
 #define ZB_ZCL_ILLUMINANCE_MEASUREMENT_REPORT_ATTR_COUNT 1
@@ -156,7 +162,7 @@ enum zb_zcl_illuminance_measurement_attr_e
 */
 #define ZB_ZCL_DECLARE_ILLUMINANCE_MEASUREMENT_ATTRIB_LIST(attr_list,                          \
     value, min_value, max_value)                                                               \
-  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                                  \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_ILLUMINANCE_MEASUREMENT) \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MEASURED_VALUE_ID, (value))         \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MIN_MEASURED_VALUE_ID, (min_value)) \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_ILLUMINANCE_MEASUREMENT_MAX_MEASURED_VALUE_ID, (max_value)) \

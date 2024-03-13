@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -129,6 +129,9 @@ void zb_zcl_poll_controll_register_cb(zb_callback_t cb);
 /** @name Poll Control cluster attributes */
 /** @{ */
 
+/** @brief Default value for Poll Control cluster revision global attribute */
+#define ZB_ZCL_POLL_CONTROL_CLUSTER_REVISION_DEFAULT ((zb_uint16_t)0x0003u)
+
 /** @brief Value for stop Check-in process for Check-in Interval attribute */
 #define ZB_ZCL_POLL_CONTROL_CHECKIN_INTERVAL_NO_CHECK_IN_VALUE    0x0000
 
@@ -185,7 +188,8 @@ void zb_zcl_poll_controll_register_cb(zb_callback_t cb);
   ZB_ZCL_ATTR_POLL_CONTROL_CHECKIN_INTERVAL_ID,         \
   ZB_ZCL_ATTR_TYPE_U32,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_WRITE,                        \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POLL_CONTROL_LONG_POLL_INTERVAL_ID(data_ptr) \
@@ -193,7 +197,8 @@ void zb_zcl_poll_controll_register_cb(zb_callback_t cb);
   ZB_ZCL_ATTR_POLL_CONTROL_LONG_POLL_INTERVAL_ID,       \
   ZB_ZCL_ATTR_TYPE_U32,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POLL_CONTROL_SHORT_POLL_INTERVAL_ID(data_ptr) \
@@ -201,7 +206,8 @@ void zb_zcl_poll_controll_register_cb(zb_callback_t cb);
   ZB_ZCL_ATTR_POLL_CONTROL_SHORT_POLL_INTERVAL_ID,      \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POLL_CONTROL_FAST_POLL_TIMEOUT_ID(data_ptr) \
@@ -209,15 +215,17 @@ void zb_zcl_poll_controll_register_cb(zb_callback_t cb);
   ZB_ZCL_ATTR_POLL_CONTROL_FAST_POLL_TIMEOUT_ID,        \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_WRITE,                        \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POLL_CONTROL_MIN_CHECKIN_INTERVAL_ID(data_ptr) \
 {                                                       \
   ZB_ZCL_ATTR_POLL_CONTROL_MIN_CHECKIN_INTERVAL_ID,     \
   ZB_ZCL_ATTR_TYPE_U32,                                 \
-  ZB_ZCL_ATTR_ACCESS_READ_ONLY,                        \
-  (void*) data_ptr                                 \
+  ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POLL_CONTROL_LONG_POLL_MIN_INTERVAL_ID(data_ptr) \
@@ -225,7 +233,8 @@ void zb_zcl_poll_controll_register_cb(zb_callback_t cb);
   ZB_ZCL_ATTR_POLL_CONTROL_LONG_POLL_MIN_INTERVAL_ID,   \
   ZB_ZCL_ATTR_TYPE_U32,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POLL_CONTROL_FAST_POLL_MAX_TIMEOUT_ID(data_ptr) \
@@ -233,7 +242,8 @@ void zb_zcl_poll_controll_register_cb(zb_callback_t cb);
   ZB_ZCL_ATTR_POLL_CONTROL_FAST_POLL_MAX_TIMEOUT_ID,    \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_POLL_CONTROL_STATUS_DATA_ID(data_ptr) \
@@ -241,7 +251,8 @@ void zb_zcl_poll_controll_register_cb(zb_callback_t cb);
   ZB_ZCL_ATTR_POLL_CONTROL_STATUS_DATA_ID,              \
   ZB_ZCL_ATTR_TYPE_NULL,                                \
   ZB_ZCL_ATTR_ACCESS_INTERNAL,                          \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 
@@ -250,7 +261,8 @@ void zb_zcl_poll_controll_register_cb(zb_callback_t cb);
   ZB_ZCL_ATTR_POLL_CONTROL_ADDR_DATA_ID,                \
   ZB_ZCL_ATTR_TYPE_NULL,                                \
   ZB_ZCL_ATTR_ACCESS_INTERNAL,                          \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 
@@ -309,7 +321,7 @@ zb_zcl_poll_control_srv_cfg_data_t;
         checkin_interval_min, long_poll_interval_min, fast_poll_timeout_max)                          \
   zb_zcl_poll_control_srv_cfg_data_t srv_cfg_data_ctx_##attr_list =                                         \
   { ZB_ZCL_POLL_CTRL_INVALID_ADDR, ZB_ZCL_POLL_INVALID_EP, 0, 0 };        \
-  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                                         \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_POLL_CONTROL)                   \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_POLL_CONTROL_CHECKIN_INTERVAL_ID, (checkin_interval))              \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_POLL_CONTROL_LONG_POLL_INTERVAL_ID, (long_poll_interval))          \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_POLL_CONTROL_SHORT_POLL_INTERVAL_ID, (short_poll_interval))        \
@@ -326,7 +338,7 @@ zb_zcl_poll_control_srv_cfg_data_t;
 #define ZB_ZCL_DECLARE_POLL_CONTROL_ATTRIB_LIST_CLIENT(attr_list)                             \
     zb_zcl_poll_control_client_status_t client_status_data_ctx_##attr_list =                  \
         { ZB_FALSE, ZB_ZCL_POLL_CONTROL_FAST_POLL_TIMEOUT_CLIENT_DEFAULT_VALUE };             \
-    ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                               \
+    ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_POLL_CONTROL)         \
     ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_POLL_CONTROL_STATUS_DATA_ID,                             \
                          (&(client_status_data_ctx_##attr_list)))                             \
   ZB_ZCL_FINISH_DECLARE_ATTRIB_LIST

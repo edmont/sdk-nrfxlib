@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -163,6 +163,9 @@ typedef enum zb_zcl_meter_identification_data_quality_e
   ZB_ZCL_DATA_QUALITY_NOT_CERTIFIED_DATA                       = 0x0003   /**< Not Certified data */
 } zb_zcl_meter_identification_data_quality_t;
 
+/** @brief Default value for Meter Identification cluster revision global attribute */
+#define ZB_ZCL_METER_IDENTIFICATION_CLUSTER_REVISION_DEFAULT ((zb_uint16_t)0x0002u)
+
 /** @brief Default value for Company Name attribute */
 #define ZB_ZCl_ATTR_METER_IDENTIFICATION_COMPANY_NAME_DEFAULT_VALUE { 0 }
 
@@ -199,7 +202,7 @@ typedef enum zb_zcl_meter_identification_data_quality_e
 #define ZB_ZCL_DECLARE_METER_IDENTIFICATION_ATTRIB_LIST(attr_list,                           \
   company_name, meter_type_id, data_quality_id,                                              \
   pod, available_power, power_threshold)                                                     \
-  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                                \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_METER_IDENTIFICATION)  \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_METER_IDENTIFICATION_COMPANY_NAME, (company_name))        \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_METER_IDENTIFICATION_METER_TYPE_ID, (meter_type_id))      \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_METER_IDENTIFICATION_DATA_QUALITY_ID, (data_quality_id))  \
@@ -231,7 +234,8 @@ typedef enum zb_zcl_meter_identification_data_quality_e
   ZB_ZCl_ATTR_METER_IDENTIFICATION_COMPANY_NAME,                                              \
   ZB_ZCL_ATTR_TYPE_CHAR_STRING,                                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                               \
-  (void*) data_ptr                                                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                         \
+  (void*) data_ptr                                                                            \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_METER_IDENTIFICATION_METER_TYPE_ID(data_ptr)       \
@@ -239,7 +243,8 @@ typedef enum zb_zcl_meter_identification_data_quality_e
   ZB_ZCl_ATTR_METER_IDENTIFICATION_METER_TYPE_ID,                                             \
   ZB_ZCL_ATTR_TYPE_U16,                                                                       \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                               \
-  (void*) data_ptr                                                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                         \
+  (void*) data_ptr                                                                            \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_METER_IDENTIFICATION_DATA_QUALITY_ID(data_ptr)     \
@@ -247,7 +252,8 @@ typedef enum zb_zcl_meter_identification_data_quality_e
   ZB_ZCl_ATTR_METER_IDENTIFICATION_DATA_QUALITY_ID,                                           \
   ZB_ZCL_ATTR_TYPE_U16,                                                                       \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                               \
-  (void*) data_ptr                                                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                         \
+  (void*) data_ptr                                                                            \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_METER_IDENTIFICATION_POD(data_ptr)                 \
@@ -255,7 +261,8 @@ typedef enum zb_zcl_meter_identification_data_quality_e
   ZB_ZCl_ATTR_METER_IDENTIFICATION_POD,                                                       \
   ZB_ZCL_ATTR_TYPE_CHAR_STRING,                                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                               \
-  (void*) data_ptr                                                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                         \
+  (void*) data_ptr                                                                            \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_METER_IDENTIFICATION_AVAILABLE_POWER(data_ptr)     \
@@ -263,7 +270,8 @@ typedef enum zb_zcl_meter_identification_data_quality_e
   ZB_ZCl_ATTR_METER_IDENTIFICATION_AVAILABLE_POWER,                                           \
   ZB_ZCL_ATTR_TYPE_S24,                                                                       \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                               \
-  (void*) data_ptr                                                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                         \
+  (void*) data_ptr                                                                            \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_METER_IDENTIFICATION_POWER_THRESHOLD(data_ptr)     \
@@ -271,7 +279,8 @@ typedef enum zb_zcl_meter_identification_data_quality_e
   ZB_ZCl_ATTR_METER_IDENTIFICATION_POWER_THRESHOLD,                                           \
   ZB_ZCL_ATTR_TYPE_S24,                                                                       \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                                               \
-  (void*) data_ptr                                                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                                         \
+  (void*) data_ptr                                                                            \
 }
 
 /*! @internal Number of attributes mandatory for reporting in Meter Identification cluster */

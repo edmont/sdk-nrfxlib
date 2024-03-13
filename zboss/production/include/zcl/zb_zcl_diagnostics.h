@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -195,6 +195,9 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_CUSTOM_ATTR_BCAST_TABLE_FULL_ID    = 0xff02
 };
 
+/** @brief Default value for Diagnostics cluster revision global attribute */
+#define ZB_ZCL_DIAGNOSTICS_CLUSTER_REVISION_DEFAULT ((zb_uint16_t)0x0003u)
+
 /** @brief Default value for number_of_resets attribute */
 #define ZB_ZCL_DIAGNOSTICS_NUMBER_OF_RESETS_DEFAULT_VALUE ((zb_uint16_t)0x00000000)
 
@@ -308,6 +311,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_NUMBER_OF_RESETS_ID,                  \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -316,6 +320,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_PACKET_BUFFER_ALLOCATE_FAILURES_ID,   \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -324,6 +329,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_JOIN_INDICATION_ID,                   \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -333,6 +339,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_MAC_RX_BCAST_ID,                      \
   ZB_ZCL_ATTR_TYPE_U32,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -341,6 +348,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_MAC_TX_BCAST_ID,                      \
   ZB_ZCL_ATTR_TYPE_U32,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -349,6 +357,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_MAC_TX_BCAST_ID,                      \
   ZB_ZCL_ATTR_TYPE_U32,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -357,6 +366,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_MAC_TX_UCAST_ID,                      \
   ZB_ZCL_ATTR_TYPE_U32,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -365,6 +375,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_MAC_TX_UCAST_ID,                      \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -373,6 +384,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_MAC_TX_UCAST_ID,                      \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -381,6 +393,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_APS_TX_BCAST_ID,                      \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -389,6 +402,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_APS_TX_UCAST_SUCCESS_ID,              \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -397,6 +411,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_APS_TX_UCAST_RETRY_ID,                \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -405,6 +420,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_APS_TX_UCAST_FAIL_ID,                 \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -413,6 +429,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_ROUTE_DISC_INITIATED_ID,              \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -421,6 +438,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_AVERAGE_MAC_RETRY_PER_APS_ID,         \
   ZB_ZCL_ATTR_TYPE_U16,                                         \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -429,6 +447,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_LAST_LQI_ID,                          \
   ZB_ZCL_ATTR_TYPE_U8,                                          \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -437,6 +456,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_LAST_RSSI_ID,                         \
   ZB_ZCL_ATTR_TYPE_S8,                                          \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                           \
   (void*) data_ptr                                              \
 }
 
@@ -445,6 +465,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_CHILD_MOVED_ID,                             \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -453,6 +474,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_NWKFC_FAILURE_ID,                           \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -461,6 +483,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_APSFC_FAILURE_ID,                           \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -469,6 +492,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_APS_UNAUTHORIZED_KEY_ID,                    \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -477,6 +501,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_NWK_DECRYPT_FAILURES_ID,                    \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -485,6 +510,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_APS_DECRYPT_FAILURES_ID,                    \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -493,6 +519,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_PHYTOMACQUEUELIMITREACHED_ID,               \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -501,6 +528,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_PACKET_VALIDATEDROPCOUNT_ID,                \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -509,6 +537,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_NEIGHBOR_ADDED_ID,                          \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -517,6 +546,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_NEIGHBOR_REMOVED_ID,                        \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -525,6 +555,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_NEIGHBOR_STALE_ID,                          \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -533,6 +564,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_CUSTOM_ATTR_NWK_RETRY_OVERFLOW_ID,          \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -541,6 +573,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_CUSTOM_ATTR_PHY_CCA_FAILURES_ID,            \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -549,6 +582,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_CUSTOM_ATTR_BCAST_TABLE_FULL_ID,            \
   ZB_ZCL_ATTR_TYPE_U16,                                               \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                                       \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                 \
   (void*) data_ptr                                                    \
 }
 
@@ -556,7 +590,7 @@ enum zb_zcl_diagnostics_attr_e
     @param attr_list - attribute list name
 */
 #define ZB_ZCL_DECLARE_DIAGNOSTICS_ATTRIB_LIST(attr_list)               \
-  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                           \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_DIAGNOSTICS)                           \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_DIAGNOSTICS_MAC_RX_BCAST_ID,                    &diagnostics_ctx_zcl.mac_data.mac_rx_bcast) \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_DIAGNOSTICS_MAC_TX_BCAST_ID,                    &diagnostics_ctx_zcl.mac_data.mac_tx_bcast) \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_DIAGNOSTICS_MAC_RX_UCAST_ID,                    &diagnostics_ctx_zcl.mac_data.mac_rx_ucast) \

@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2020 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -176,6 +176,9 @@ typedef struct zb_zcl_shade_get_value_param_s
 /*! @}
  *  @endcond */ /* internals_doc */
 
+ /** @brief Default value for Shade Configuration cluster revision global attribute */
+#define ZB_ZCL_SHADE_CONFIG_CLUSTER_REVISION_DEFAULT ((zb_uint16_t)0x0001u)
+
 /** @brief Shade Configuration Status attribute default value */
 #define ZB_ZCL_SHADE_CONFIG_STATUS_DEFAULT_VALUE 0x00
 
@@ -195,7 +198,7 @@ typedef struct zb_zcl_shade_get_value_param_s
     @param mode - pointer to variable to store Mode attribute value
 */
 #define ZB_ZCL_DECLARE_SHADE_CONFIG_ATTRIB_LIST(attr_list, status, closed_limit, mode) \
-  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                          \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_SHADE_CONFIG)    \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_SHADE_CONFIG_STATUS_ID, (status))                   \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_SHADE_CONFIG_CLOSED_LIMIT_ID, (closed_limit))       \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_SHADE_CONFIG_MODE_ID, (mode))                       \
@@ -217,7 +220,8 @@ typedef struct zb_zcl_shade_get_value_param_s
   ZB_ZCL_ATTR_SHADE_CONFIG_STATUS_ID,                                             \
   ZB_ZCL_ATTR_TYPE_8BITMAP,                                                       \
   ZB_ZCL_ATTR_ACCESS_READ_WRITE,                                                  \
-  (void*) data_ptr                                                           \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                             \
+  (void*) data_ptr                                                                \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_SHADE_CONFIG_CLOSED_LIMIT_ID(data_ptr) \
@@ -225,7 +229,8 @@ typedef struct zb_zcl_shade_get_value_param_s
   ZB_ZCL_ATTR_SHADE_CONFIG_CLOSED_LIMIT_ID,                                       \
   ZB_ZCL_ATTR_TYPE_U16,                                                           \
   ZB_ZCL_ATTR_ACCESS_READ_WRITE,                                                  \
-  (void*) data_ptr                                                           \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                             \
+  (void*) data_ptr                                                                \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_SHADE_CONFIG_MODE_ID(data_ptr)         \
@@ -233,7 +238,8 @@ typedef struct zb_zcl_shade_get_value_param_s
   ZB_ZCL_ATTR_SHADE_CONFIG_MODE_ID,                                               \
   ZB_ZCL_ATTR_TYPE_8BIT_ENUM,                                                     \
   ZB_ZCL_ATTR_ACCESS_READ_WRITE,                                                  \
-  (void*) data_ptr                                                           \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                                             \
+  (void*) data_ptr                                                                \
 }
 
 /** Number of attributes mandatory for reporting in Shade Configuration cluster */

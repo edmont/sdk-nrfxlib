@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -73,6 +73,9 @@ enum zb_zcl_ias_wd_attr_e
 
 };
 
+/** @brief Default value for IAS WD cluster revision global attribute */
+#define ZB_ZCL_IAS_WD_CLUSTER_REVISION_DEFAULT ((zb_uint16_t)0x0002u)
+
 /** @brief Max Duration attribute default value */
 #define ZB_ZCL_ATTR_IAS_WD_MAX_DURATION_DEF_VALUE            240
 
@@ -93,7 +96,8 @@ enum zb_zcl_ias_wd_attr_e
   ZB_ZCL_ATTR_IAS_WD_MAX_DURATION_ID,                   \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_WRITE,                        \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 /*! @internal Number of attributes mandatory for reporting in IAS WD cluster */
@@ -109,7 +113,7 @@ enum zb_zcl_ias_wd_attr_e
 */
 #define ZB_ZCL_DECLARE_IAS_WD_ATTRIB_LIST(attr_list,                          \
     max_duration)                                                             \
-  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                 \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_IAS_WD) \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_IAS_WD_MAX_DURATION_ID, (max_duration))    \
   ZB_ZCL_FINISH_DECLARE_ATTRIB_LIST
 

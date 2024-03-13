@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -53,7 +53,7 @@
 
 #define ZB_ZCL_TIME_SERVER_SYNCHRONIZATION_TIMEOUT_SECONDS 100
 zb_ret_t check_value_time_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_uint8_t *value);
-void zb_zcl_time_write_attr_hook_server(zb_uint8_t endpoint, zb_uint16_t attr_id, zb_uint8_t *new_value);
+void zb_zcl_time_write_attr_hook_server(zb_uint8_t endpoint, zb_uint16_t attr_id, zb_uint8_t *new_value, zb_uint16_t manuf_code);
 
 #ifdef THAT_CB_IS_NEVER_USED_CAUSING_WARNING
 static zb_zcl_time_set_real_time_clock_t       zb_zcl_set_real_time_clock_cb;
@@ -314,7 +314,7 @@ zb_ret_t check_value_time_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_ui
       TRACE_MSG(TRACE_ZCL1, "Master bit is set (Time synchronization is not allowed) or invalid time value",
                 (FMT__0));
 
-      return RET_ERROR;
+      return RET_BLOCKED;
     }
   }
   else if (ZB_ZCL_ATTR_TIME_TIME_STATUS_ID == attr_id)
@@ -322,13 +322,18 @@ zb_ret_t check_value_time_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_ui
     /* The Synchronized bit must be explicitly written to indicate this - i.e.,
      * it is not set automatically on writing to the Time attribute.
      * If the Master bit is 1, the value of this bit is 0.
+     *
+     * ZCL 2.5.3.3 Write Attributes Command - Effect on Receipt
+     * 4. If the device is not currently accepting write attribute commands for the attribute,
+     * the status field of the corresponding write attribute status record SHALL be set to
+     * NOT_AUTHORIZED or READ_ONLY.
      */
 
     if (ZB_ZCL_TIME_TIME_STATUS_MASTER_BIT_IS_SET(ZB_ZCL_GET_ATTRIBUTE_VAL_8(time_status_desc)) &&
         ZB_ZCL_TIME_TIME_STATUS_SYNCHRONIZED_BIT_IS_SET(*value))
     {
       TRACE_MSG(TRACE_ZCL1, "Don't write Time Status attribute: Master Bit is set", (FMT__0));
-      return RET_ERROR;
+      return RET_BLOCKED;
     }
 
     /* Master(0-bit) and MasterZoneDst(2nd-bit) bits are not writeable */
@@ -338,11 +343,11 @@ zb_ret_t check_value_time_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_ui
   else if (ZB_ZCL_ATTR_TIME_DST_START_ID == attr_id
            || ZB_ZCL_ATTR_TIME_DST_END_ID == attr_id)
   {
-    if (ZB_ZCL_TIME_TIME_STATUS_MASTER_BIT_IS_SET(ZB_ZCL_GET_ATTRIBUTE_VAL_8(time_status_desc)))
+    if (ZB_ZCL_TIME_TIME_STATUS_MASTER_ZONE_DST_BIT_IS_SET(ZB_ZCL_GET_ATTRIBUTE_VAL_8(time_status_desc)))
     {
-      TRACE_MSG(TRACE_ZCL1, "Master bit is set. Time synchronization is not allowed.",
+      TRACE_MSG(TRACE_ZCL1, "MasterZoneDst bit is set. Time synchronization is not allowed.",
                 (FMT__0));
-      return RET_ERROR;
+      return RET_BLOCKED;
     }
     else if (ZB_ZCL_TIME_TIME_INVALID_VALUE == ZB_ZCL_ATTR_GET32(value))
     {
@@ -358,17 +363,20 @@ zb_ret_t check_value_time_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_ui
 
 void zb_zcl_time_update_current_time(zb_uint8_t endpoint)
 {
-  zb_zcl_attr_t* attr_desc;
+  zb_uint32_t time_value;
 
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_time_update_current_time ep %hd", (FMT__H, endpoint));
 
-  attr_desc = zb_zcl_get_attr_desc_a(
-    endpoint, ZB_ZCL_CLUSTER_ID_TIME, ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ZCL_ATTR_TIME_TIME_ID);
-  if (attr_desc != NULL)
-  {
-    /* TODO: Use set_attribute instead - to update all related attributes from write_attr_hook. */
-    ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, zb_get_utc_time());
-  }
+  time_value = zb_get_utc_time();
+  /* This time setting does not produce any ZCL packets, so no need to catch the status and
+   * send it in response.
+   */
+  ZB_ZCL_SET_ATTRIBUTE(endpoint,
+                       ZB_ZCL_CLUSTER_ID_TIME,
+                       ZB_ZCL_CLUSTER_SERVER_ROLE,
+                       ZB_ZCL_ATTR_TIME_TIME_ID,
+                       (zb_uint8_t *)(&time_value),
+                       ZB_FALSE);
 
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_time_update_current_time", (FMT__0));
 }
@@ -388,7 +396,7 @@ static zb_int32_t zb_zcl_color_control_getS32(zb_uint8_t endpoint, zb_uint16_t a
 }
 
 /** @brief Hook on Write attribute */
-void zb_zcl_time_write_attr_hook_server(zb_uint8_t endpoint, zb_uint16_t attr_id, zb_uint8_t *new_value)
+void zb_zcl_time_write_attr_hook_server(zb_uint8_t endpoint, zb_uint16_t attr_id, zb_uint8_t *new_value, zb_uint16_t manuf_code)
 {
   zb_zcl_attr_t* attr_desc;
   zb_uint32_t
@@ -400,8 +408,10 @@ void zb_zcl_time_write_attr_hook_server(zb_uint8_t endpoint, zb_uint16_t attr_id
   zb_bool_t update_standard_time = ZB_FALSE;
   zb_bool_t update_local_time = ZB_FALSE;
 
-  TRACE_MSG(TRACE_ZCL1, "> zb_zcl_time_write_attr_hook_server endpoint %hx attr_id %d",
-      (FMT__H_D, endpoint, attr_id));
+  TRACE_MSG(TRACE_ZCL1, "> zb_zcl_time_write_attr_hook_server endpoint %hx attr_id 0x%x, manuf_code 0x%x",
+            (FMT__H_D_D, endpoint, attr_id, manuf_code));
+
+  ZVUNUSED(manuf_code);
 
   switch (attr_id)
   {
