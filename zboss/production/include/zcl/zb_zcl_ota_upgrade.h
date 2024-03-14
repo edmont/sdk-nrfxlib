@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -237,6 +237,13 @@ typedef ZB_PACKED_PRE struct zb_zcl_ota_upgrade_sub_element_s
   zb_uint8_t value[1];    /** data variable, length - see 'length' field */
 
 } ZB_PACKED_STRUCT zb_zcl_ota_upgrade_sub_element_t;
+
+/*! @brief Structure representation of OTA File Sub-element header */
+typedef ZB_PACKED_PRE struct zb_zcl_ota_upgrade_sub_element_hdr_s
+{
+  zb_uint16_t tag_id;     /** Tag ID*/
+  zb_uint32_t length;     /** length */
+} ZB_PACKED_STRUCT zb_zcl_ota_upgrade_sub_element_hdr_t;
 
 
 /*! @brief OTA File header - Tag Identifiers
@@ -664,7 +671,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ID,                    \
   ZB_ZCL_ATTR_TYPE_IEEE_ADDR,                           \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_FILE_OFFSET_ID(data_ptr) \
@@ -672,7 +680,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_FILE_OFFSET_ID,               \
   ZB_ZCL_ATTR_TYPE_U32,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_FILE_VERSION_ID(data_ptr) \
@@ -680,7 +689,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_FILE_VERSION_ID,              \
   ZB_ZCL_ATTR_TYPE_U32,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_STACK_VERSION_ID(data_ptr) \
@@ -688,7 +698,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_STACK_VERSION_ID,             \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID(data_ptr) \
@@ -696,7 +707,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID,   \
   ZB_ZCL_ATTR_TYPE_U32,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_STACK_VERSION_ID(data_ptr) \
@@ -704,7 +716,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_STACK_VERSION_ID,  \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_STATUS_ID(data_ptr) \
@@ -712,7 +725,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_STATUS_ID,              \
   ZB_ZCL_ATTR_TYPE_8BIT_ENUM,                           \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID(data_ptr) \
@@ -720,7 +734,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID,               \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID(data_ptr) \
@@ -728,7 +743,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID,                \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_MIN_BLOCK_REQUE_ID(data_ptr) \
@@ -736,7 +752,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_MIN_BLOCK_REQUE_ID,           \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_STAMP_ID(data_ptr) \
@@ -744,15 +761,17 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_STAMP_ID,               \
   ZB_ZCL_ATTR_TYPE_U32,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_CLIENT_DATA_ID(data_ptr) \
 {                                                       \
   ZB_ZCL_ATTR_OTA_UPGRADE_CLIENT_DATA_ID,               \
   ZB_ZCL_ATTR_TYPE_NULL,                                \
-  ZB_ZCL_ATTR_ACCESS_INTERNAL,                            \
-  (void*) data_ptr                                 \
+  ZB_ZCL_ATTR_ACCESS_INTERNAL,                          \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ADDR_ID(data_ptr) \
@@ -760,7 +779,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ADDR_ID,               \
   ZB_ZCL_ATTR_TYPE_U16,                                 \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID(data_ptr) \
@@ -768,7 +788,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID,           \
   ZB_ZCL_ATTR_TYPE_U8,                                  \
   ZB_ZCL_ATTR_ACCESS_READ_ONLY,                         \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 #define ZB_SET_ATTR_DESCR_WITH_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_DATA_ID(data_ptr) \
@@ -776,7 +797,8 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_DATA_ID,               \
   ZB_ZCL_ATTR_TYPE_NULL,                                \
   ZB_ZCL_ATTR_ACCESS_INTERNAL,                          \
-  (void*) data_ptr                                 \
+  (ZB_ZCL_NON_MANUFACTURER_SPECIFIC),                   \
+  (void*) data_ptr                                      \
 }
 
 /*! @internal Number of attributes mandatory for reporting in OTA Upgrade cluster */
