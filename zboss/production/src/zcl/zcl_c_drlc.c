@@ -38,7 +38,7 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* PURPOSE: CLIENT: Demand Response and Load Control cluster defintions
+/* PURPOSE: CLIENT: Demand Response and Load Control cluster definitions
 
 */
 
@@ -119,15 +119,15 @@ static zb_ret_t check_value_drlc(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_ui
  *
  */
 
-void zb_drlc_client_send_report_event_status(zb_uint8_t param,
+void zb_drlc_client_send_report_event_status_tsn(zb_uint8_t param,
   zb_addr_u *dst_addr, zb_aps_addr_mode_t dst_addr_mode, zb_uint8_t dst_ep,
   zb_uint8_t src_ep, zb_zcl_drlc_report_event_status_payload_t *payload,
-  zb_callback_t cb)
+  zb_uint8_t tsn, zb_callback_t cb)
 {
   zb_zcl_drlc_report_event_status_payload_t pl = ZB_ZCL_DRLC_REPORT_EVENT_STATUS_PAYLOAD_INIT;
   zb_uint8_t *data = (zb_uint8_t *)&pl;
 
-  TRACE_MSG(TRACE_ZCL1, ">> zb_drlc_client_send_report_event_status", (FMT__0));
+  TRACE_MSG(TRACE_ZCL1, ">> zb_drlc_client_send_report_event_status_tsn", (FMT__0));
 
   ZB_BZERO(&pl, sizeof(pl));
 
@@ -143,7 +143,7 @@ void zb_drlc_client_send_report_event_status(zb_uint8_t param,
   ZB_ZCL_PACKET_PUT_DATA8(data, payload->signature_type);
   ZB_ZCL_PACKET_PUT_DATA_N(data, &payload->signature, sizeof(pl.signature));
 
-  zb_zcl_send_cmd(
+  zb_zcl_send_cmd_tsn(
     param, dst_addr, dst_addr_mode,
     dst_ep, ZB_ZCL_FRAME_DIRECTION_TO_SRV,
     src_ep,
@@ -151,10 +151,24 @@ void zb_drlc_client_send_report_event_status(zb_uint8_t param,
     ZB_ZCL_CLUSTER_ID_DRLC,
     ZB_ZCL_ENABLE_DEFAULT_RESPONSE,
     ZB_ZCL_DRLC_CLI_CMD_REPORT_EVENT_STATUS,
+    tsn,
     cb
   );
 
-  TRACE_MSG(TRACE_ZCL1, "<< zb_drlc_client_send_report_event_status", (FMT__0));
+  TRACE_MSG(TRACE_ZCL1, "<< zb_drlc_client_send_report_event_status_tsn", (FMT__0));
+}
+
+void zb_drlc_client_send_report_event_status(zb_uint8_t param,
+  zb_addr_u *dst_addr, zb_aps_addr_mode_t dst_addr_mode, zb_uint8_t dst_ep,
+  zb_uint8_t src_ep, zb_zcl_drlc_report_event_status_payload_t *payload,
+  zb_callback_t cb)
+{
+  zb_drlc_client_send_report_event_status_tsn(
+    param, dst_addr, dst_addr_mode,
+    dst_ep, src_ep, payload,
+    ZB_ZCL_GET_SEQ_NUM(),
+    cb
+  );
 }
 
 void zb_drlc_client_send_get_scheduled_events(zb_uint8_t param,
@@ -199,7 +213,6 @@ zb_ret_t zb_drlc_client_handle_load_control_event(zb_uint8_t param, const zb_zcl
   if (!ZB_ZCL_DRLC_SRV_CMD_LOAD_CONTROL_EVENT_IS_VALID(zb_buf_len(param)))
   {
     TRACE_MSG(TRACE_ZCL1, "Invalid packet len (%hd).", (FMT__H, zb_buf_len(param)));
-    zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_INVALID_FIELD);
     return RET_INVALID_FORMAT;
   }
 
@@ -227,17 +240,17 @@ zb_ret_t zb_drlc_client_handle_load_control_event(zb_uint8_t param, const zb_zcl
 
   if (ZB_ZCL_DEVICE_CMD_PARAM_STATUS(param) == RET_OK)
   {
-    zb_drlc_client_send_report_event_status(param,
+    ZB_ZCL_DRLC_SEND_CMD_REPORT_EVENT_STATUS_TSN(param,
       &dst_addr,
       ZB_APS_ADDR_MODE_16_ENDP_PRESENT,
       ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
       ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-      &pl_out, NULL);
+      &pl_out,
+      cmd_info->seq_number);
   }
   else
   {
     TRACE_MSG(TRACE_ZCL1, "<< error in user cb call:%d", (FMT__D, ZB_ZCL_DEVICE_CMD_PARAM_STATUS(param)));
-    zb_buf_free(param);
     return RET_ERROR;
   }
 
@@ -258,7 +271,6 @@ zb_ret_t zb_drlc_client_handle_cancel_load_control_event(zb_uint8_t param, const
   if (!ZB_ZCL_DRLC_SRV_CMD_CANCEL_LOAD_CONTROL_EVENT_IS_VALID(zb_buf_len(param)))
   {
     TRACE_MSG(TRACE_ZCL1, "Invalid packet len (%hd).", (FMT__H, zb_buf_len(param)));
-    zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_INVALID_FIELD);
     return RET_INVALID_FORMAT;
   }
 
@@ -288,18 +300,17 @@ device shall reply using the "Report Event Status Command" with an Event Status 
 
   if (ZB_ZCL_DEVICE_CMD_PARAM_STATUS(param) == RET_OK)
   {
-    zb_drlc_client_send_report_event_status(param,
+    ZB_ZCL_DRLC_SEND_CMD_REPORT_EVENT_STATUS_TSN(param,
       &dst_addr,
       ZB_APS_ADDR_MODE_16_ENDP_PRESENT,
       ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
       ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
       &pl_out,
-      NULL);
+      cmd_info->seq_number);
   }
   else
   {
     TRACE_MSG(TRACE_ZCL1, "<< error in user cb call:%d", (FMT__D, ZB_ZCL_DEVICE_CMD_PARAM_STATUS(param)));
-    zb_buf_free(param);
     return RET_ERROR;
   }
 
@@ -317,7 +328,6 @@ zb_ret_t zb_drlc_client_handle_cancel_all_load_control_events(zb_uint8_t param,
   if (!ZB_ZCL_DRLC_SRV_CMD_CANCEL_ALL_LOAD_CONTROL_EVENTS_IS_VALID(zb_buf_len(param)))
   {
     TRACE_MSG(TRACE_ZCL1, "Invalid packet len (%hd).", (FMT__H, zb_buf_len(param)));
-    zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_INVALID_FIELD);
     return RET_INVALID_FORMAT;
   }
 
@@ -360,38 +370,30 @@ static zb_bool_t zb_zcl_process_drlc_client_commands(zb_uint8_t param,
       result = zb_drlc_client_handle_load_control_event(param, cmd_info);
       status = (RET_OK == result) ? ZB_ZCL_STATUS_SUCCESS: 
                ((RET_INVALID_FORMAT == result) ? ZB_ZCL_STATUS_INVALID_FIELD : ZB_ZCL_STATUS_FAIL);
-      processed = ZB_TRUE;
       break;
     case ZB_ZCL_DRLC_SRV_CMD_CANCEL_LOAD_CONTROL_EVENT:
       result = zb_drlc_client_handle_cancel_load_control_event(param, cmd_info);
       status = (RET_OK == result) ? ZB_ZCL_STATUS_SUCCESS: 
                ((RET_INVALID_FORMAT == result) ? ZB_ZCL_STATUS_INVALID_FIELD : ZB_ZCL_STATUS_FAIL);
-      processed = ZB_TRUE;
       break;
     case ZB_ZCL_DRLC_SRV_CMD_CANCEL_ALL_LOAD_CONTROL_EVENTS:
       result = zb_drlc_client_handle_cancel_all_load_control_events(param, cmd_info);
       status = (RET_OK == result) ? ZB_ZCL_STATUS_SUCCESS: 
                ((RET_INVALID_FORMAT == result) ? ZB_ZCL_STATUS_INVALID_FIELD : ZB_ZCL_STATUS_FAIL);
-      processed = ZB_TRUE;
       break;
     default:
       break;
+  }
+
+  if (status == ZB_ZCL_STATUS_SUCCESS) {
+    processed = ZB_TRUE;
   }
 
   if (!processed)
   {
     if (!cmd_info->disable_default_response)
     {
-      ZB_ZCL_SEND_DEFAULT_RESP(param,
-                         ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
-                         ZB_APS_ADDR_MODE_16_ENDP_PRESENT,
-                         ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
-                         ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-                         cmd_info->profile_id,
-                         cmd_info->cluster_id,
-                         cmd_info->seq_number,
-                         cmd_info->cmd_id,
-                         status);
+      zb_zcl_send_default_handler(param, cmd_info, status);
     }
     else
     {

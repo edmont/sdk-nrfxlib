@@ -136,12 +136,12 @@ typedef struct zb_apsde_data_req_s
 				    If the UseAlias parameter has a value of FALSE,
 				    the AliasSeqNumb parameter is ignored.
 				    Values: 0x00-0xff */
+  zb_uint8_t    ext_tx_options; /* !< Additional non-standard TX options. See @ref apsde_tx_opt */
+  /* Keep NCP protocol compatibility - do not include ext tx options. We need it only for one customer indeed.. */
+#define NCP_APSDE_PARAM_SIZE ZB_OFFSETOF(zb_apsde_data_req_t, ext_tx_options)
 #ifdef APS_FRAGMENTATION
-#define NCP_APSDE_PARAM_SIZE ZB_OFFSETOF(zb_apsde_data_req_t, extended_fc)
   zb_uint8_t extended_fc;  /* Extended Frame Control - internal use only */
   zb_uint8_t block_num;    /* Fragmentation: for the first segment - total payload len */
-#else
-#define NCP_APSDE_PARAM_SIZE sizeof(zb_apsde_data_req_t)
 #endif
 } zb_apsde_data_req_t;
 
@@ -173,14 +173,21 @@ typedef ZB_PACKED_PRE struct zb_apsde_data_confirm_s
  */
 /** @{ */
 #define ZB_APSDE_TX_OPT_SECURITY_ENABLED         0x01U /*!< Security enabled transmission */
-#define ZB_APSDE_TX_OPT_USE_NWK_KEY_R21OBSOLETE  0x02U /*!< Use NWK key */
+#define ZB_APSDE_TX_OPT_USE_NWK_KEY_R21OBSOLETE  0x02U /*!< Use NWK key (obsolete) */
+#define ZB_APSDE_TX_OPT_NO_LONG_ADDR             0x02U /*!< Extension: do not include long src/dst addresses into NWK hdr  */
 #define ZB_APSDE_TX_OPT_ACK_TX                   0x04U /*!< Acknowledged transmission */
 #define ZB_APSDE_TX_OPT_FRAG_PERMITTED           0x08U /*!< Fragmentation permitted */
 #define ZB_APSDE_TX_OPT_INC_EXT_NONCE            0x10U /*!< Include extended nonce in APS security frame */
 
 #ifdef ZB_APSDE_REQ_ROUTING_FEATURES
-#define ZB_APSDE_TX_OPT_FORCE_MESH_ROUTE_DISC    0x20U /* Non-spec extension: Force mesh route discovery */
-#define ZB_APSDE_TX_OPT_FORCE_SEND_ROUTE_REC     0x40U /* Non-spec extension: Force send route record */
+#define ZB_APSDE_TX_OPT_FORCE_MESH_ROUTE_DISC    0x20U /*!< Non-spec extension: Force mesh route discovery */
+#define ZB_APSDE_TX_OPT_FORCE_SEND_ROUTE_REC     0x40U /*!< Non-spec extension: Force send route record */
+#define ZB_APSDE_TX_OPT_HAVE_EXT_OPTIONS         0x80U /*!< Additional TX options are in ext_tx_options field  */
+
+#define ZB_APSDE_EXT_TX_OPT_INC_EXT_SRC          0x01u /*!< Include long src addr into nwk hdr. If used with ZB_APSDE_TX_OPT_NO_LONG_ADDR, long dst is not included */
+#define ZB_APSDE_EXT_TX_OPT_INC_EXT_DST          0x02u /*!< Include long dst addr into nwk hdr. If used with ZB_APSDE_TX_OPT_NO_LONG_ADDR, long src is not included */
+#define ZB_APSDE_EXT_TX_OPT_NO_ROUTE_DISC        0x04u /*!< Do not use route discovery (spec violation!) */
+#define ZB_APSDE_EXT_TX_OPT_NO_ADDR_DISC         0x08u /*!< Do not discover short address of destination if addr mode is "long" and address is unknown */
 #endif /* ZB_APSDE_REQ_ROUTING_FEATURES */
 
 /** @} */
@@ -259,10 +266,6 @@ void zb_apsde_data_indication(zb_uint8_t param);
    @param packet - APS packet
    @param ptr - (out) pointer to the APS data begin
 
-   @par Example
-   @snippet tp_aps_bv_19_i_zr1.c data_indication
-   @par
-
  */
 #define ZB_APS_HDR_CUT_P(packet, ptr)                   \
   ptr = zb_buf_cut_left(packet, zb_aps_full_hdr_size(zb_buf_begin(packet)))
@@ -302,6 +305,8 @@ typedef ZB_PACKED_PRE struct zb_apsme_get_group_membership_req_s
 {
   zb_callback_t  confirm_cb;    /*!< The callback to be called when the operation is completed. */
   zb_ushort_t    n_groups;      /*!< Group addresses amount. */
+  zb_uint8_t     endpoint;      /*!< The endpoint which the groups are assigned to. */
+  zb_uint8_t     align[1];
   zb_uint16_t    groups[1];     /*!< First element if list with group addresses. */
 } ZB_PACKED_STRUCT zb_apsme_get_group_membership_req_t;
 
@@ -517,9 +522,6 @@ void zb_aps_hdr_parse(zb_bufid_t packet, zb_aps_hdr_t *aps_hdr, zb_bool_t cut_nw
 /** @internal
  * @brief Check element in the group array by GroupID.
  *
- * @par Example
- * @snippet tp_pro_bv-52_zr1.c tp_pro_bv-52_zr1
- * @par
  * */
 zb_bool_t zb_aps_is_in_group(zb_uint16_t grp_id);
 
@@ -555,6 +557,9 @@ zb_ret_t zb_check_binding_table_whitelist(zb_apsme_binding_req_t *apsreq);
 /* Functions for accessing and modifying a group table */
 zb_ret_t zb_aps_group_table_add(zb_aps_group_table_t *table, zb_uint16_t group, zb_uint8_t ep);
 zb_ret_t zb_aps_group_table_remove(zb_aps_group_table_t *table, zb_uint16_t group, zb_uint8_t ep);
+void zb_aps_group_table_get_groups_by_ep(zb_aps_group_table_t *table,
+                                         zb_ushort_t groups_len, zb_uint16_t *groups,
+                                         zb_ushort_t *out_group_cnt, zb_uint8_t ep);
 void zb_aps_group_table_remove_all(zb_aps_group_table_t *table);
 zb_bool_t zb_aps_group_table_is_endpoint_in_group(zb_aps_group_table_t *table,
                                                   zb_uint16_t group_id,
@@ -571,6 +576,45 @@ zb_ret_t zb_apsme_add_group_internal(zb_uint16_t group, zb_uint8_t ep);
  * called from zb_apsme_remove_group_request or elsewhere from any layer
  */
 zb_ret_t zb_apsme_remove_group_internal(zb_uint16_t group, zb_uint8_t ep);
+
+/*
+ * Internal function for finding a list of groups that an endpoint is a member of
+ */
+void zb_apsme_get_groups_by_ep(zb_ushort_t groups_len, zb_uint16_t *groups,
+                               zb_ushort_t *out_group_cnt, zb_uint8_t ep);
+
+/**
+ * @brief This function clears
+ *   "ZB_AIB().aps_device_key_pair_storage" structure
+ *   in a way compatible with both
+ *   static and configurable memory builds.
+ *
+ *   It doesn't changes pointers to configurable memory if it is enabled.
+ */
+void zb_reinit_aps_device_key_pair_storage(void);
+
+/**
+ * @brief This function clears
+ *   "ZG->aps.binding" structure
+ *   in a way compatible with both
+ *   static and configurable memory builds.
+ *
+ *   It doesn't changes pointers to configurable memory if it is enabled.
+ *
+ */
+void zb_reinit_aps_binding(void);
+
+/**
+ * @brief This function clears
+ *   "ZG->aps.binding.dst_table" entry by its index
+ *   in a way compatible with both
+ *   static and configurable memory builds.
+ *
+ *   It doesn't changes pointers to configurable memory if it is enabled.
+ *
+ * @param idx index of entry in destination table.
+ */
+void zb_reinit_aps_binding_dst_table_entry_by_index(zb_uint8_t idx);
 
 /** @endcond */ /* internals_doc */
 

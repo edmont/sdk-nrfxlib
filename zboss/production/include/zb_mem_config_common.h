@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -292,10 +292,10 @@ ZB_ASSERT_COMPILE_DECL(ZB_CONFIG_APS_SRC_BINDING_TABLE_SIZE <= (1U<<5U));
 
 #endif  /* ZB_CONFIG_APPLICATION_COMPLEX */
 
-#ifdef ZB_CONFIG_SCHEDULER_Q_SIZE 
+#ifdef ZB_CONFIG_SCHEDULER_Q_SIZE
 /**
    The purpose of the define. Ret code handling implementation on the application side
-   (via ZB_SCHEDULE_USER_APP_ALARM and ZB_SCHEDULE_USER_APP_CALLBACK) implies that we have some part 
+   (via ZB_SCHEDULE_USER_APP_ALARM and ZB_SCHEDULE_USER_APP_CALLBACK) implies that we have some part
    of the callback and alarm queues which can not be used from the user app and always should be reserved
    for stack schedule purposes. So, let's define this part as 12 (for both immediate callbacks and alarms)
    for all configurations.

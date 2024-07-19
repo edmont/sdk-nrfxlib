@@ -69,6 +69,7 @@ void zb_bdb_process_ext_addr_resp(zb_uint8_t param);
 static zb_ret_t zb_bdb_find_respondent(zb_uint16_t nwk_addr, zb_uint8_t *resp_index);
 static void zb_bdb_finding_binding_initiator_stop(  zb_uint8_t param, zb_uint16_t status);
 static zb_ret_t zb_bdb_finding_binding_target_func(zb_uint8_t endpoint, zb_uint16_t commissioning_time_secs);
+static void finding_binding_target_cancel_ep_internal(zb_uint8_t endpoint, zb_bool_t is_timeout_expired);
 
 /*
   Initialization of EZ-Mode context
@@ -90,7 +91,7 @@ void zb_bdb_finding_binding_init_ctx()
 F & B Target
 */
 
-/* Starts EZ-Mode Finding and binding mechanism at the target's endpoint internal fuction */
+/* Starts EZ-Mode Finding and binding mechanism at the target's endpoint internal function */
 static zb_ret_t zb_bdb_finding_binding_target_func(zb_uint8_t endpoint, zb_uint16_t commissioning_time_secs)
 {
   zb_ret_t ret = RET_OK;
@@ -98,8 +99,7 @@ static zb_ret_t zb_bdb_finding_binding_target_func(zb_uint8_t endpoint, zb_uint1
 
   TRACE_MSG(TRACE_ZCL1, "> bdb_finding_binding_target_func endpoint %hd", (FMT__H, endpoint));
 
-  bdb_finding_binding_started =
-	  (zb_bool_t)((zb_bdb_commissioning_mode_mask_t)ZB_BDB().bdb_commissioning_step != ZB_BDB_COMMISSIONING_STOP);
+  bdb_finding_binding_started = zb_zcl_is_identifying(endpoint);
 
 #ifdef ZB_STACK_REGRESSION_TESTING_API
   if (ZB_REGRESSION_TESTS_API().bdb_allow_multiple_fb_targets)
@@ -108,16 +108,15 @@ static zb_ret_t zb_bdb_finding_binding_target_func(zb_uint8_t endpoint, zb_uint1
   }
 #endif
 
-  if (ret == RET_OK
-      && (!zb_zdo_joined() || bdb_finding_binding_started))
+  if (!ZB_JOINED() || bdb_finding_binding_started)
   {
     ret = RET_INVALID_STATE;
   }
 
   if (ret == RET_OK)
   {
-    /* Clear BDB Comissioning Mode state after identifying has finished */
-    ZB_SCHEDULE_ALARM(zb_bdb_finding_binding_target_alarm, 0,
+    /* Clear BDB Commissioning Mode state after identifying has finished */
+    ZB_SCHEDULE_ALARM(zb_bdb_finding_binding_target_alarm, endpoint,
                       ZB_MILLISECONDS_TO_BEACON_INTERVAL(commissioning_time_secs * 1000));
     ret = ( zb_zcl_start_identifying(endpoint, commissioning_time_secs) == ZB_ZCL_STATUS_SUCCESS ?
             RET_OK : RET_ERROR );
@@ -127,7 +126,6 @@ static zb_ret_t zb_bdb_finding_binding_target_func(zb_uint8_t endpoint, zb_uint1
     ZB_BDB().bdb_commissioning_step = ZB_BDB_FINDING_N_BINDING;
     ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_IN_PROGRESS;
     BDB_COMM_CTX().state = ZB_BDB_COMM_FINDING_AND_BINDING_TARGET;
-    BDB_COMM_CTX().ep = endpoint;
   }
 
   TRACE_MSG(TRACE_ZCL1, "< bdb_finding_binding_target_func ret %hd", (FMT__H, ret));
@@ -186,39 +184,130 @@ zb_ret_t zb_bdb_finding_binding_target_ext(zb_uint8_t endpoint, zb_uint16_t comm
   return ret;
 }
 
-
-void zb_bdb_finding_binding_target_cancel()
+static void finding_binding_finished_context_update(void)
 {
-  TRACE_MSG(TRACE_ZCL1, "> zb_bdb_finding_binding_target_cancel", (FMT__0));
-
-  ZB_SCHEDULE_ALARM_CANCEL(zb_bdb_finding_binding_target_alarm, 0);
-  zb_zcl_stop_identifying(BDB_COMM_CTX().ep);
   BDB_COMM_CTX().state = ZB_BDB_COMM_IDLE;
   ZB_BDB().bdb_commissioning_step = ZB_BDB_COMMISSIONING_STOP;
   TRACE_MSG(TRACE_ZDO3, "ZB_BDB_COMMISSIONING_STOP", (FMT__0));
   ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_SUCCESS;
+}
 
+static void raise_target_finished_cancelled_signal(zb_uint8_t param, zb_uint16_t ep)
+{
+  zb_uint8_t *ptr;
+  TRACE_MSG(TRACE_ZDO1, "F&B target cancelled calling zb_zdo_startup_complete", (FMT__0));
+  ptr = zb_app_signal_pack_with_detailed_status(param, ZB_BDB_SIGNAL_FINDING_AND_BINDING_TARGET_FINISHED,
+                                                RET_CANCELLED, sizeof(zb_uint8_t));
+  *ptr = (zb_uint8_t)ep;
+  ZB_SCHEDULE_CALLBACK(zb_zdo_startup_complete_int, param);
+  TRACE_MSG(TRACE_ZDO1, "F&B target cancelled calling zb_zdo_startup_complete", (FMT__0));
+}
+
+void zb_bdb_finding_binding_target_cancel(void)
+{
+  zb_uint8_t ep_id = 0;
+
+  TRACE_MSG(TRACE_ZCL1, "> zb_bdb_finding_binding_target_cancel", (FMT__0));
+
+  ZB_SCHEDULE_ALARM_CANCEL(zb_bdb_finding_binding_target_alarm, ZB_ALARM_ALL_CB);
+
+  do
+  {
+    ep_id = zb_zcl_get_next_target_endpoint(
+             ep_id, ZB_ZCL_CLUSTER_ID_IDENTIFY, ZB_ZCL_CLUSTER_SERVER_ROLE, get_profile_id_by_endpoint(ep_id));
+    if (ep_id != 0U)
+    {
+      zb_zcl_stop_identifying(ep_id);
+    }
+  } while (ep_id != 0U);
+
+  /* put ZB_ZCL_BROADCAST_ENDPOINT(0xFF) value to endpoint in this case */
+  zb_buf_get_out_delayed_ext(raise_target_finished_cancelled_signal, ZB_ZCL_BROADCAST_ENDPOINT, sizeof(zb_uint16_t));
+
+  finding_binding_finished_context_update();
   TRACE_MSG(TRACE_ZCL1, "< zb_bdb_finding_binding_target_cancel", (FMT__0));
 }
 
-
-void zb_bdb_finding_binding_target_alarm(zb_uint8_t param)
+void zb_bdb_finding_binding_target_alarm_ep(zb_uint8_t param, zb_uint16_t endpoint)
 {
-  TRACE_MSG(TRACE_ZCL1, "> zb_bdb_finding_binding_target_alarm %hd", (FMT__H, param));
-  ZVUNUSED(param);
+  zb_uint8_t *ptr;
+  TRACE_MSG(TRACE_ZCL1, "> zb_bdb_finding_binding_target_alarm_ep param %hd endpoint %d", (FMT__H_D, param, endpoint));
 
-  if (param == 0)
-  {
-    zb_buf_get_out_delayed(zb_bdb_finding_binding_target_alarm);
-  }
-  else
+  finding_binding_target_cancel_ep_internal((zb_uint8_t)endpoint, ZB_TRUE);
+
+  TRACE_MSG(TRACE_ZDO1, "F&B target done calling zb_zdo_startup_complete", (FMT__0));
+  ptr = zb_app_signal_pack(param, ZB_BDB_SIGNAL_FINDING_AND_BINDING_TARGET_FINISHED, RET_OK, sizeof(zb_uint8_t));
+  *ptr = (zb_uint8_t)endpoint;
+  ZB_SCHEDULE_CALLBACK(zb_zdo_startup_complete_int, param);
+
+  TRACE_MSG(TRACE_ZCL2, "< zb_bdb_finding_binding_target_alarm_ep", (FMT__0));
+}
+
+static void finding_binding_target_cancel_ep_internal(zb_uint8_t endpoint, zb_bool_t is_timeout_expired)
+{
+  zb_uint8_t ep_id = 0;
+  zb_bool_t is_identifying = ZB_FALSE;
+
+  TRACE_MSG(TRACE_ZCL1, "> finding_binding_target_cancel_ep_internal endpoint %hd is timeout expired %hd", (FMT__H_H, endpoint, ZB_B2U(is_timeout_expired)));
+
+  /* Let's treat 0xFF endpoint ID as cancel all targets */
+  if (endpoint == ZB_ZCL_BROADCAST_ENDPOINT)
   {
     zb_bdb_finding_binding_target_cancel();
-
-    TRACE_MSG(TRACE_ZDO1, "F&B target done calling zb_zdo_startup_complete", (FMT__0));
-    zb_app_signal_pack(param, ZB_BDB_SIGNAL_FINDING_AND_BINDING_TARGET_FINISHED, RET_OK, 0);
-    ZB_SCHEDULE_CALLBACK(zb_zdo_startup_complete_int, param);
+    return;
   }
+
+  ZB_SCHEDULE_ALARM_CANCEL(zb_bdb_finding_binding_target_alarm, endpoint);
+  zb_zcl_stop_identifying(endpoint);
+
+  if (!is_timeout_expired)
+  {
+    zb_buf_get_out_delayed_ext(raise_target_finished_cancelled_signal, (zb_uint16_t)endpoint, sizeof(zb_uint16_t));
+  }
+
+  /* After Identifying on that EP is stopped we need to iterate through all other endpoints having Identifying cluster server checking if that endpoint is now in identifying mode.
+   * If no more endpoints are identifying now, update BDB commissioning step, stage, status, as in zb_bdb_finding_binding_target_cancel().
+   */
+  do
+  {
+    ep_id = zb_zcl_get_next_target_endpoint(
+             ep_id, ZB_ZCL_CLUSTER_ID_IDENTIFY, ZB_ZCL_CLUSTER_SERVER_ROLE, get_profile_id_by_endpoint(endpoint));
+    if (ep_id == endpoint)
+    {
+      continue;
+    }
+    else if (ep_id != 0U)
+    {
+      if (zb_zcl_is_identifying(ep_id))
+      {
+         is_identifying = ZB_TRUE;
+      }
+    }
+  }
+  while(ep_id != 0U && !is_identifying);
+
+  if (!is_identifying)
+  {
+    finding_binding_finished_context_update();
+  }
+
+  TRACE_MSG(TRACE_ZCL1, "< finding_binding_target_cancel_ep_internal", (FMT__0));
+}
+
+void zb_bdb_finding_binding_target_cancel_ep(zb_uint8_t endpoint)
+{
+  TRACE_MSG(TRACE_ZCL1, "> zb_bdb_finding_binding_target_cancel_ep endpoint %hd ", (FMT__H, endpoint));
+
+  finding_binding_target_cancel_ep_internal(endpoint, ZB_FALSE);
+
+  TRACE_MSG(TRACE_ZCL1, "< zb_bdb_finding_binding_target_cancel_ep", (FMT__0));
+}
+
+void zb_bdb_finding_binding_target_alarm(zb_uint8_t endpoint)
+{
+  TRACE_MSG(TRACE_ZCL1, "> zb_bdb_finding_binding_target_alarm endpoint %hd", (FMT__H, endpoint));
+
+  zb_buf_get_out_delayed_ext(zb_bdb_finding_binding_target_alarm_ep, (zb_uint16_t)endpoint, sizeof(zb_uint16_t));
 
   TRACE_MSG(TRACE_ZCL2, "< zb_bdb_finding_binding_target_alarm", (FMT__0));
 }
@@ -234,10 +323,7 @@ static void zb_bdb_finding_binding_initiator_stop(
 {
   zb_zdo_signal_fb_initiator_finished_params_t *signal_params;
 
-  BDB_COMM_CTX().state = ZB_BDB_COMM_IDLE;
-  ZB_BDB().bdb_commissioning_step = ZB_BDB_COMMISSIONING_STOP;
-  TRACE_MSG(TRACE_ZDO3, "ZB_BDB_COMMISSIONING_STOP", (FMT__0));
-  ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_SUCCESS;
+  finding_binding_finished_context_update();
   ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_FINDING_AND_BINDING_INITIATOR_FINISHED;
 
   signal_params = (zb_zdo_signal_fb_initiator_finished_params_t *)zb_app_signal_pack(
@@ -433,6 +519,8 @@ static zb_ret_t bind_respondent_cluster(zb_bdb_comm_respondent_info_t *responden
   zb_apsme_binding_req_t *aps_bind_req = ZB_BUF_GET_PARAM(param, zb_apsme_binding_req_t);
   zb_ret_t status;
 
+  /* Unused without trace. */
+  ZVUNUSED(ep);
   TRACE_MSG(TRACE_ZCL2, ">> bind_respondent_cluster, respondent %p, ep %d, cluster 0x%x, param %d",
             (FMT__P_D_D_D, respondent, ep, cluster, param));
 

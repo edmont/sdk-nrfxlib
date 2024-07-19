@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -172,6 +172,8 @@ zb_bool_t zb_zcl_time_server_read_attr_handle(zb_uint8_t param)
   {
     TRACE_MSG(TRACE_ZCL1, "Mallformed Read Time Status attribute response", (FMT__H, param));
   }
+
+  zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_SUCCESS);
 
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_time_server_read_attr_handle", (FMT__0));
 
@@ -351,9 +353,8 @@ zb_ret_t check_value_time_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_ui
     }
     else if (ZB_ZCL_TIME_TIME_INVALID_VALUE == ZB_ZCL_ATTR_GET32(value))
     {
-      zb_uint32_t val = ZB_ZCL_ATTR_GET32(value);
       TRACE_MSG(TRACE_ZCL1, "Invalid attribute value! attr_id == 0x%x, value == 0x%lx",
-                (FMT__D_L, attr_id, val));
+                (FMT__D_L, attr_id, ZB_ZCL_ATTR_GET32(value)));
       return RET_ERROR;
     }
   }

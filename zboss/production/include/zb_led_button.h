@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -46,6 +46,8 @@
 
 #include "zb_vendor.h"
 #include "zboss_api_core.h"
+
+/** @cond DOXYGEN_LEDS_BUTTONS_SECTION */
 
 /*! @addtogroup leds_buttons */
 /*! @{ */
@@ -97,8 +99,6 @@ typedef enum zb_led_blink_frequency_e
   ZB_LED_BLINK_PER_2SEC = 8,   /*!< Blink every two seconds */
 } zb_led_blink_frequency_t;
 
-/** @cond internals_doc */
-
 /**
  * @brief get period argument value (in beacon intervals) from led_arg.
  * To be used in ZBOSS led functions
@@ -110,8 +110,6 @@ typedef enum zb_led_blink_frequency_e
  * To be used in ZBOSS led functions
  */
 #define ZB_LED_ARG_NUMBER(led_arg) ((led_arg) & 0xfU)
-
-/** @endcond */
 
 /**
  * @brief Construct argument to pass to LEd functions line zb_led_blink_on()
@@ -139,7 +137,7 @@ void zb_button_on_cb(zb_uint8_t butt_no);
 /**
  * @brief Set state of given button to off and invoke button handler.
  *
- * Handler to invoke is chosen by botton and duration of button press.
+ * Handler to invoke is chosen by button and duration of button press.
  * See @ref zb_button_register_handler() for how to setup button handlers
  *
  * @param butt_no - number of button being released
@@ -160,25 +158,51 @@ void zb_button_off_cb(zb_uint8_t butt_no);
  */
 void zb_button_register_handler(zb_uint8_t butt_no, zb_uint8_t pressed_sec_pow2, zb_callback_t cb);
 
-/** @cond internals_doc */
-void zb_osif_led_button_init(void);
-/** @endcond */
 
-/**
- * @brief Set state of given LED to "On"
+/* Init leds and buttons
+ *
+ */
+void zb_osif_led_button_init(void);
+
+/* Set a LED on
+ * It must be initialized first.
+ *
+ * @param led_no - id of the LED in board (check platform specific headers to identify LED)
  */
 void zb_osif_led_on(zb_uint8_t led_no);
 
-/**
- * @brief Set state of given LED to "Off"
+/* Set a LED off
+ * It must be initialized first.
+ *
+ * @param led_no - id of the LED in board (check platform specific headers to identify LED)
  */
 void zb_osif_led_off(zb_uint8_t led_no);
 
-/** @cond internals_doc */
-zb_bool_t zb_setup_buttons_cb(zb_callback_t cb);
-void zb_osif_button_cb(zb_uint8_t arg);
+/* Invert a LED off
+ * It must be initialized first.
+ *
+ * @param led_no - id of the LED in board (check platform specific headers to identify LED)
+ */
+void zb_osif_led_toggle(zb_uint8_t led_no);
+
+
+/* Get the current button tate
+ * It must be initialized first.
+ *
+ * @param arg - id of the LED in board (check platform specific headers to identify LED)
+ *
+ * @return ZB_FALSE is button is pressed, ZB_TRUE if button is not being pressed
+ */
 zb_bool_t zb_osif_button_state(zb_uint8_t arg);
-/** @endcond */
+
+/* Inform osif layer that button callback is being set
+ * @return ZB_TRUE if leds and buttons are not initialized yet
+ *  with zb_osif_led_button_init(). In this case stack logic
+ *  should call it explicitly.
+ */
+zb_bool_t zb_setup_buttons_cb(zb_callback_t cb);
+
+void zb_osif_button_cb(zb_uint8_t arg);
 
 /* Button indexes utilized by applications
  * note: more can be used/defined depending on target HW
@@ -213,7 +237,6 @@ zb_bool_t zb_osif_button_state(zb_uint8_t arg);
 
 #endif
 
-/** @cond internals_doc */
 typedef struct zb_button_ctl_s
 {
   zb_bool_t is_on;
@@ -227,10 +250,10 @@ typedef struct zb_buttons_global_s
   zb_button_ctl_t buttons[ZB_N_BUTTONS];
 } zb_buttons_global_t;
 
-/** @endcond */
-
 /*! @} */
 
 /*! @} */
+
+/** @endcond */ /*DOXYGEN_LEDS_BUTTONS_SECTION */
 
 #endif /* ZB_LED_H */

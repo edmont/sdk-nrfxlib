@@ -86,7 +86,11 @@ typedef zb_uint8_t nwk_requested_timeout_status_t;
 
 #define NWK_ED_DEVICE_CONFIG_DEFAULT 0x00U /*At this time there are no enumerated bits in the configuration field. Devices adhering to this standard shall set the field to 0.*/
 
+#ifdef ZB_ENABLE_NWK_RETRANSMIT
+#define ZB_NWK_ED_TIMEOUT_RESP_FAILURE_TMO (7U * ZB_TIME_ONE_SECOND)
+#else
 #define ZB_NWK_ED_TIMEOUT_RESP_FAILURE_TMO (5U * ZB_TIME_ONE_SECOND)
+#endif
 
 /**
    End device timeout request command

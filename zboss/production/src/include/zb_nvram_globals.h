@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -123,9 +123,6 @@ typedef struct zb_nvram_globals_s
   /* positions of datasets; updated on each write operation; used for read operations */
   zb_nvram_ds_pos_t ds_pos[ZB_NVRAM_DATASET_NUMBER];
 #endif /* ZB_NVRAM_ENABLE_DIRECT_API */
-
-  /* Actually useful at Nordic only. Move it out of there? */
-  volatile zb_uint_t op_in_progress;
 
   /* Checker for nvram read/write calls */
   zb_nvram_pos_payload_checker_t gs_nvram_write_checker;

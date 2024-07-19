@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -76,12 +76,14 @@ typedef zb_bool_t (*zb_commissioning_is_in_tc_rejoin_func_t)(void);
 #define ZB_COMM_SIGNAL_AUTHENTICATE_REMOTE 18u
 #define ZB_COMM_SIGNAL_TCLK_VERIFIED_REMOTE 19u
 #define ZB_COMM_SIGNAL_DEVICE_LEFT 20u
+#define ZB_COMM_SIGNAL_INIT 21u
 
 
 typedef struct zb_formation_func_selector_s
 {
   zb_callback_t start_formation;
   zb_commissioning_formation_channels_mask_t get_formation_channels_mask;
+  zb_commissioning_get_scan_duration_func_t get_scan_duration;
 } zb_formation_func_selector_t;
 
 
@@ -128,6 +130,7 @@ typedef struct zb_commissioning_ctx_s
                                    * 2.5.5.5). This attribute has
                                    * default value of 5 */
 
+    zb_callback_t active_scan_complete_cb;
   } discovery_ctx;
 
 #ifdef ZB_FORMATION
@@ -135,6 +138,9 @@ typedef struct zb_commissioning_ctx_s
 #endif /* ZB_FORMATION */
 
   zb_commissioning_func_selector_t commissioning_selector;
+#ifdef ZB_COMMISSIONING_CLASSIC_SUPPORT
+  zb_uint8_t application_signal;
+#endif
 } zb_commissioning_ctx_t;
 
 #define COMM_CTX() ZG->commissioning_ctx
@@ -153,7 +159,7 @@ void zdo_authenticated_send_device_annce(zb_uint8_t param);
 void zdo_reset_scanlist(zb_bool_t do_free);
 void zdo_call_nlme_reset(zb_uint8_t param, zb_bool_t warm_start, zb_callback_t cb);
 void zdo_next_nwk_discovery_req(zb_uint8_t param);
-zb_bool_t zb_distributed_security_enabled(void);
+zb_bool_t zb_joining_to_distributed_network_enabled(void);
 #if !defined NCP_MODE_HOST && defined ZB_COORDINATOR_ROLE
 void zdo_commissioning_secure_rejoin_setup_lk_alarm(zb_uint8_t param);
 void zdo_commissioning_tclk_verified_remote(zb_address_ieee_ref_t param);
@@ -165,13 +171,16 @@ void zdo_commissioning_authenticate_remote(zb_bufid_t param);
 #endif /* ZB_FORMATION */
 void zdo_commissioning_leave_with_rejoin(zb_uint8_t param);
 
+#ifdef ZB_ROUTER_ROLE
+void zdo_commissioning_start_router_confirm(zb_uint8_t param);
+#endif
+
 #ifdef ZB_JOIN_CLIENT
 void zdo_commissioning_join_via_scanlist(zb_uint8_t param);
 void zdo_commissioning_nwk_discovery_failed(zb_uint8_t param);
 void zdo_commissioning_join_failed(zb_uint8_t param);
 void zdo_commissioning_authentication_failed(zb_uint8_t param);
 void zdo_commissioning_handle_dev_annce_sent_event(zb_uint8_t param);
-void zdo_commissioning_start_router_confirm(zb_uint8_t param);
 void zdo_commissioning_initiate_rejoin(zb_uint8_t param);
 zb_bool_t zdo_secur_waiting_for_tclk_update(void);
 void zdo_retry_joining(zb_uint8_t param);

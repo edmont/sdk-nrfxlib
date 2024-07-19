@@ -189,7 +189,7 @@ static zb_uint8_t* zb_zcl_put_attribute_value(zb_uint8_t *data_ptr, zb_zcl_attr_
 }
 
 
-/*! @internal @brief ZCL read attrubutes handler continue
+/*! @internal @brief ZCL read attributes handler continue
     @param param - index of the buffer with read attributes request
 */
 static void zb_zcl_read_attr_handler_continue(zb_uint8_t param)
@@ -209,6 +209,7 @@ static void zb_zcl_read_attr_handler_continue(zb_uint8_t param)
   zb_uint16_t global_cluster_revision_value;
   zb_uint16_t manuf_code;
   zb_zcl_status_t status;
+  zb_uint16_t trans_size_limit = 0U;
 
   TRACE_MSG(TRACE_ZCL1, ">>zb_zcl_read_attr_handler_continue param %hd", (FMT__H, param));
   TRACE_MSG(TRACE_ZCL1, "sizeof(zb_zcl_parsed_hdr_t) %ld", (FMT__L, sizeof(zb_zcl_parsed_hdr_t)));
@@ -223,150 +224,232 @@ static void zb_zcl_read_attr_handler_continue(zb_uint8_t param)
   /* Cluster existence was checked on command accept - it must be in the list */
   ZB_ASSERT(cluster_desc);
 
-  /* ZCL spec, 2.4.2 Read Attributes Response Command */
-  /* Read attribute response
-     | ZCL header 3 b | Read attr status rec 1 XX b | Read attr status rec 2 XX b | ...
-
-     Read attr status rec format
-     | attr id 2 b | status 1 b | Attr data type 0/1 b | attr value 0/XX b |
-  */
-
-  /* ZCL frame format */
-  /* frame control 1b | manufacturer code 0/2b | TSN 1b | cmd id 1b | payload XXb */
-
-  /* frame control */
-  /* frame type | manufacturer specific | direction | disable default resp */
-
-  /* Construct packet header */
-  /* Use runtime_buf buffer for composing and sending response, request buffer
-   * will be saved as runtime_buf */
-  resp_data = ZB_ZCL_START_PACKET(ZCL_CTX().runtime_buf);
-
-  ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_RESP_FRAME_CONTROL_A(
-    resp_data,
-    (cmd_info->cmd_direction == ZB_ZCL_FRAME_DIRECTION_TO_SRV ?
-     ZB_ZCL_FRAME_DIRECTION_TO_CLI :
-     ZB_ZCL_FRAME_DIRECTION_TO_SRV),
-    cmd_info->is_manuf_specific);
-
-  ZB_ZCL_CONSTRUCT_COMMAND_HEADER_EXT(
-    resp_data,
-    cmd_info->seq_number,
-    cmd_info->is_manuf_specific,
-    cmd_info->manuf_specific,
-    ZB_ZCL_CMD_READ_ATTRIB_RESP);
-
   read_attr_req = (zb_zcl_read_attr_req_t*)zb_buf_begin(param);
   attr_num = zb_buf_len(param) / sizeof(zb_zcl_read_attr_req_t);
   TRACE_MSG(TRACE_ZCL2, "read_attr_req %p, attr_num %d", (FMT__P_D, read_attr_req, attr_num));
 
-  for(i = 0; i < attr_num; i++)
-  {
-    status = ZB_ZCL_STATUS_SUCCESS;
-    manuf_code = (cmd_info->is_manuf_specific) ? cmd_info->manuf_specific : ZB_ZCL_NON_MANUFACTURER_SPECIFIC;
-    ZB_HTOLE16(&attr_id, &read_attr_req->attr_id[i]);
-    TRACE_MSG(TRACE_ZCL3, "attr_id %d", (FMT__D, attr_id));
-    attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, attr_id, manuf_code);
-    TRACE_MSG(TRACE_ZCL3, "attr_desc %p", (FMT__P, attr_desc));
+  /* Use runtime_buf buffer for composing and sending response, request buffer
+   * will be saved as runtime_buf */
+  resp_data = ZB_ZCL_START_PACKET(ZCL_CTX().runtime_buf);
 
-    bytes_avail = ZB_ZCL_GET_BYTES_AVAILABLE(ZCL_CTX().runtime_buf, resp_data,
-                                             cmd_info->profile_id, cmd_info->cluster_id);
-
-    TRACE_MSG(TRACE_ZCL3, "attr_desc %p, bytes_avail %d", (FMT__P_D, attr_desc, bytes_avail));
-
-    if (attr_desc == NULL)
-    {
-      if (attr_id == ZB_ZCL_ATTR_GLOBAL_CLUSTER_REVISION_ID)
-      {
-        TRACE_MSG(
-          TRACE_ZCL1,
-          "Global revision requested. Return ZB_ZCL_GLOBAL_CLUSTER_REVISION_DEFAULT",
-          (FMT__0));
-        global_cluster_revision_value = ZB_ZCL_GLOBAL_CLUSTER_REVISION_DEFAULT;
-        ZB_ZCL_PACKET_PUT_DATA16(resp_data, &attr_id);
-        ZB_ZCL_PACKET_PUT_DATA8(resp_data, ZB_ZCL_STATUS_SUCCESS);
-        ZB_ZCL_PACKET_PUT_DATA8(resp_data, ZB_ZCL_ATTR_TYPE_U16);
-        ZB_ZCL_PACKET_PUT_DATA16_VAL(resp_data, global_cluster_revision_value);
-      }
-      else
-      {
-        status = ZB_ZCL_STATUS_UNSUP_ATTRIB;
-        TRACE_MSG(TRACE_ZCL1, "attr is not found id %hd", (FMT__H, read_attr_req[i]));
-      }
-    }
-    else if (attr_desc->data_p == NULL || ZB_BIT_IS_SET(attr_desc->access, ZB_ZCL_ATTR_ACCESS_INTERNAL))
-    {
-      TRACE_MSG(TRACE_ZCL1, "error, internal attr isn't readable", (FMT__0));
-      status = ZB_ZCL_STATUS_UNSUP_ATTRIB;
-    }
-    else if (!ZB_BIT_IS_SET(attr_desc->access, ZB_ZCL_ATTR_ACCESS_READ_ONLY))
-    {
-      TRACE_MSG(TRACE_ZCL1, "error, attr access mask 0x%hx - isn't readable", (FMT__H, attr_desc->access));
-      status = ZB_BIT_IS_SET(attr_desc->access, ZB_ZCL_ATTR_ACCESS_WRITE_ONLY)
-        /* ZCL8: CCB 2477: use NOT_AUTHORIZED instead of Write-only status*/
-        ?((zb_zcl_get_backward_compatible_statuses_mode() == ZB_ZCL_STATUSES_ZCL8_MODE) ?
-                ZB_ZCL_STATUS_NOT_AUTHORIZED : ZB_ZCL_STATUS_WRITE_ONLY)
-        : ZB_ZCL_STATUS_FAIL;
-    }
-    else
-    {
-      TRACE_MSG(
-        TRACE_ZCL3,
-        "attribute: id 0x%x, type 0x%hx",
-        (FMT__D_H, attr_desc->id, attr_desc->type));
-      attr_size = zb_zcl_get_attribute_size(attr_desc->type, attr_desc->data_p);
-      TRACE_MSG(TRACE_ZCL3, "attr_size %hd", (FMT__H, attr_size));
-
-      /* Decrement read attr response by sizeof(zb_uint8_t), because attr value size is
-       * calculated separately by attr_size  */
-      if (bytes_avail >= (sizeof(zb_zcl_read_attr_res_t) - sizeof(zb_uint8_t) + attr_size))
-      {
-        ZB_ZCL_PACKET_PUT_DATA16_VAL(resp_data, attr_desc->id);
-        ZB_ZCL_PACKET_PUT_DATA8(resp_data, ZB_ZCL_STATUS_SUCCESS);
-        ZB_ZCL_PACKET_PUT_DATA8(resp_data, attr_desc->type);
-        resp_data = zb_zcl_put_attribute_value(resp_data, attr_desc, attr_desc->data_p, attr_size);
-      }
-      else
-      {
-        /* ZCL7 spec, 2.5.1.3:
-           If the status record  does  not  fit,  the  device  SHALL  set  the  status  field  of
-           the  corresponding  read  attribute  status  record  to INSUFFICIENT_SPACE and not
-           include the data type and value fields.
-        */
-        status = ZB_ZCL_STATUS_INSUFF_SPACE;
-        TRACE_MSG(TRACE_ZCL1, "ERROR, buffer is full (bytes_avail %d)", (FMT__D, bytes_avail));
-      }
-    }
-
-    if (status != ZB_ZCL_STATUS_SUCCESS)
-    {
-      if (bytes_avail >= (sizeof(zb_uint16_t) + sizeof(zb_uint8_t)))
-      {
-        ZB_ZCL_PACKET_PUT_DATA16_VAL(resp_data, attr_id);
-        ZB_ZCL_PACKET_PUT_DATA8(resp_data, status);
-      }
-      else
-      {
-        TRACE_MSG(TRACE_ZCL1, "ERROR, buffer is full; terminate", (FMT__0));
-        break;
-      }
-    }
+  /* Message is malformed, If it is empty or contains extra data */
+  if (attr_num == 0U
+  /*cstat !MISRAC2012-Rule-13.5 */
+  /* After some investigation, the following violation of Rule 13.5 seems to be
+   * a false positive. There are no side effects to 'zb_buf_len()'. This violation
+   * seems to be caused by the fact that 'zb_buf_len()' is an external function,
+   * which cannot be analyzed by C-STAT. */
+      || zb_buf_len(param) % sizeof(zb_zcl_read_attr_req_t) != (zb_size_t)0)
+  {/* ZCL spec Rev 7 p. 2.6.3. The command appears to contain the wrong fields, as
+    * detected either by the presence of one or more invalid
+    * field entries or by there being missing fields.
+    * Command not carried out. Implementer has discretion
+    * as to whether to return this error or
+    * INVALID_FIELD*/
+    TRACE_MSG(TRACE_ZCL3, "report status MALFORMED_CMD", (FMT__0));
+    ZB_ZCL_SEND_DEFAULT_RESP_DIRECTION( ZCL_CTX().runtime_buf,
+      ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
+      ZB_APS_ADDR_MODE_16_ENDP_PRESENT,
+      ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
+      ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
+      cmd_info->profile_id,
+      cmd_info->cluster_id,
+      cmd_info->seq_number,
+      cmd_info->cmd_id,
+      ZB_ZCL_STATUS_MALFORMED_CMD,
+      ZB_ZCL_REVERT_DIRECTION(cmd_info->cmd_direction));
   }
+  else
+  {
+    /* ZCL spec, 2.4.2 Read Attributes Response Command */
+    /* Read attribute response
+      | ZCL header 3 b | Read attr status rec 1 XX b | Read attr status rec 2 XX b | ...
 
-  ZB_ZCL_FINISH_N_SEND_PACKET_NEW(
-    ZCL_CTX().runtime_buf,
-    resp_data,
-    ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
-    ZB_APS_ADDR_MODE_16_ENDP_PRESENT,
-    ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
-    ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-    cmd_info->profile_id,
-    cmd_info->cluster_id,
-    NULL,
-    security, ZB_FALSE, 0);
+      Read attr status rec format
+      | attr id 2 b | status 1 b | Attr data type 0/1 b | attr value 0/XX b |
+    */
 
-  /* Use runtime buffer to send request, use received buffer with
-   * request data_buf as runtime buffer */
+    /* ZCL frame format */
+    /* frame control 1b | manufacturer code 0/2b | TSN 1b | cmd id 1b | payload XXb */
+
+    /* frame control */
+    /* frame type | manufacturer specific | direction | disable default resp */
+
+    /* Construct packet header */
+    ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_RESP_FRAME_CONTROL_A(
+      resp_data,
+      (cmd_info->cmd_direction == ZB_ZCL_FRAME_DIRECTION_TO_SRV ?
+      ZB_ZCL_FRAME_DIRECTION_TO_CLI :
+      ZB_ZCL_FRAME_DIRECTION_TO_SRV),
+      cmd_info->is_manuf_specific);
+
+    ZB_ZCL_CONSTRUCT_COMMAND_HEADER_EXT(
+      resp_data,
+      cmd_info->seq_number,
+      cmd_info->is_manuf_specific,
+      cmd_info->manuf_specific,
+      ZB_ZCL_CMD_READ_ATTRIB_RESP);
+
+    for(i = 0; i < attr_num; i++)
+    {
+      status = ZB_ZCL_STATUS_SUCCESS;
+      manuf_code = (cmd_info->is_manuf_specific) ? cmd_info->manuf_specific : ZB_ZCL_NON_MANUFACTURER_SPECIFIC;
+      ZB_HTOLE16(&attr_id, &read_attr_req->attr_id[i]);
+      TRACE_MSG(TRACE_ZCL3, "attr_id %d", (FMT__D, attr_id));
+      attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, attr_id, manuf_code);
+      TRACE_MSG(TRACE_ZCL3, "attr_desc %p", (FMT__P, attr_desc));
+
+      bytes_avail = ZB_ZCL_GET_BYTES_AVAILABLE(ZCL_CTX().runtime_buf, resp_data,
+                                              cmd_info->profile_id, cmd_info->cluster_id);
+
+      if (trans_size_limit == 0U)
+      {
+        trans_size_limit = ZB_ZCL_HI_WO_IEEE_MAX_PAYLOAD_SIZE;
+      }
+
+      TRACE_MSG(TRACE_ZCL3, "attr_desc %p, bytes_avail %d", (FMT__P_D, attr_desc, bytes_avail));
+
+      if (attr_desc == NULL)
+      {
+        if (attr_id == ZB_ZCL_ATTR_GLOBAL_CLUSTER_REVISION_ID
+            && manuf_code == ZB_ZCL_NON_MANUFACTURER_SPECIFIC)
+        {
+          TRACE_MSG(
+            TRACE_ZCL1,
+            "Global revision requested. Return ZB_ZCL_GLOBAL_CLUSTER_REVISION_DEFAULT",
+            (FMT__0));
+          global_cluster_revision_value = ZB_ZCL_GLOBAL_CLUSTER_REVISION_DEFAULT;
+          ZB_ZCL_PACKET_PUT_DATA16(resp_data, &attr_id);
+          ZB_ZCL_PACKET_PUT_DATA8(resp_data, ZB_ZCL_STATUS_SUCCESS);
+          ZB_ZCL_PACKET_PUT_DATA8(resp_data, ZB_ZCL_ATTR_TYPE_U16);
+          ZB_ZCL_PACKET_PUT_DATA16_VAL(resp_data, global_cluster_revision_value);
+        }
+        else
+        {
+          status = ZB_ZCL_STATUS_UNSUP_ATTRIB;
+          TRACE_MSG(TRACE_ZCL1, "attr is not found id %hd", (FMT__H, read_attr_req[i]));
+        }
+      }
+      else if (attr_desc->data_p == NULL || ZB_BIT_IS_SET(attr_desc->access, ZB_ZCL_ATTR_ACCESS_INTERNAL))
+      {
+        TRACE_MSG(TRACE_ZCL1, "error, internal attr isn't readable", (FMT__0));
+        status = ZB_ZCL_STATUS_UNSUP_ATTRIB;
+      }
+      else if (!ZB_BIT_IS_SET(attr_desc->access, ZB_ZCL_ATTR_ACCESS_READ_ONLY))
+      {
+        TRACE_MSG(TRACE_ZCL1, "error, attr access mask 0x%hx - isn't readable", (FMT__H, attr_desc->access));
+        status = ZB_BIT_IS_SET(attr_desc->access, ZB_ZCL_ATTR_ACCESS_WRITE_ONLY)
+          /* ZCL8: CCB 2477: use NOT_AUTHORIZED instead of Write-only status*/
+          ?((zb_zcl_get_backward_compatible_statuses_mode() == ZB_ZCL_STATUSES_ZCL8_MODE) ?
+                  ZB_ZCL_STATUS_NOT_AUTHORIZED : ZB_ZCL_STATUS_WRITE_ONLY)
+          : ZB_ZCL_STATUS_FAIL;
+      }
+      else
+      {
+        zb_bool_t buf_size_limit_reached = ZB_FALSE;
+        zb_bool_t trans_size_limit_reached = ZB_FALSE;
+
+        attr_size = zb_zcl_get_attribute_size(attr_desc->type, attr_desc->data_p);
+
+        TRACE_MSG(
+          TRACE_ZCL3,
+          "attribute: id 0x%x, type 0x%hx",
+          (FMT__D_H, attr_desc->id, attr_desc->type));
+        /* Decrement read attr response by sizeof(zb_uint8_t), because attr value size is
+        * calculated separately by attr_size  */
+
+        if (((ZB_ZCL_GET_BYTES_WRITTEN(ZCL_CTX().runtime_buf, resp_data)
+              + ZB_ZCL_ATTR_SZ_RAW(attr_size)) > trans_size_limit))
+        {
+          trans_size_limit_reached = ZB_TRUE;
+        }
+
+        if (bytes_avail < ZB_ZCL_ATTR_SZ_RAW(attr_size))
+        {
+          buf_size_limit_reached = ZB_TRUE;
+        }
+
+  #ifdef APS_FRAGMENTATION
+        if (zb_zcl_can_cluster_be_fragmented(cmd_info->profile_id,
+                                            cmd_info->cluster_id))
+        {
+          /* Checking that we can put attr in to the response buf: */
+          /* - by transport packet size limitations for destination device */
+          if (trans_size_limit_reached)
+          {
+            zb_uint16_t trans_size_limit_upd = zb_aps_get_max_trans_size(ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr);
+            if (trans_size_limit_upd > trans_size_limit) {
+              trans_size_limit = trans_size_limit_upd;
+              trans_size_limit_reached = ZB_FALSE;
+            }
+          }
+
+          /* - by free area of the current buffer */
+          if (buf_size_limit_reached && !trans_size_limit_reached)
+          {
+            zb_bufid_t buf = zb_buf_get(ZB_FALSE, (zb_buf_get_max_size(ZCL_CTX().runtime_buf) + 1U));
+            if (buf != 0U) {
+              zb_uint32_t resp_data_addr_offset = (zb_uint32_t)(resp_data - (zb_uint8_t*) zb_buf_begin(ZCL_CTX().runtime_buf));
+              zb_buf_copy(buf, ZCL_CTX().runtime_buf);
+              resp_data = ((zb_uint8_t*)zb_buf_begin(buf) + resp_data_addr_offset);
+
+              zb_buf_free(ZCL_CTX().runtime_buf);
+              ZCL_CTX().runtime_buf  = buf;
+              buf_size_limit_reached = ZB_FALSE;
+            }
+          }
+        }
+  #endif /* APS_FRAGMENTATION */
+
+        if (!trans_size_limit_reached && !buf_size_limit_reached)
+        {
+          ZB_ZCL_PACKET_PUT_DATA16_VAL(resp_data, attr_desc->id);
+          ZB_ZCL_PACKET_PUT_DATA8(resp_data, ZB_ZCL_STATUS_SUCCESS);
+          ZB_ZCL_PACKET_PUT_DATA8(resp_data, attr_desc->type);
+          resp_data = zb_zcl_put_attribute_value(resp_data, attr_desc, attr_desc->data_p, attr_size);
+        }
+        else
+        {
+          /* ZCL7 spec, 2.5.1.3:
+            If the status record  does  not  fit,  the  device  SHALL  set  the  status  field  of
+            the  corresponding  read  attribute  status  record  to INSUFFICIENT_SPACE and not
+            include the data type and value fields.
+          */
+          status = ZB_ZCL_STATUS_INSUFF_SPACE;
+          TRACE_MSG(TRACE_ZCL1, "ERROR, buffer is full (bytes_avail %d)", (FMT__D, bytes_avail));
+        }
+      }
+
+      if (status != ZB_ZCL_STATUS_SUCCESS)
+      {
+        if (bytes_avail >= (sizeof(zb_uint16_t) + sizeof(zb_uint8_t)))
+        {
+          ZB_ZCL_PACKET_PUT_DATA16_VAL(resp_data, attr_id);
+          ZB_ZCL_PACKET_PUT_DATA8(resp_data, status);
+        }
+        else
+        {
+          TRACE_MSG(TRACE_ZCL1, "ERROR, buffer is full; terminate", (FMT__0));
+          break;
+        }
+      }
+    } /* end of `for` cycle */
+
+    ZB_ZCL_FINISH_N_SEND_PACKET_NEW(
+      ZCL_CTX().runtime_buf,
+      resp_data,
+      ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
+      ZB_APS_ADDR_MODE_16_ENDP_PRESENT,
+      ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
+      ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
+      cmd_info->profile_id,
+      cmd_info->cluster_id,
+      NULL,
+      security, ZB_FALSE, 0);
+  } /*  end of `else` branch of `if (attr_num == 0)` */
+
+  /* We used runtime buffer to send response, now it will be freed by sender
+   * function. Keep the buffer with request instead of it */
   ZCL_CTX().runtime_buf = param;
 
   TRACE_MSG(TRACE_ZCL1, "<<zb_zcl_read_attr_handler_continue", (FMT__0));
@@ -391,7 +474,7 @@ static void zb_zcl_sync_stats(zb_uint8_t param)
 }
 #endif /* ZB_ZCL_SUPPORT_CLUSTER_DIAGNOSTICS */
 
-/*! @internal @brief ZCL read attrubutes handler
+/*! @internal @brief ZCL read attributes handler
     @param param - index of the buffer with read attributes request
 */
 void zb_zcl_read_attr_handler(zb_uint8_t param)
@@ -435,7 +518,7 @@ void zb_zcl_read_attr_handler(zb_uint8_t param)
   TRACE_MSG(TRACE_ZCL1, "<<zb_zcl_read_attr_handler", (FMT__0));
 }
 
-/*! @internal @brief ZCL read attrubutes response handler
+/*! @internal @brief ZCL read attributes response handler
     @param param - index of the buffer with read attributes response
 */
 static void zb_zcl_read_attr_resp_handler(zb_uint8_t param)
@@ -446,21 +529,17 @@ static void zb_zcl_read_attr_resp_handler(zb_uint8_t param)
    * Need to define better solution (not in the scope of diagnostic cluster, but in the future).
    * Add one more type of the cluster handler?
    */
-#ifdef ZB_CONTROL4_NETWORK_SUPPORT
   zb_zcl_parsed_hdr_t *cmd_info = ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t);
-
+#ifdef ZB_CONTROL4_NETWORK_SUPPORT
   if (cmd_info->profile_id == ZB_AF_CONTROL4_PROFILE_ID &&
       cmd_info->cluster_id == ZB_ZCL_CLUSTER_ID_CONTROL4_NETWORKING)
   {
     zb_zcl_control4_network_cluster_read_attr_resp_handler(param);
   }
-  else
 #endif /* ZB_CONTROL4_NETWORK_SUPPORT */
-  {
     /* TODO: implement default response handler with notifying
      * user about received attribute value via callback */
-    zb_buf_free(param);
-  }
+  (void)zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_SUCCESS);
 }
 
 /*
@@ -587,7 +666,7 @@ static void zcl_write_attr_post_process(
 }
 
 /*! @brief ZCL write attributes command handler
-    @param param - reference to buffer (see @ref zb_buf_t) with read attributes request
+    @param param - reference to buffer (see @ref zb_buf_t) with write attributes request
 */
 void zb_zcl_write_attr_handler(zb_uint8_t param)
 {
@@ -604,6 +683,7 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
   zb_uint32_t buf_len;
   zb_uint16_t manuf_code;
   zb_bool_t can_write_all_attrs = ZB_TRUE;
+  zb_bool_t should_send_response = ZB_TRUE;
 
   TRACE_MSG(
       TRACE_ZCL1,
@@ -670,7 +750,8 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
 
       if (attr_desc == NULL)
       {
-        if (write_attr_req->attr_id == ZB_ZCL_ATTR_GLOBAL_CLUSTER_REVISION_ID)
+        if (write_attr_req->attr_id == ZB_ZCL_ATTR_GLOBAL_CLUSTER_REVISION_ID
+            && manuf_code == ZB_ZCL_NON_MANUFACTURER_SPECIFIC)
         {
           TRACE_MSG(
             TRACE_ZCL1,
@@ -802,7 +883,7 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
         * as to whether to return this error or
         * INVALID_FIELD*/
         TRACE_MSG(TRACE_ZCL3, "report status MALFORMED_CMD", (FMT__0));
-        ZB_ZCL_SEND_DEFAULT_RESP_DIRECTION( ZCL_CTX().runtime_buf,
+        ZB_ZCL_SEND_DEFAULT_RESP_DIRECTION(ZCL_CTX().runtime_buf,
           ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
           ZB_APS_ADDR_MODE_16_ENDP_PRESENT,
           ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
@@ -813,11 +894,11 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
           cmd_info->cmd_id,
           ZB_ZCL_STATUS_MALFORMED_CMD,
           ZB_ZCL_REVERT_DIRECTION(cmd_info->cmd_direction));
-        param = 0;
+        should_send_response = ZB_FALSE;
       }
     }
 
-    if (param > 0U)
+    if (should_send_response)
     {
       ZB_ZCL_FINISH_N_SEND_PACKET_NEW(ZCL_CTX().runtime_buf, resp_data,
         ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
@@ -832,8 +913,8 @@ void zb_zcl_write_attr_handler(zb_uint8_t param)
         0U);
     }
 
-    /* Use runtime buffer to send request, use received buffer with
-     * request data_buf as runtime buffer */
+    /* We used runtime buffer to send response, now it will be freed by sender
+     * function. Keep the buffer with request instead of it */
     ZCL_CTX().runtime_buf = param;
 
     TRACE_MSG(TRACE_ZCL1, "<<zb_zcl_write_attr_handler", (FMT__0));
@@ -885,7 +966,7 @@ static zb_uint8_t check_config_rep_req(zb_zcl_configure_reporting_req_t *config_
       if (attr_desc->type == ZB_ZCL_ATTR_TYPE_OCTET_STRING || attr_desc->type == ZB_ZCL_ATTR_TYPE_ARRAY
         || attr_desc->type == ZB_ZCL_ATTR_TYPE_CUSTOM_32ARRAY)
       {
-        TRACE_MSG(TRACE_ZCL1, "inalid attr type", (FMT__0));
+        TRACE_MSG(TRACE_ZCL1, "invalid attr type", (FMT__0));
         status = ZB_ZCL_STATUS_UNSUP_ATTRIB;
       }
       else if (!(attr_desc->access & ZB_ZCL_ATTR_ACCESS_REPORTING))
@@ -1007,13 +1088,13 @@ void zb_zcl_read_report_config_cmd_handler(zb_uint8_t param)
        free_space =  ZB_ZCL_GET_BYTES_AVAILABLE(ZCL_CTX().runtime_buf,resp_data,
                                                 cmd_info->profile_id, cmd_info->cluster_id);
 
-       /*If there is no space for the smallest responce record*/
+       /*If there is no space for the smallest response record*/
        if(free_space<ZB_ZCL_READ_REPORTING_CFG_ERROR_SIZE)
        {
-         break;  /*Exit from do...while, finish ZCL buffer and send responce command */
+         break;  /*Exit from do...while, finish ZCL buffer and send response command */
        }
 
-       /*Get attribute descriptor to undestand, is it supported and
+       /*Get attribute descriptor to understand, is it supported and
         * reportable or not. Calculate status field*/
        attr_desc = zb_zcl_get_attr_desc_manuf(cluster_desc, read_rep_cfg_req.attr_id, manuf_code);
 
@@ -1055,7 +1136,7 @@ void zb_zcl_read_report_config_cmd_handler(zb_uint8_t param)
 
 
 
-       /*Create responce record depending on status and direction fields*/
+       /*Create response record depending on status and direction fields*/
        switch(status)
        {
          case ZB_ZCL_STATUS_SUCCESS:
@@ -1074,13 +1155,13 @@ void zb_zcl_read_report_config_cmd_handler(zb_uint8_t param)
                } */  /*    switch(read_rep_cfg_req.direction)  */
 
              if(free_space<required_space) /*If there is not enough
-                                          * space for responce
+                                          * space for response
                                           * record in ZCL buffer*/
            {
              read_rep_conf_exist = ZB_FALSE; /*Set condition for exit
                                               * from do...while cycle */
            } /*if(free_space<required_space)*/
-           else  /*If we have enough space for responce*/
+           else  /*If we have enough space for response*/
            {
            TRACE_MSG(TRACE_ZCL1, "setting SUCCESS status", (FMT__0));
              /*Add common entries*/
@@ -1088,7 +1169,7 @@ void zb_zcl_read_report_config_cmd_handler(zb_uint8_t param)
              ZB_ZCL_PACKET_PUT_DATA8(resp_data, read_rep_cfg_req.direction);   /*Add direction field*/
              ZB_ZCL_PACKET_PUT_DATA16_VAL(resp_data, read_rep_cfg_req.attr_id);   /*Add attr_id field*/
            TRACE_MSG(TRACE_ZCL1, "setting SUCCESS status end", (FMT__0));
-             /*Add entires that depends on direction*/
+             /*Add entries that depends on direction*/
              switch(read_rep_cfg_req.direction)
              {
                case ZB_ZCL_CONFIGURE_REPORTING_SEND_REPORT:
@@ -1178,8 +1259,8 @@ void zb_zcl_read_report_config_cmd_handler(zb_uint8_t param)
       cmd_info->cluster_id,
       NULL);
 
-  /* Use runtime buffer to send request, use received buffer with
-   * request data_buf as runtime buffer */
+  /* We used runtime buffer to send response, now it will be freed by sender
+   * function. Keep the buffer with request instead of it */
   ZCL_CTX().runtime_buf = param;
 
 
@@ -1322,8 +1403,8 @@ void zb_zcl_configure_reporting_handler(zb_uint8_t param)
       cmd_info->cluster_id,
       NULL);
 
-  /* Use runtime buffer to send request, use received buffer with
-   * request data_buf as runtime buffer */
+  /* We used runtime buffer to send response, now it will be freed by sender
+   * function. Keep the buffer with request instead of it */
   ZCL_CTX().runtime_buf = param;
 
   TRACE_MSG(TRACE_ZCL1, "<< zb_zcl_configure_reporting_handler", (FMT__0));
@@ -1450,7 +1531,7 @@ void zb_zcl_send_report_attr_command(zb_zcl_reporting_info_t *rep_info, zb_uint8
 
 #endif
 
-/*! @internal @brief ZCL discovery attrubutes handler
+/*! @internal @brief ZCL discovery attributes handler
     @param param - index of the buffer with discovery attributes request
 */
 static void zb_zcl_disc_attr_handler(zb_uint8_t param)
@@ -1484,7 +1565,7 @@ static void zb_zcl_disc_attr_handler(zb_uint8_t param)
   /* frame control */
   /* frame type | manufacturer specific | direction | disable default resp */
 
-  /* TODO: implement correct parsing to get request (check command size, convert endianess if needed) */
+  /* TODO: implement correct parsing to get request (check command size, convert endianness if needed) */
   /* We are using the same structure/parsing utility for discover
    * attr/discover attr extended because commands are completely identical */
   disc_attr_req = (zb_zcl_disc_attr_req_t*)zb_buf_begin(param);
@@ -1494,7 +1575,7 @@ static void zb_zcl_disc_attr_handler(zb_uint8_t param)
     (ZB_ZCL_HI_WO_IEEE_MAX_PAYLOAD_SIZE / sizeof(zb_zcl_disc_attr_ext_info_t)) :
     (ZB_ZCL_HI_WO_IEEE_MAX_PAYLOAD_SIZE / sizeof(zb_zcl_disc_attr_info_t));
 
-  // ZB_ZCL_DISC_ATTR_MAX - max possibly number attr for send
+  /* ZB_ZCL_DISC_ATTR_MAX - max possibly number attr for send */
   if (disc_attr_req->maximum > max_info_num)
   {
     ZB_ASSERT(max_info_num <= ZB_UINT8_MAX);
@@ -1525,7 +1606,7 @@ static void zb_zcl_disc_attr_handler(zb_uint8_t param)
   /* Cluster existence was checked on command accept - it must be in the list */
   ZB_ASSERT(cluster_desc);
 
-  // find start
+  /* find start */
   attr_desc = cluster_desc->attr_desc_list;
 
   complete = resp_data;
@@ -1596,7 +1677,7 @@ static void zb_zcl_disc_attr_handler(zb_uint8_t param)
       attr_desc++;
     }
 
-   // correct complete field
+   /* correct complete field */
   *complete = (j < cluster_desc->attr_count - 1U) ? ZB_ZCL_DISC_NON_COMPLETE : ZB_ZCL_DISC_COMPLETE;
   }
 
@@ -1609,8 +1690,8 @@ static void zb_zcl_disc_attr_handler(zb_uint8_t param)
       cmd_info->cluster_id,
       NULL);
 
-  /* Use runtime buffer to send request, use received buffer with
-   * request data_buf as runtime buffer */
+  /* We used runtime buffer to send response, now it will be freed by sender
+   * function. Keep the buffer with request instead of it */
   ZCL_CTX().runtime_buf = param;
 
   TRACE_MSG(TRACE_ZCL1, "<<zb_zcl_disc_attr_handler", (FMT__0));
@@ -1739,11 +1820,11 @@ zb_bool_t zb_zcl_handle_general_commands(zb_uint8_t param)
 #if defined (ZB_ZCL_SUPPORT_CLUSTER_TIME)
       if (!processed && (ZB_ZCL_CLUSTER_ID_TIME == cmd_info->cluster_id))
       {
-          processed = zb_zcl_time_server_read_attr_handle(param);
+        processed = zb_zcl_time_server_read_attr_handle(param);
       }
 #endif
       /*cstat !MISRAC2012-Rule-14.3_a */
-      /* The 'processed' variable is defined in the beggining of this function and never takes a
+      /* The 'processed' variable is defined in the beginning of this function and never takes a
        * value different than 'ZB_FALSE' due to several reasons:
        * Since 'ZB_ZDO_PERIODIC_CHECKIN_BLOCK_ZCL_CMD()' always returns 'ZB_FALSE', the 'if' statement
        *    above is never evaluated as true and the value of 'processed' never changes. A deviation
@@ -1767,7 +1848,7 @@ zb_bool_t zb_zcl_handle_general_commands(zb_uint8_t param)
     case ZB_ZCL_CMD_WRITE_ATTRIB_RESP:
       /* TODO: implement default response handler with notifying
        * user about received attribute value via callback */
-      zb_buf_free(param);
+      (void)zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_SUCCESS);
       processed = ZB_TRUE;
       break;
 
@@ -1788,7 +1869,7 @@ zb_bool_t zb_zcl_handle_general_commands(zb_uint8_t param)
 
     case ZB_ZCL_CMD_CONFIG_REPORT_RESP:
       TRACE_MSG(TRACE_ZCL2, "CMD_CONFIG_REPORT default handler", (FMT__0));
-      zb_buf_free(param);
+      zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_SUCCESS);
       processed = ZB_TRUE;
       break;
 
@@ -1888,7 +1969,7 @@ static zb_bool_t zb_zcl_handle_default_response_commands(zb_uint8_t param)
    * previous switch when at least one of the switch-clauses was disabled with '#if defined' guards.
    * Removed switch and a if-else structure is now used. */
 
-#if defined ZB_ZCL_ENABLE_DEFAULT_OTA_UPGRADE_PROCESSING
+#if defined ZB_ZCL_ENABLE_DEFAULT_OTA_UPGRADE_PROCESSING && defined ZB_HA_ENABLE_OTA_UPGRADE_SERVER
   if (cmd_info->cluster_id == ZB_ZCL_CLUSTER_ID_OTA_UPGRADE)
   {
     /* There was a call to
@@ -1899,7 +1980,8 @@ static zb_bool_t zb_zcl_handle_default_response_commands(zb_uint8_t param)
     processed = zb_zcl_handle_specific_commands(param);
   }
   else
-#endif /* defined ZB_ZCL_ENABLE_DEFAULT_OTA_UPGRADE_PROCESSING */
+#endif /* defined ZB_ZCL_ENABLE_DEFAULT_OTA_UPGRADE_PROCESSING && defined                          \
+          ZB_HA_ENABLE_OTA_UPGRADE_SERVER */
 #if defined ZB_ZCL_ENABLE_DEFAULT_TUNNEL_PROCESSING
       if (cmd_info->cluster_id == ZB_ZCL_CLUSTER_ID_TUNNEL)
   {
@@ -2027,7 +2109,7 @@ void zb_zcl_discover_commands_res(zb_uint8_t param, zb_bool_t recv_cmd_type)
       }
     }
 
-    // create response
+    /* create response */
     {
       zb_uint8_t cmd_for_receive = 0;
       zb_uint8_t i;

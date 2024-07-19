@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -115,6 +115,10 @@
 /** An attempt was made to use a MAC Interface with state that is currently set to FALSE (disabled)
  * or that is unknown to the stack. */
 #define ZB_NWK_STATUS_INVALID_INTERFACE      0xD5U
+/** A request was interrupted by a higher layer. */
+#define ZB_NWK_STATUS_INTERRUPTED            0xD6U
+/** An error occurred during executing a request. */
+#define ZB_NWK_STATUS_ERROR                  0xD7U
 /** @} */
 
 /**
@@ -133,7 +137,6 @@ typedef enum zb_nwk_multicast_mode_e
 }
 zb_nwk_multicast_mode_t;
 
-#ifdef ZB_APSDE_REQ_ROUTING_FEATURES
 /**
  * @name NLDE non-spec extension values
  * @anchor nlde_tx_opt
@@ -146,9 +149,11 @@ zb_nwk_multicast_mode_t;
 #define ZB_NLDE_OPT_FORCE_MESH_ROUTE_DISC (1U << 0)
 /** Non-spec extension: Force send route record */
 #define ZB_NLDE_OPT_FORCE_SEND_ROUTE_REC (1U << 1)
-/** Non-spec extension: Force send route record. Auxillary bitfield for marking route as many-to-one
+/** Non-spec extension: Force send route record. Auxiliary bitfield for marking route as many-to-one
  * for force rrec sending */
 #define ZB_NLDE_OPT_TEMPORARY_MARK_ROUTE_AS_MTO (1U << 2)
+#define ZB_NLDE_OPT_NO_LONG_SRC                 (1U << 3)
+#define ZB_NLDE_OPT_NO_LONG_DST                 (1U << 4)
 /** @} */
 
 /**
@@ -159,7 +164,6 @@ zb_nwk_multicast_mode_t;
  * removed in future releases.
  */
 typedef zb_uint8_t zb_nlde_tx_opt_e;
-#endif
 
 /** @brief 'frame security failed' status mentioned in ZB spec, subclause 4.3.1.2.
   *
@@ -235,12 +239,10 @@ typedef struct zb_nlde_data_req_s
 			      */
 #endif /*ZB_USEALIAS*/
   /* 14/06/2016 CR [AEV] end */
-#ifdef ZB_APSDE_REQ_ROUTING_FEATURES
   zb_uint8_t extension_flags; /** The field for extension flags storing:
                                *  - force mesh route discovery
                                *  - force send route record
                                */
-#endif
 } zb_nlde_data_req_t;
 
 /** @brief NLDE-DATA.request primitive.
@@ -380,6 +382,7 @@ typedef struct zb_nlme_network_discovery_request_s
                                                                * within those pages that the discovery shall
                                                                * be performed upon. */
   zb_uint8_t        scan_duration;                            /**< Time to spend scanning each channel */
+  zb_callback_t     cb;                                       /* used by zb_zdo_active_scan_request */
 }
 zb_nlme_network_discovery_request_t;
 
@@ -700,7 +703,7 @@ void zb_nlme_beacon_survey_scan_confirm(zb_uint8_t param);
  * @anchor nlme_rejoin_method
  */
 /** @{ */
-#define ZB_NLME_REJOIN_METHOD_ASSOCIATION    0x00U /**< Throught association */
+#define ZB_NLME_REJOIN_METHOD_ASSOCIATION    0x00U /**< Through association */
 #define ZB_NLME_REJOIN_METHOD_DIRECT         0x01U /**< Join directly or rejoining using the orphaning */
 #define ZB_NLME_REJOIN_METHOD_REJOIN         0x02U /**< Using NWK rejoin procedure */
 #define ZB_NLME_REJOIN_METHOD_CHANGE_CHANNEL 0x03U /**< Changing the network channel  */
@@ -811,18 +814,6 @@ typedef ZB_PACKED_PRE struct zb_nlme_direct_join_request_s
 } ZB_PACKED_STRUCT
 zb_nlme_direct_join_request_t;
 
-#if defined ZB_ENABLE_ZLL && defined ZB_ROUTER_ROLE
-/**
-   NLME-DIRECT-JOIN.request primitive
-
-   Directly Join another device to the network
-
-   @param param - buffer containing parameters - @see
-   zb_nlme_direct_join_request_t
-   @return RET_OK on success, error code otherwise.
- */
-void zb_nlme_direct_join_request(zb_uint8_t param);
-#endif /* ZB_ENABLE_ZLL && ZB_ROUTER_ROLE */
 
 /**
    Arguments of the NLME-DIRECT-JOIN.confirm routine.
@@ -834,18 +825,6 @@ typedef ZB_PACKED_PRE struct zb_nlme_direct_join_confirm_s
 } ZB_PACKED_STRUCT
 zb_nlme_direct_join_confirm_t;
 
-#if defined ZB_ENABLE_ZLL && defined ZB_ROUTER_ROLE
-/**
-   NLME-DIRECT-JOIN.confirm primitive
-
-   Report the results of the direct join request.
-
-   @param param - buffer containing results - @see
-   zb_nlme_direct_join_confirm_t
-   @return RET_OK on success, error code otherwise.
- */
-void zb_nlme_direct_join_confirm(zb_uint8_t param);
-#endif /* ZB_ENABLE_ZLL && ZB_ROUTER_ROLE */
 
 /**
    Arguments of the NLME-LEAVE.request routine.
@@ -854,8 +833,6 @@ typedef ZB_PACKED_PRE struct zb_nlme_leave_request_s
 {
   zb_ieee_addr_t device_address; /**< 64-bit IEEE address of the device to
                                   * remove, zero fill if device itself */
-  zb_uint8_t remove_children; /**< If true - remove child devices from the
-                                    * network */
   zb_uint8_t rejoin; /**< If true - Join after leave */
 } ZB_PACKED_STRUCT
 zb_nlme_leave_request_t;
@@ -869,7 +846,6 @@ zb_nlme_leave_request_t;
    zb_nlme_leave_request_t
    @return RET_OK on success, error code otherwise.
 
-   @snippet tp_pro_bv-67_zc.c zb_nlme_leave_request
  */
 void zb_nlme_leave_request(zb_uint8_t param);
 
@@ -986,7 +962,7 @@ void zb_nlme_reset_confirm(zb_uint8_t param);
 */
 typedef ZB_PACKED_PRE struct zb_nlme_sync_request_s
 {
-  zb_uint8_t track; /**< Whether ot not the sync should be maintained for
+  zb_uint8_t track; /**< Whether to not the sync should be maintained for
                      * future beacons */
   zb_time_t  poll_rate; /*!< MAC poll rate */
 } ZB_PACKED_STRUCT
@@ -1066,7 +1042,6 @@ zb_nlme_route_discovery_request_t;
    zb_nlme_route_discovery_request_t
    @return RET_OK on success, error code otherwise.
 
-   @snippet tp_pro_bv_08_zc.c zb_nlme_route_discovery_request
  */
 void zb_nlme_route_discovery_request(zb_uint8_t param);
 
@@ -1149,8 +1124,8 @@ void zb_nlme_send_status(zb_uint8_t param);
   (*((a) + sizeof(zb_uint16_t)) = ((*((a) + sizeof(zb_uint16_t)) & 0x70U) >> 4U) & 0x07U)
 #define ZB_GET_INCOMING_COST(a)                                                    \
   (*((a) + sizeof(zb_uint16_t)) & 0x7U)
-#define ZB_LS_SET_INCOMING_COST(a, b) ( *(a) = (*(a) & 0xF8U) | ( (b) & 0x07U) )
-#define ZB_LS_SET_OUTGOING_COST(a, b) ( *(a) = (*(a) & 0x0FU) | ( (b) << 4U) )
+#define ZB_LS_SET_INCOMING_COST(a, b) ( *(a) = (*(a) & 0x70U) | ( (b) & 0x07U) )
+#define ZB_LS_SET_OUTGOING_COST(a, b) ( *(a) = (*(a) & 0x07U) | ( ((b) & 0x07U) << 4U) )
 
 #define ZB_NWK_LS_GET_COUNT(a) ((a) & ZB_NWK_LS_COUNT_MASK)
 #define ZB_NWK_LS_SET_COUNT(_a, _b) ((*(_a)) |= ((*(_a)) & (~ZB_NWK_LS_COUNT_MASK)) | (_b))
@@ -1595,8 +1570,6 @@ ZB_LETOH16(addr, &((zb_nwk_hdr_t *)nwk_hdr)->dst_addr)
 */
 
 /* Route request command options field */
-#ifdef ZB_PRO_STACK
-#endif
 
 /**
    Route request structure
@@ -1765,7 +1738,6 @@ typedef ZB_PACKED_PRE struct zb_nwk_update_cmd_s
   zb_uint16_t new_panid;        /**< 16-bit new Network ID*/
 } ZB_PACKED_STRUCT zb_nwk_update_cmd_t;
 
-#ifdef ZB_PRO_STACK
 
 typedef ZB_PACKED_PRE struct zb_nwk_cmd_rrec_s
 {
@@ -1832,7 +1804,6 @@ zb_time_t zb_nwk_get_default_keepalive_timeout(void);
 /*Return ZB_TRUE if nearest aging timeout expired*/
 zb_bool_t zb_nwk_check_aging(void);
 
-#if !(defined ZB_MACSPLIT_DEVICE)
 /**
 Send End device timeout request command
  */
@@ -1848,7 +1819,6 @@ Send End device timeout response handler
  */
 
 void nwk_timeout_resp_handler(zb_bufid_t buf, zb_nwk_hdr_t *nwk_hdr, zb_nwk_ed_timeout_response_t *cmd_ed_time_resp);
-#endif
 
 /**
    3.4.13 Link Power Delta command
@@ -1901,7 +1871,6 @@ zb_ret_t zb_nwk_is_conflict_addr(zb_uint16_t addr, zb_ieee_addr_t ieee_addr);
  */
 zb_ret_t zb_nwk_test_dev_annce(zb_uint16_t addr, zb_ieee_addr_t ieee_addr);
 
-#endif  /* pro stack */
 
 /**
   Set NWK PIB attribute
@@ -2174,12 +2143,14 @@ zb_ret_t zb_nwk_get_neighbor_element(zb_uint16_t addr, zb_bool_t create_if_absen
 zb_ret_t zb_nwk_set_neighbor_element(zb_uint16_t addr, zb_nwk_neighbor_element_t *update);
 
 zb_ret_t zb_nwk_delete_neighbor_by_short(zb_uint16_t addr);
-zb_ret_t zb_nwk_delete_neighbor_by_ieee(zb_ieee_addr_t addr);
 
 void zb_nwk_send_direct_leave_req(zb_uint8_t param, zb_uint16_t dst_addr);
 
 zb_bool_t nwk_is_lq_bad_for_direct(zb_int8_t rssi, zb_uint8_t lqi);
 void nwk_maybe_force_send_via_routing(zb_uint16_t addr);
+void nwk_set_send_via_routing(zb_neighbor_tbl_ent_t *nbt, zb_bool_t set);
+void nwk_reset_send_via_routing_aging(zb_neighbor_tbl_ent_t *nbt);
+zb_bool_t nwk_can_send_via_nbt(zb_neighbor_tbl_ent_t *nbt);
 
 void nwk_internal_lock_in(void);
 void nwk_internal_unlock_in(void);
@@ -2205,16 +2176,9 @@ void nwk_set_tc_connectivity(zb_uint8_t val);
 zb_bool_t nwk_get_tc_connectivity(void);
 #endif /* ZB_PARENT_CLASSIFICATION && ZB_ROUTER_ROLE */
 
-#ifndef ZB_MAC_INTERFACE_SINGLE
-
-zb_uint32_t zb_nwk_get_octet_duration_us(void);
-#define ZB_NWK_OCTET_DURATION_US (zb_nwk_get_octet_duration_us())
-
-#else
 
 #define ZB_NWK_OCTET_DURATION_US (zb_uint32_t)(ZB_2_4_GHZ_OCTET_DURATION_USEC)
 
-#endif
 
 /* 01/15/2019 EE CR:MINOR For 2.4-only mode this solution is ok from
  * the code size point of view: you pass your octets up to the top and
@@ -2234,8 +2198,26 @@ void zb_disable_control4_emulator();
 void zb_enable_control4_emulator();
 #endif /* ZB_CONTROL4_NETWORK_SUPPORT */
 
-#ifndef ZB_MACSPLIT_DEVICE
 zb_ext_neighbor_tbl_ent_t *nwk_choose_parent(zb_address_pan_id_ref_t panid_ref, zb_mac_capability_info_t capability_information);
-#endif /* ZB_MACSPLIT_DEVICE */
+
+void nwk_inc_child_num(zb_bool_t is_router);
+
+void nwk_clear_child_num(void);
+
+void nwk_dec_child_num(zb_bool_t is_router);
+
+zb_bool_t nwk_have_space_for_children(void);
+
+zb_bool_t nwk_have_ed_children(void);
+
+void zb_nwk_advise_to_run_mtorr(zb_bool_t hi_pri);
+
+void zb_nwk_advise_to_delay_mtorr(void);
+
+void zb_nwk_mtor_got_rejoin(void);
+
+void nwk_maybe_add_route_by_pkt(zb_uint16_t nwk_src, zb_uint16_t mac_src);
+
+void zb_nwk_mesh_send_pending_data(zb_uint16_t dest_addr);
 
 #endif /* ZB_NWK_H */

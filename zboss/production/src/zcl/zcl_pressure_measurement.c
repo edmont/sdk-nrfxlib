@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -146,6 +146,7 @@ void zb_zcl_pressure_measurement_write_attr_hook_server(
   ZVUNUSED(new_value);
   ZVUNUSED(endpoint);
   ZVUNUSED(manuf_code);
+  ZVUNUSED(attr_id);
 
   TRACE_MSG(TRACE_ZCL1, ">> zb_zcl_pressure_measurement_write_attr_hook endpoint %hd, attr_id 0x%x, manuf_code 0x%x",
             (FMT__H_D_D, endpoint, attr_id, manuf_code));

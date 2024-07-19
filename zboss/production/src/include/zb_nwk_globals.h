@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -95,10 +95,13 @@ zb_uint_t zb_calc_non_zero_bits_in_bit_vector(zb_uint8_t *vector, zb_uint_t size
 #define ZB_NLME_STATE_PIB_LOAD8                 20U
 #define ZB_NLME_STATE_PIB_LOAD9                 21U
 #define ZB_NLME_STATE_PIB_LOAD10                22U
-#define ZB_NLME_STATE_PIB_LOAD_SRC_MATCH_TBL    23U
+#define ZB_NLME_STATE_PIB_LOAD11                23U
+#define ZB_NLME_STATE_PIB_LOAD_SRC_MATCH_TBL    24U
+#define ZB_NLME_STATE_PIB_LOAD_BEACON_JITTER    25U
+
 
 /*!< State to execute the 'Survey Beacon' procedure */
-#define ZB_NLME_STATE_SURVEY_BEACON             24U
+#define ZB_NLME_STATE_SURVEY_BEACON             25U
 /** @} */
 
 /* Broadcast transaction record */
@@ -126,7 +129,7 @@ zb_nwk_btr_t;
 #define ZB_NWK_BRCST_PASSIVE_ACK_ARRAY_SIZE ((ZB_NEIGHBOR_TABLE_SIZE + 7U) / 8U)
 
 /**
-   Broadcast retransmition info
+   Broadcast retransmission info
    Important! This struct must ZB_PACKED_STRUCT for ZB_NEED_ALIGN
  */
 typedef ZB_PACKED_PRE struct zb_nwk_broadcast_retransmit_s
@@ -175,12 +178,6 @@ typedef struct zb_in_mgmt_leave_pending_list_s /* do not pack for IAR */
 } ZB_PACKED_STRUCT zb_in_mgmt_leave_pending_list_t;
 
 
-typedef struct zb_leave_ind_notify_s
-{
-  zb_address_ieee_ref_t addr_ref;       /*!< Address of device for leave */
-  zb_uint8_t rejoin;                    /*!< Is rejoin after leave */
-} zb_leave_ind_notify_t;
-
 /**
   leave context
 */
@@ -188,12 +185,9 @@ typedef struct zb_leave_context_s
 {
   /*!< * Pending incoming mgmt leave req, or self mgmt leave req */
   zb_in_mgmt_leave_pending_list_t pending_list[ZB_ZDO_PENDING_LEAVE_SIZE];
-  zb_leave_ind_notify_t leave_ind_prnt;                             /*!< */
-  zb_leave_ind_notify_t leave_ind_zed;                              /*!< */
   zb_uint8_t pending_list_bm;                                       /*!< */
   zb_bitfield_t rejoin_after_leave:1;                               /*!< */
-  zb_bitfield_t remove_children:1;                                  /*!< */
-  zb_bitfield_t reserved:6;
+  zb_bitfield_t reserved:7;
 } zb_leave_context_t;
 
 #define ZB_SET_LEAVE_PENDING(i) ZG->nwk.leave_context.pending_list_bm |= (1U<<(i))
@@ -276,14 +270,12 @@ typedef struct zb_nwk_handle_s  /* do not pac for IAR */
 
   zb_uint16_t status_addr; /* Used to report NWK status indication */
 
-#ifdef ZB_PRO_STACK
   zb_uint8_t               send_link_status_index;  /*!< Current Index of short_sorted address table  */
-#endif /* ZB_PRO_STACK */
 
 #if defined ZB_MAC_POWER_CONTROL
   zb_uint8_t send_power_delta_index; /* Current index of short_sorted address
                                       * table for NWK Power Delta command (notification */
-  zb_uint16_t lpd_resp_addr;         /* Address of recepient, LPD frame
+  zb_uint16_t lpd_resp_addr;         /* Address of recipient, LPD frame
                                       * response to be sent to */
   zb_ieee_addr_t lpd_leave_ieee; /* IEEE to delete from MAC power table */
 #endif
@@ -300,7 +292,7 @@ typedef struct zb_nwk_handle_s  /* do not pac for IAR */
 
 #ifdef ZB_ROUTER_ROLE
   zb_nwk_broadcast_retransmit_t brrt[ZB_NWK_BRR_TABLE_SIZE]; /* Broadcast
-                                                              * retransmition
+                                                              * retransmission
                                                               table */
   zb_uint8_t brrt_cnt;
   zb_uint8_t brrt_in_progress;                               /* Broadcast retransmission is in progress */
@@ -483,6 +475,7 @@ typedef struct zb_nwk_globals_s
   zb_bitfield_t reserved:4;
 #endif  /* ZB_CHECK_OOM_STATUS */
   zb_bitbool_t panid_conflict_auto_resolution:1;   /* CCB2713 */
+  zb_bitbool_t is_not_first_formation:1;           /* to reset a PAN ID before formation */
 #ifdef ZB_NWK_BLACKLIST
   zb_nwk_blacklist_t blacklist;
 #endif
@@ -501,11 +494,9 @@ typedef struct zb_nwk_globals_s
     zb_callback_t nwk_cancel_nwk_form_resp;
   } selector;
 
-#ifndef ZB_MAC_INTERFACE_SINGLE
-    zb_uindex_t        mac_interfaces_count;
-    zb_mac_interface_t mac_interfaces[ZB_NWK_MAC_IFACE_TBL_SIZE];
-#endif /* ZB_MAC_INTERFACE_SINGLE */
 
+  zb_bitbool_t is_nwk_started:1;        /*!< nwk started flag           */
+  zb_bitbool_t pta_state_at_start:1;    /*!< set pta state at nwk start */
 } zb_nwk_globals_t;
 
 
@@ -565,9 +556,6 @@ void zb_nwk_sync_pibcache_with_mac(zb_uint8_t param, zb_callback_t cb);
 #define zb_nwk_sync_pibcache_with_mac(param, cb)
 #endif
 
-#ifdef ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-void nbt_inc_in_pkt_count(zb_neighbor_tbl_ent_t *ent);
-#endif /* ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ */
 
 #if defined ZB_MAC_POWER_CONTROL
 /* Routine to be called by child (ZED/ZR) */

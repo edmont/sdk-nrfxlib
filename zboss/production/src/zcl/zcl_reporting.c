@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -596,7 +596,7 @@ static void start_wait_reporting_timer(zb_zcl_reporting_info_t *rep_info)
   if (rep_info->u.recv_info.timeout != ZB_ZCL_TIMEOUT_ZERO)
   {
     ZB_SCHEDULE_ALARM(zb_zcl_wait_reporting_timeout, zb_zcl_reporting_slot_number(rep_info),
-                      rep_info->u.recv_info.timeout * ZB_TIME_ONE_SECOND);
+                      ZB_SECONDS_TO_BEACON_INTERVAL(rep_info->u.recv_info.timeout));
   }
 }
 
@@ -647,7 +647,7 @@ void zb_zcl_update_reporting_info(zb_zcl_reporting_info_t *rep_info)
 
     t = ZB_TIMER_GET();
     ZB_ZCL_SET_REPORTING_FLAG(rep_info, ZB_ZCL_REPORT_TIMER_STARTED);
-    rep_info->run_time = ZB_TIME_ADD(t, delay_time*ZB_TIME_ONE_SECOND);
+    rep_info->run_time = ZB_TIME_ADD(t, ZB_SECONDS_TO_BEACON_INTERVAL(delay_time));
     TRACE_MSG(TRACE_ZCL1, "rep_info->run_time %ld", (FMT__L, rep_info->run_time));
   }
 
@@ -765,7 +765,7 @@ void zb_zcl_reporting_timer_handler(zb_uint8_t param)
                 zb_uint16_t delay_time;
 
                 delay_time = rep_info->u.send_info.max_interval - rep_info->u.send_info.min_interval;
-                rep_info->run_time = ZB_TIME_ADD(t, delay_time*ZB_TIME_ONE_SECOND);
+                rep_info->run_time = ZB_TIME_ADD(t, ZB_SECONDS_TO_BEACON_INTERVAL(delay_time));
                 TRACE_MSG(TRACE_ZCL1, "Schedule max_interval timer, delay %d seconds, run_time %ld",
                           (FMT__D_L, delay_time, rep_info->run_time));
               }
@@ -1089,7 +1089,7 @@ void zb_zcl_wait_reporting_timeout(zb_uint8_t param)
   {
     TRACE_MSG(TRACE_ZCL3, "start wait reporting again", (FMT__0));
     ZB_SCHEDULE_ALARM(zb_zcl_wait_reporting_timeout, param,
-                      rep_info->u.recv_info.timeout * ZB_TIME_ONE_SECOND);
+                      ZB_SECONDS_TO_BEACON_INTERVAL(rep_info->u.recv_info.timeout));
   }
 }
 
@@ -1288,7 +1288,7 @@ static zb_bool_t check_delta_value(zb_zcl_reporting_info_t *rep_info)
           {
             zb_uint8_t delta;
 
-            delta = ZB_ABS((zb_int16_t)*(zb_uint8_t*)(attr_desc->data_p) - rep_info->u.send_info.reported_value.u8);
+            delta = ZB_ABS(*(zb_uint8_t*)(attr_desc->data_p) - rep_info->u.send_info.reported_value.u8);
 
             TRACE_MSG(TRACE_ZCL3, "U8 delta %hd, min delta %hd", (FMT__H_H, delta, rep_info->u.send_info.delta.u8));
             ret = (delta >= rep_info->u.send_info.delta.u8)?(RET_OK ):(RET_IGNORE );
@@ -1545,7 +1545,7 @@ zb_ret_t zb_zcl_start_attr_reporting_manuf(zb_uint8_t ep, zb_uint16_t cluster_id
 
 /** Reporting command send callback
 
-   Reports are sent 1-by-1, zb_zcl_reporting_cb() is called when previouse report is sent
+   Reports are sent 1-by-1, zb_zcl_reporting_cb() is called when previous report is sent
  */
 void zb_zcl_reporting_cb(zb_uint8_t param)
 {

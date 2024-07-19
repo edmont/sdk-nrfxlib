@@ -53,6 +53,7 @@
 #include "zdo_wwah_parent_classification.h"
 #include "zb_bdb_internal.h"
 #include "zdo_hubs.h"
+#include "zb_error_indication.h"
 
 /* #include "zb_mac_globals.h" */
 /* #include "mac_internal.h" */
@@ -228,7 +229,8 @@ zb_ret_t check_value_wwah(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_uint8_t *
  */
 void zb_zcl_wwah_invoke_user_app(zb_uint8_t param, zb_uint16_t endpoint16)
 {
-
+  /* Unused without trace. */
+  ZVUNUSED(endpoint16);
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_invoke_user_app %hx endpoint %d",
       (FMT__H_D, param, endpoint16));
   zb_buf_free(param);
@@ -869,7 +871,7 @@ zb_ret_t zb_zcl_wwah_update_time(zb_uint8_t param)
 zb_ret_t zb_zcl_wwah_request_time_handler(zb_uint8_t param)
 {
   zb_ret_t ret;
-
+  ZVUNUSED(param);
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_request_time_handler %hd", (FMT__H, param));
 
   ret = zb_zcl_wwah_update_time(0);
@@ -920,6 +922,8 @@ zb_ret_t zb_zcl_wwah_disable_wwah_rejoin_algorithm_handler(zb_uint8_t param)
 {
   zb_ret_t ret = RET_OK;
   zb_bool_t enable_bool = ZB_FALSE;
+
+  ZVUNUSED(param);
 
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_disable_wwah_rejoin_algorithm_handler %hd", (FMT__H, param));
 
@@ -994,7 +998,7 @@ zb_ret_t zb_zcl_wwah_get_rejoin_tmo(zb_uint16_t attempt, zb_time_t *tmo)
           backoff_attempt %= WWAH_CTX().rejoin_alg.max_backoff_iterations;
         }
 
-        *tmo = (WWAH_CTX().rejoin_alg.fast_rejoin_first_backoff_in_seconds * (1l << backoff_attempt));
+        *tmo = (zb_time_t)(WWAH_CTX().rejoin_alg.fast_rejoin_first_backoff_in_seconds * (1l << backoff_attempt));
         if (*tmo > WWAH_CTX().rejoin_alg.rejoin_max_backoff_time_in_seconds)
         {
           *tmo = WWAH_CTX().rejoin_alg.rejoin_max_backoff_time_in_seconds;
@@ -1362,7 +1366,7 @@ zb_ret_t zb_zcl_wwah_survey_beacons_handler(zb_uint8_t param)
       ZB_BUF_GET_PARAM(param, zb_zdo_beacon_survey_configuration_t);
 
     conf->params.channel_page = zb_get_current_page();
-    conf->params.channel_mask = (1l << zb_get_current_channel());
+    conf->params.channel_mask = (zb_uint32_t)(1l << zb_get_current_channel());
     conf->params.scan_type = (zb_uint8_t)(((zb_uint8_t)need_standard_beacons) ? ACTIVE_SCAN : ENHANCED_ACTIVE_SCAN);
 
     ret = zdo_wwah_start_survey_beacons(param);
@@ -1605,9 +1609,16 @@ zb_ret_t zb_zcl_wwah_enable_tc_security_on_nwk_key_rotation_handler(zb_uint8_t p
 
 /* ----------------------- BAD PARENT RECOVERY ----------------------- */
 
-void zb_zcl_wwah_bad_parent_recovery_tmo(zb_zcl_wwah_bad_parent_recovery_signal_t sig);
+/**
+ * @param sig variable of type @ref zb_zcl_wwah_bad_parent_recovery_signal_t
+ */
+void zb_zcl_wwah_bad_parent_recovery_tmo(zb_bufid_t sig);
 
-void zb_zcl_wwah_restart_bad_parent_recovery(zb_zcl_wwah_bad_parent_recovery_signal_t sig)
+
+/**
+ * @param sig variable of type @ref zb_zcl_wwah_bad_parent_recovery_signal_t
+ */
+void zb_zcl_wwah_restart_bad_parent_recovery(zb_bufid_t sig)
 {
   TRACE_MSG(TRACE_ZCL1, ">> zb_zcl_wwah_restart_bad_parent_recovery: sig %hd", (FMT__H, sig));
 
@@ -1619,15 +1630,15 @@ void zb_zcl_wwah_restart_bad_parent_recovery(zb_zcl_wwah_bad_parent_recovery_sig
     }
     else
     {
-      ZB_SCHEDULE_ALARM_CANCEL((zb_callback_t)zb_zcl_wwah_bad_parent_recovery_tmo, sig);
-      ZB_SCHEDULE_ALARM((zb_callback_t)zb_zcl_wwah_bad_parent_recovery_tmo, sig, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_TIMEOUT);
+      ZB_SCHEDULE_ALARM_CANCEL(zb_zcl_wwah_bad_parent_recovery_tmo, sig);
+      ZB_SCHEDULE_ALARM(zb_zcl_wwah_bad_parent_recovery_tmo, sig, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_TIMEOUT);
     }
   }
 
   TRACE_MSG(TRACE_ZCL1, "<< zb_zcl_wwah_restart_bad_parent_recovery", (FMT__0));
 }
 
-void zb_zcl_wwah_bad_parent_recovery_signal(zb_zcl_wwah_bad_parent_recovery_signal_t sig)
+void zb_zcl_wwah_bad_parent_recovery_signal(zb_bufid_t sig)
 {
   TRACE_MSG(TRACE_ZCL1, ">> zb_zcl_wwah_bad_parent_recovery_signal sig %hd", (FMT__H, sig));
 
@@ -1665,8 +1676,8 @@ void zb_zcl_wwah_bad_parent_recovery_signal(zb_zcl_wwah_bad_parent_recovery_sign
 
 void zb_zcl_wwah_stop_bad_parent_recovery(void)
 {
-  ZB_SCHEDULE_ALARM_CANCEL((zb_callback_t)zb_zcl_wwah_bad_parent_recovery_tmo, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_RSSI_WITH_PARENT_BAD);
-  ZB_SCHEDULE_ALARM_CANCEL((zb_callback_t)zb_zcl_wwah_bad_parent_recovery_tmo, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_APS_ACK_FAILED);
+  ZB_SCHEDULE_ALARM_CANCEL(zb_zcl_wwah_bad_parent_recovery_tmo, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_RSSI_WITH_PARENT_BAD);
+  ZB_SCHEDULE_ALARM_CANCEL(zb_zcl_wwah_bad_parent_recovery_tmo, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_APS_ACK_FAILED);
   WWAH_CTX().bad_parent_recovery.poll_control_checkin_failed_cnt = 0;
   WWAH_CTX().bad_parent_recovery.started = ZB_FALSE;
 }
@@ -1700,7 +1711,7 @@ void zb_zcl_wwah_start_bad_parent_recovery(void)
   TRACE_MSG(TRACE_ZCL1, "<< zb_zcl_wwah_start_bad_parent_recovery", (FMT__0));
 }
 
-void zb_zcl_wwah_bad_parent_recovery_tmo(zb_zcl_wwah_bad_parent_recovery_signal_t sig)
+void zb_zcl_wwah_bad_parent_recovery_tmo(zb_bufid_t sig)
 {
   TRACE_MSG(TRACE_ZCL1, "zb_zcl_wwah_start_bad_parent_recovery_tmo: sig %hd", (FMT__H, sig));
   zb_zcl_wwah_stop_bad_parent_recovery();
@@ -1985,6 +1996,9 @@ void zb_zcl_wwah_periodic_checkin_match_desc_req(zb_uint8_t param)
         break;
     }
 
+    /* Verify ep_desc assignment. It will unrecoverably fail if ep_desc is NULL */
+    ZB_VERIFY(ep_desc != NULL, RET_UNINITIALIZED);
+
     req->profile_id = ep_desc->simple_desc->app_profile_id;
 
     TRACE_MSG(TRACE_ZCL1, "send match descr for cluster 0x%x", (FMT__D, req->cluster_list[0]));
@@ -2177,7 +2191,7 @@ void zb_zcl_wwah_periodic_checkin_tc_poll(zb_uint8_t param)
   else
   {
     WWAH_CTX().periodic_checkins.tsn = ZCL_CTX().seq_number - 1;
-    /* Need to wait some time for the answer (unicast). Minumum border is
+    /* Need to wait some time for the answer (unicast). Minimum border is
      * ZB_N_APS_ACK_WAIT_DURATION_FROM_NON_SLEEPY * ZB_N_APS_MAX_FRAME_RETRIES, but intermediate
      * hops may add some additional delay. */
     ZB_SCHEDULE_ALARM(zb_zcl_wwah_periodic_checkin_timeout, 0, ZB_N_APS_ACK_WAIT_DURATION_FROM_NON_SLEEPY * ZB_N_APS_MAX_FRAME_RETRIES);

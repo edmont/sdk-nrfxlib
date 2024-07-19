@@ -352,18 +352,26 @@ static void zb_zcl_scenes_process_store_scene_command(zb_uint8_t param, const zb
     /* FALLTHRU */
     case RET_ALREADY_EXISTS:
     {
-      ZB_ZCL_SCENES_SEND_STORE_SCENE_RES(
-        param,
-        cmd_info->seq_number,
-        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
-        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
-        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-        cmd_info->profile_id,
-        NULL,
-        store_scene_status,
-        req_copy.group_id,
-        req_copy.scene_id);
-        set_scene_valid = ZB_TRUE;
+      /* prevent to send response on ZGP command */
+      if (!ZB_ZCL_ADDR_TYPE_IS_GPD(cmd_info->addr_data.common_data.source.addr_type))
+      {
+        ZB_ZCL_SCENES_SEND_STORE_SCENE_RES(
+          param,
+          cmd_info->seq_number,
+          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
+          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
+          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
+          cmd_info->profile_id,
+          NULL,
+          store_scene_status,
+          req_copy.group_id,
+          req_copy.scene_id);
+          set_scene_valid = ZB_TRUE;
+      }
+      else
+      {
+        zb_buf_free(param);
+      }
     }
     break;
 
@@ -454,37 +462,45 @@ static void zb_zcl_scenes_process_add_scene_command(zb_uint8_t param, const zb_z
     /* FALLTHRU */
     case RET_ALREADY_EXISTS:
     {
-#ifdef ZB_ZCL_SCENES_OPTIONAL_COMMANDS_DISABLED
-      ZVUNUSED(is_enhanced);
-#else
-      if (is_enhanced)
+      /* prevent to send response on ZGP command */
+      if (!ZB_ZCL_ADDR_TYPE_IS_GPD(cmd_info->addr_data.common_data.source.addr_type))
       {
-        ZB_ZCL_SCENES_SEND_ENHANCED_ADD_SCENE_RES(
-          param,
-          cmd_info->seq_number,
-          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
-          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
-          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-          cmd_info->profile_id,
-          NULL,
-          add_scene_status,
-          req_copy.group_id,
-          req_copy.scene_id);
+#ifdef ZB_ZCL_SCENES_OPTIONAL_COMMANDS_DISABLED
+        ZVUNUSED(is_enhanced);
+#else
+        if (is_enhanced)
+        {
+          ZB_ZCL_SCENES_SEND_ENHANCED_ADD_SCENE_RES(
+            param,
+            cmd_info->seq_number,
+            ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
+            ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
+            ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
+            cmd_info->profile_id,
+            NULL,
+            add_scene_status,
+            req_copy.group_id,
+            req_copy.scene_id);
+        }
+        else
+#endif /* ZB_ZCL_SCENES_OPTIONAL_COMMANDS_DISABLED */
+        {
+          ZB_ZCL_SCENES_SEND_ADD_SCENE_RES(
+            param,
+            cmd_info->seq_number,
+            ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
+            ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
+            ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
+            cmd_info->profile_id,
+            NULL,
+            add_scene_status,
+            req_copy.group_id,
+            req_copy.scene_id);
+        }
       }
       else
-#endif /* ZB_ZCL_SCENES_OPTIONAL_COMMANDS_DISABLED */
       {
-        ZB_ZCL_SCENES_SEND_ADD_SCENE_RES(
-          param,
-          cmd_info->seq_number,
-          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
-          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
-          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-          cmd_info->profile_id,
-          NULL,
-          add_scene_status,
-          req_copy.group_id,
-          req_copy.scene_id);
+        zb_buf_free(param);
       }
     }
     break;
@@ -618,17 +634,25 @@ static void zb_zcl_scenes_process_remove_scene_command(zb_uint8_t param, const z
         }
       }
 
-      ZB_ZCL_SCENES_SEND_REMOVE_SCENE_RES(
-        param,
-        cmd_info->seq_number,
-        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
-        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
-        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-        cmd_info->profile_id,
-        NULL,
-        remove_scene_status,
-        req_copy.group_id,
-        req_copy.scene_id);
+      /* prevent to send response on ZGP command */
+      if (!ZB_ZCL_ADDR_TYPE_IS_GPD(cmd_info->addr_data.common_data.source.addr_type))
+      {
+        ZB_ZCL_SCENES_SEND_REMOVE_SCENE_RES(
+          param,
+          cmd_info->seq_number,
+          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
+          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
+          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
+          cmd_info->profile_id,
+          NULL,
+          remove_scene_status,
+          req_copy.group_id,
+          req_copy.scene_id);
+      }
+      else
+      {
+        zb_buf_free(param);
+      }
     }
     break;
 
@@ -700,16 +724,24 @@ static void zb_zcl_scenes_process_remove_all_scenes_command(zb_uint8_t param, co
         }
       }
 
-      ZB_ZCL_SCENES_SEND_REMOVE_ALL_SCENES_RES(
-        param,
-        cmd_info->seq_number,
-        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
-        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
-        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
-        cmd_info->profile_id,
-        NULL,
-        remove_all_scenes_status,
-        req_copy.group_id);
+      /* prevent to send response on ZGP command */
+      if (!ZB_ZCL_ADDR_TYPE_IS_GPD(cmd_info->addr_data.common_data.source.addr_type))
+      {
+        ZB_ZCL_SCENES_SEND_REMOVE_ALL_SCENES_RES(
+          param,
+          cmd_info->seq_number,
+          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
+          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).src_endpoint,
+          ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint,
+          cmd_info->profile_id,
+          NULL,
+          remove_all_scenes_status,
+          req_copy.group_id);
+      }
+      else
+      {
+        zb_buf_free(param);
+      }
     }
     break;
 

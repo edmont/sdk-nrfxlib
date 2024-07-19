@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -63,7 +63,7 @@ void zb_abort(char *caller_file, int caller_line);
    @param file_name - source file name
    @param line_number - line in the source
 */
-void zb_assert(const zb_char_t *file_name, zb_int_t line_number);
+ZB_NORETURN void zb_assert(const zb_char_t *file_name, zb_int_t line_number);
 /** @endcond */
 /**
    Check for expression in runtime and call zb_assert() if it is false.
@@ -72,7 +72,7 @@ void zb_assert(const zb_char_t *file_name, zb_int_t line_number);
 
    @param expr expression to check
 */
-#define ZB_ASSERT(expr) {if(!(expr)){zb_assert(__FILE__, __LINE__);}}
+#define ZB_ASSERT(expr) ({if(!(expr)){zb_assert(__FILE__, __LINE__);}})
 /** @cond internals_doc */
 #define ZB_INLINE_ASSERT_SIMPLE(expr)  ((expr) ? 1 : (zb_assert(__FILE__, __LINE__), 1))
 /** @endcond */
@@ -84,7 +84,7 @@ void zb_assert(const zb_char_t *file_name, zb_int_t line_number);
    @param file_id - source file id
    @param line_number - line in the source
 */
-void zb_assert(zb_uint16_t file_id, zb_int_t line_number);
+ZB_NORETURN void zb_assert(zb_uint16_t file_id, zb_int_t line_number);
 /**
    Check for expression in runtime and call zb_assert() if it is false.
 
@@ -92,7 +92,7 @@ void zb_assert(zb_uint16_t file_id, zb_int_t line_number);
 
    @param expr expression to check
 */
-#define ZB_ASSERT(expr) {if(!(expr)) { zb_assert(ZB_TRACE_FILE_ID, __LINE__);} }
+#define ZB_ASSERT(expr) ({if(!(expr)) { zb_assert(ZB_TRACE_FILE_ID, __LINE__);} })
 /** @cond internals_doc */
 #define ZB_INLINE_ASSERT_SIMPLE(expr)  ((expr) ? 1 : (zb_assert(ZB_TRACE_FILE_ID, __LINE__), 1))
 /** @endcond */
@@ -222,17 +222,10 @@ while (0)
 #endif  /* ZB_ARRAYS_CHECK */
 
 
-#if !defined ZB_NS_BUILD && defined ZB8051 && defined C8051F120
-#define ZB_P3_ON() LED1 = 0
-#define ZB_P3_OFF() LED1 = 1
-#define ZB_P4_ON() LED2 = 0
-#define ZB_P4_OFF() LED2 = 1
-#else
 #define ZB_P3_ON()
 #define ZB_P3_OFF()
 #define ZB_P4_ON()
 #define ZB_P4_OFF()
-#endif
 
 #if defined ZB_TRAFFIC_DUMP_ON
 /**
@@ -250,16 +243,12 @@ void dump_usb_traf(zb_uint8_t *buf, zb_ushort_t len);
 #define dump_usb_traf(buf, len)
 #endif
 
-#if (defined ZB_MAC_TESTING_MODE) && (defined ZB_TRAFFIC_DUMP_ON)
-#define DUMP_TRAF(cmt, buf, len, total) TRACE_MSG(TRACE_MAC3, #cmt, (FMT__0)); dump_traf(buf, len)
-#else
 #define DUMP_TRAF(comment, buf, len, total)
-#endif
 
 #ifdef DEBUG
-void dump_hex_data(zb_uint_t trace_mask, zb_uint8_t trace_level, zb_uint8_t *buf, zb_ushort_t len);
+void dump_hex_data(zb_uint_t trace_mask, zb_uint8_t trace_level, const zb_uint8_t *buf, zb_ushort_t len);
 
-void trace_hex_data_func(zb_uint8_t *ptr, zb_short_t size, zb_bool_t format);
+void trace_hex_data_func(const zb_uint8_t *ptr, zb_short_t size, zb_bool_t format);
 #define trace_8hex_per_line(ptr, size) trace_hex_data_func((ptr), (size), ZB_FALSE)
 #define trace_16hex_per_line(ptr, size) trace_hex_data_func((ptr), (size), ZB_TRUE)
 #else

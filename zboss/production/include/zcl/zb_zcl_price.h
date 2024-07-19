@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -4488,6 +4488,21 @@ typedef ZB_PACKED_PRE struct zb_zcl_price_cancel_tariff_payload_s
   zb_zcl_price_send_cmd_price_ack( \
     _param, _dst_addr, _dst_addr_mode, _dst_ep, _src_ep, _payload, NULL)
 
+/** @cond internals_doc */
+/** @def ZB_ZCL_PRICE_SEND_CMD_PRICE_ACK_TSN
+ *  @brief Macro for sending @ref ZB_ZCL_PRICE_SEND_CMD_PRICE_ACK_TSN "PriceAcknowledgement" command.
+ *  @param _param - Reference to buffer.
+ *  @param _dst_addr - Address of the device to send command to.
+ *  @param _dst_addr_mode - Address mode for _dst_addr.
+ *  @param _dst_ep - Destination endpoint.
+ *  @param _src_ep - Current endpoint.
+ *  @param _payload - Packet payload (@ref zb_zcl_price_ack_payload_t).
+ *  @param _tsn - sequence number of source command
+ */
+#define ZB_ZCL_PRICE_SEND_CMD_PRICE_ACK_TSN( \
+  _param, _dst_addr, _dst_addr_mode, _dst_ep, _src_ep, _payload, _tsn) \
+  zb_zcl_price_send_cmd_price_ack_tsn( \
+    _param, _dst_addr, _dst_addr_mode, _dst_ep, _src_ep, _payload, _tsn, NULL)
 
 void zb_zcl_price_send_cmd_publish_price(zb_uint8_t param, const zb_addr_u *dst_addr,
                                               zb_aps_addr_mode_t dst_addr_mode, zb_uint8_t dst_ep,
@@ -4504,6 +4519,23 @@ void zb_zcl_price_send_cmd_price_ack(zb_uint8_t param, const zb_addr_u *dst_addr
                                           zb_aps_addr_mode_t dst_addr_mode,
                                           zb_uint8_t dst_ep, zb_uint8_t src_ep,
                                           const zb_zcl_price_ack_payload_t *payload,
+                                          zb_callback_t cb);
+
+/** Function for sending @ref ZB_ZCL_PRICE_CLI_CMD_PRICE_ACK_TSN "PriceAcknowledgement" command.
+ *  @param _param - Reference to buffer.
+ *  @param _dst_addr - Address of the device to send command to.
+ *  @param _dst_addr_mode - Address mode for _dst_addr.
+ *  @param _dst_ep - Destination endpoint.
+ *  @param _src_ep - Current endpoint.
+ *  @param _payload - Packet payload (@ref zb_zcl_price_ack_payload_t).
+ *  @param _tsn - sequence number of source command
+ *  @param cb - Callback which should be called when the ZCL stack receives APS ack.
+ */
+void zb_zcl_price_send_cmd_price_ack_tsn(zb_uint8_t param, const zb_addr_u *dst_addr,
+                                          zb_aps_addr_mode_t dst_addr_mode,
+                                          zb_uint8_t dst_ep, zb_uint8_t src_ep,
+                                          const zb_zcl_price_ack_payload_t *payload,
+                                          zb_uint8_t tsn,
                                           zb_callback_t cb);
 
 void zb_zcl_price_send_cmd_get_scheduled_prices(zb_uint8_t param, const zb_addr_u *dst_addr,

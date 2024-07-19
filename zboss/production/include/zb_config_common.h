@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -54,13 +54,6 @@ Do not put there ifdefs depending on defines made in the middle of zb_config.h!
 /* To compile MAC only build;
    TODO: Fix it. there should probably be another way to build without security
 */
-#ifdef ZB_MACSPLIT_DEVICE
-#define ZB_CCM_M 4U
-#define ZB_CCM_KEY_SIZE 16U
-#ifndef ZB_BUILD_DATE
-#define ZB_BUILD_DATE "19700101"
-#endif
-#endif
 /** @endcond *//* internals_doc */
 /****************************Security options**************************/
 
@@ -266,7 +259,17 @@ key. They use same algorithm.
  APS: APS ACK wait time from Sleepy devices. After this timeout resend APS packet
       see Zigbee specification revision 22 section 2.2.7.1 APS Constants
 */
-  #define ZB_N_APS_ACK_WAIT_DURATION_FROM_SLEEPY (10U*ZB_TIME_ONE_SECOND)
+#ifndef ZB_NONSLEEPY_ACK_WAIT_DURATION_DECREASE
+/*
+Motivation of increasing wait dueration: be able to retry send when ZED polling not so fast, else it all will be expired in MAC.
+ */
+#define ZB_N_APS_ACK_WAIT_DURATION_FROM_SLEEPY (10U*ZB_TIME_ONE_SECOND)
+#else
+/*
+To satisfy negative test in the testsute of some customer use same value as for ZR
+*/
+#define ZB_N_APS_ACK_WAIT_DURATION_FROM_SLEEPY (3U*ZB_TIME_ONE_SECOND)
+#endif
 /** @cond internals_doc */
 /*!
  APS: The base amount of delay before each broadcast parent announce is sent.
@@ -334,6 +337,12 @@ At the worst case our NWK can skip long address at tx: 8 bytes of reserve.
    Maximal frame size
  */
 #define MAX_PHY_FRM_SIZE              127U
+
+/**
+   MAC overhead for unicast frame with Pan ID compression (normal case when
+   sending via nwk), including FCS bytes
+*/
+#define MAX_MAC_OVERHEAD_SHORT_ADDRS  11U
 
 /* ZB packet length must not exceed 127 bytes
  *
@@ -980,6 +989,10 @@ Workaround for secure rejoin
    Timeout for turbo poll
  */
 #define ZB_PIM_TURBO_POLL_LEAVE_TIMEOUT (ZB_TIME_ONE_SECOND / 3U)
+/*!
+   Maximal number of turbo poll retries when data receiving failed
+ */
+#define ZB_PIM_TURBO_POLL_MAX_RETRIES (3U)
 /**@cond internals_doc*/
 /*!
    Timeout for poll buffer allocation retry
@@ -1265,13 +1278,7 @@ request command frame.
    Maximum time to wait for a response command frame, range 2-64
    Default is 32, 64 set for better compatibility
 */
-#ifndef ZB_NSNG
 #define ZB_MAC_RESPONSE_WAIT_TIME 32U
-#else
-/* Too fast for NSNG causing retransmits. TODO: check why can't it work with
- * normal timeouts.  */
-#define ZB_MAC_RESPONSE_WAIT_TIME (32U)
-#endif
 
 /*! Make all MAC PIB attributes configurable */
 #define ZB_CONFIGURABLE_MAC_PIB
@@ -1301,8 +1308,11 @@ request command frame.
 *  IEEE Standard for Low-Rate Wireless Networks 2006, section 7.4.2 MAC PIB attributes.
 *
 *  @note Make sure the time value is not too big.
+*  There is no defined value for sub-ghz now. In case of aLBTTxMinOff frame can be sent with a
+*  delay in case of it's own transmission right before Received Date Req. This value calculated
+*  taking into account this possible situation.
 */
-#define ZB_MAX_FRAME_TOTAL_WAIT_TIME_SUB_GHZ (ZB_MILLISECONDS_TO_BEACON_INTERVAL(48U) + 1U)
+#define ZB_MAX_FRAME_TOTAL_WAIT_TIME_SUB_GHZ (ZB_MILLISECONDS_TO_BEACON_INTERVAL(136U) + 1U)
 
 
 /*!
@@ -1315,7 +1325,10 @@ request command frame.
 /*!
 *  Sets MAC address at start
 */
+
+#ifndef ZB_DONT_SET_DEFAULT_IEEE_ADDRESS
 #define ZB_SET_MAC_ADDRESS
+#endif
 
 #ifndef ZB_SEND_BEACON_IMMEDIATELY
 /*!
@@ -1523,16 +1536,12 @@ request command frame.
 #define ZB_MAC_LBT_MAX_TX_RETRIES 3U
 
 /* Tuned to fit to 2 beacon intervals */
-/*! LBT transmition wait period in ms */
+/*! LBT transmission wait period in ms */
 #define ZB_MAC_LBT_TX_WAIT_QUANT_MS        33U
 
 /* aDUTYCYCLEMeasurementPeriod */
 /*! The period over which the duty cycle is calculated. */
-#ifndef ZB_MAC_TESTING_MODE
 #define ZB_MAC_DUTY_CYCLE_MEASUREMENT_PERIOD_SYMBOLS 360000000U
-#else
-#define ZB_MAC_DUTY_CYCLE_MEASUREMENT_PERIOD_SYMBOLS 24000000U
-#endif /* ZB_MAC_TESTING_MODE */
 
 /* aDUTYCYCLERampUp */
 #ifndef ZB_MAC_DUTY_CYCLE_RAMP_UP_SYMBOLS
@@ -1546,24 +1555,15 @@ request command frame.
 #define ZB_MAC_DUTY_CYCLE_RAMP_DOWN_SYMBOLS   0U
 #endif  /* ZB_MAC_DUTY_CYCLE_RAMP_DOWN_SYMBOLS */
 
-#ifdef ZB_MAC_TESTING_MODE
-
-#define ZB_MAC_DUTY_CYCLE_LIMITED_THRESHOLD_SYMBOLS  6000000U
-
-#define ZB_MAC_DUTY_CYCLE_CRITICAL_THRESHOLD_SYMBOLS 8000000U
-
-#endif  /* ZB_MAC_TESTING_MODE */
 
 
 #ifndef ZB_USE_DUTY_CYCLE_PERCENT_ENABLE
 
-#ifndef ZB_MAC_TESTING_MODE
 /*! MAC duty cycle of limited threshold length */
 #define ZB_MAC_DUTY_CYCLE_LIMITED_THRESHOLD_SYMBOLS  5400000U
 /*! MAC duty cycle of critical threshold length */
 #define ZB_MAC_DUTY_CYCLE_CRITICAL_THRESHOLD_SYMBOLS 7500000U
 
-#endif
 /*! MAC duty cycle of limited threshold length */
 /*! Length of regulated MAC duty cycle pages 29 and 29 */
 #define ZB_MAC_DUTY_CYCLE_REGULATED_SYMBOLS_PAGES_28_29 10000000U
@@ -1697,7 +1697,7 @@ request command frame.
 *  the last stage is successful or,
 *  otherwise, start the cancel procedure.
 */
-#define ZB_ZGP_TIMEOUT_BEFORE_FORCE_CANCEL (3U * ZB_TIME_ONE_SECOND)
+#define ZB_ZGP_TIMEOUT_BEFORE_FORCE_CANCEL 0U
 
 /*! Unspecified Zigbee Green Power device manufacturer ID */
 #define ZB_ZGPD_MANUF_ID_UNSPEC     0xFFFFU
@@ -1710,9 +1710,13 @@ request command frame.
 /*! Maximum number of paired endpoints*/
 #define ZB_ZGP_MAX_PAIRED_ENDPOINTS 2U
 /*! Maximum number of paired Green Power devices commands */
-#define ZB_ZGP_MAX_PAIRED_CONF_GPD_COMMANDS 2U
+#ifndef ZB_ZGP_MAX_PAIRED_CONF_GPD_COMMANDS
+#define ZB_ZGP_MAX_PAIRED_CONF_GPD_COMMANDS 6U
+#endif /* ZB_ZGP_MAX_PAIRED_CONF_GPD_COMMANDS */ 
 /*! Maximum number of paired configuration clusters */
+#ifndef ZB_ZGP_MAX_PAIRED_CONF_CLUSTERS
 #define ZB_ZGP_MAX_PAIRED_CONF_CLUSTERS 2U
+#endif /* ZB_ZGP_MAX_PAIRED_CONF_CLUSTERS */
 /** @endcond */ /* DOXYGEN_ZGP_SECTION */
 /*! @} */
 
@@ -1725,12 +1729,6 @@ request command frame.
 #define ZB_APS_MAX_WINDOW_SIZE 1U
 #define ZB_APS_INTERFRAME_DELAY 50U /* milliseconds */
 
-#if defined(ZB_SE_ENABLE_SERVICE_DISCOVERY_PROCESSING)
-
-#define ZB_SE_SERVICE_DISCOVERY_PERIODIC_RESTART_TIME (ZB_TIME_ONE_SECOND * 60U * 60U * 3U)
-#define ZB_SE_SERVICE_DISCOVERY_CLUSTER_TIME (ZB_TIME_ONE_SECOND * 40U)
-
-#endif
 
 #define ZB_SE_STEADY_STATE_CLUSTER_MATCH_DESC_TIME (ZB_TIME_ONE_SECOND * 20U)
 #define ZB_SE_STEADY_STATE_MAX_FAILURE_CNT 3U

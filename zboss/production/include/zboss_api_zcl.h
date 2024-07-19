@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -194,9 +194,6 @@
 #include "zcl/zb_zcl_tunneling.h"
 #endif
 
-#if defined (ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ)
-#include "zcl/zb_zcl_subghz.h"
-#endif
 #if defined (ZB_ZCL_SUPPORT_CLUSTER_PREPAYMENT)
 #include "zcl/zb_zcl_prepayment.h"
 #endif
@@ -204,25 +201,7 @@
 #include "zcl/zb_zcl_calendar.h"
 #endif
 
-#ifdef ZB_ENABLE_SE_CLUSTERS
-#if defined (ZB_ZCL_SUPPORT_CLUSTER_EVENTS)
-#include "zcl/zb_zcl_events.h"
-#endif
-#if defined (ZB_ZCL_SUPPORT_CLUSTER_ENERGY_MANAGEMENT)
-#include "zcl/zb_zcl_energy_mgmt.h"
-#endif
-#if defined (ZB_ZCL_SUPPORT_CLUSTER_MDU_PAIRING)
-#include "zcl/zb_zcl_mdu_pairing.h"
-#endif
-#if defined (ZB_ZCL_SUPPORT_CLUSTER_DEVICE_MANAGEMENT)
-#include "zcl/zb_zcl_device_management.h"
-#endif
-#endif /* ZB_ENABLE_SE_CLUSTERS */
 
-#ifdef ZB_ENABLE_CUSTOM_CLUSTERS
-#include "zcl/zb_zcl_tunnel.h"
-#include "zcl/zb_zcl_ir_blaster.h"
-#endif /* ZB_ENABLE_CUSTOM_CLUSTERS */
 
 #if defined ZB_ENABLE_ZGP_CLUSTER
 //#include "zgp/zgp_internal.h"
@@ -382,6 +361,18 @@
 #define ZB_ZCL_SET_DISC_MANUFACTURE_COMMAND_CB(func_ptr) ZCL_CTX().disc_manuf_cmd_cb = (func_ptr)
 
 #endif /* ZB_ENABLE_HA */
+
+/**
+ *  @brief Set user callback to notify an application a broadcast EP command received.
+ *  @param func_ptr - callback to set (of type @ref zb_device_handler_t).
+ *  @return processing status (see @ref zb_bool_t)
+ *  Value of ZB_TRUE means that the application successfully processed a command - ZBOSS stack
+ *  will do nothing in this case and will free a buffer automatically.
+ *  If set to ZB_FALSE, default stack processing will be performed.
+ *  @note Do not use this callback unless you are sure you need it.
+ *  ZBOSS stack performs additional command checks that can be skipped by an application.
+ */
+#define ZB_ZCL_SET_BROADCAST_EP_CB(func_ptr) ZCL_CTX().broadcast_ep_cb = (func_ptr)
 
 /** @cond internals_doc */
 /**
@@ -1411,11 +1402,6 @@ typedef enum zb_zcl_device_callback_id_e
   /** Inform user about APS fragmented data transfer completion */
   ZB_ZCL_BIG_DATA_TRANSFER_COMPLETE_CB_ID,
 /** @endcond */ /* DOXYGEN_INTERNAL_DOC */
-#ifdef ZB_ENABLE_SE
-  /** Inform user about Time receiving from Time server */
-  ZB_ZCL_TIME_SYNC_CB_ID,
-  ZB_ZCL_TIME_SYNC_FAILED_CB_ID,
-#endif /* ZB_ENABLE_SE */
   /** @b Server. Inform user about Window Covering Up/Open command.
    *
    * User's application callback is initialized by RET_OK status of device
@@ -1732,12 +1718,6 @@ typedef enum zb_zcl_device_callback_id_e
    *
    */
   ZB_ZCL_ALARMS_RESET_ALL_ALARMS_CB_ID,
-#ifdef ZB_ENABLE_CUSTOM_CLUSTERS
-  ZB_ZCL_IR_BLASTER_TRANSMIT_IR_DATA_CB_ID,
-  ZB_ZCL_IR_BLASTER_TRANSMISSION_STATUS_CB_ID,
-  ZB_ZCL_IR_BLASTER_GET_IR_SIGNATURE_CB_ID,
-  ZB_ZCL_IR_BLASTER_GET_IR_SIGNATURE_RESP_CB_ID,
-#endif /* ZB_ENABLE_CUSTOM_CLUSTERS */
   /** @b Client. Inform user about Alarms Alarm command.
    * User's application callback is initialized by RET_OK status of device
    * callback parameters.
@@ -1876,12 +1856,6 @@ typedef struct zb_zcl_device_callback_param_s
 #endif
 #if defined (ZB_ZCL_SUPPORT_CLUSTER_IAS_WD)
    zb_zcl_ias_wd_squawk_value_param_t  squawk_value_param;
-#endif
-#ifdef ZB_ZCL_SUPPORT_CLUSTER_IR_BLASTER
-   zb_zcl_ir_blaster_transmit_ir_data_value_param_t irb_tr_value_param;
-   zb_zcl_ir_blaster_transmission_status_value_param_t irb_tr_status_value_param;
-   zb_zcl_ir_blaster_get_ir_signature_value_param_t irb_get_ir_sig_value_param;
-   zb_zcl_ir_blaster_get_ir_signature_resp_value_param_t irb_get_ir_sig_resp_value_param;
 #endif
 #if defined ZB_ENABLE_HA
 #if defined ZB_HA_ENABLE_OTA_UPGRADE_CLIENT || defined DOXYGEN
@@ -2041,7 +2015,8 @@ enum zb_bdb_error_codes_e
   ZB_BDB_STATUS_TCLK_EX_FAILURE,             /*!< The Trust Center link key exchange procedure has failed attempting to join a centralized security network.*/
   ZB_BDB_STATUS_NOT_ON_A_NETWORK,            /*!< A commissioning procedure was forbidden since the node was not currently on a network.*/
   ZB_BDB_STATUS_ON_A_NETWORK,                /*!< A commissioning procedure was forbidden since the node was currently on a network.*/
-  ZB_BDB_STATUS_CANCELLED                    /*!< The current operation (steering or formation) was cancelled by an app */
+  ZB_BDB_STATUS_CANCELLED,                    /*!< The current operation (steering or formation) was cancelled by an app */
+  ZB_BDB_STATUS_DEV_ANNCE_SEND_FAILURE        /*!< A device announce sending has been failed (e.g. device announce haven't acked by parent router). */
 };
 /** @endcond */ /* internals_doc */
 /** @} */
@@ -2183,7 +2158,7 @@ void bdb_set_scan_duration(zb_uint8_t duration);
  * @param buf - a ZBOSS buffer, if zero is passed, a new buffer will be allocated
  * @return RET_OK if broadcast was successful
  * @return RET_NO_MEMORY if buffer allocation failed
- * @return RET_ERROR if any error occured
+ * @return RET_ERROR if any error occurred
  *
  * @snippet thermostat/thermostat_zr/thermostat_zr.c close_network_example
  */
@@ -2295,8 +2270,17 @@ typedef zb_bool_t (ZB_CODE * zb_bdb_comm_binding_callback_t)(
  */
 zb_ret_t zb_bdb_finding_binding_initiator(zb_uint8_t endpoint, zb_bdb_comm_binding_callback_t user_binding_cb);
 
-/** Cancel previously started finding and binding procedure on target */
+/**
+ *  @brief Cancel previously started finding and binding procedure on all target endpoints
+ */
 void zb_bdb_finding_binding_target_cancel(void);
+
+/**
+ *  @brief  Cancel previously started finding and binding procedure on particular target endpoint
+ *
+ *  @param endpoint - target endpoint. The ZB_ZCL_BROADCAST_ENDPOINT(0xFF) value is treated as cancel on all target endpoints
+ */
+void zb_bdb_finding_binding_target_cancel_ep(zb_uint8_t endpoint);
 
 /** Cancel previously started finding and binding procedure on initiator */
 void zb_bdb_finding_binding_initiator_cancel(void);
@@ -2432,9 +2416,6 @@ typedef zb_bool_t (*zb_zcl_read_attr_resp_handler_t)(zb_bufid_t);
 #if defined ZB_ENABLE_SE || defined ZB_BDB_ENABLE_FINDING_BINDING || defined ZB_ZCL_SUPPORT_CLUSTER_WWAH
 typedef struct zb_zcl_func_selector_s
 {
-#ifdef ZB_ENABLE_SE
-  zb_zcl_is_high_freq_msg_func_t is_high_freq_msg;
-#endif /* ZB_ENABLE_SE */
 
 #if defined ZB_SE_COMMISSIONING || (defined ZB_ZCL_SUPPORT_CLUSTER_WWAH && defined ZB_ZCL_ENABLE_WWAH_SERVER)
   zb_zcl_block_zcl_cmd_t block_zcl_cmd;
@@ -2513,9 +2494,6 @@ typedef struct zb_zcl_globals_s
 #endif /* ZB_CONTROL4_NETWORK_SUPPORT */
   zb_uint8_t zcl_handlers_cnt;
   zb_discover_cmd_list_t *zb_zcl_cluster_cmd_list;
-#ifdef ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-  zb_zcl_subghz_ctx_t subghz_ctx;         /* Sub-GHz cluster context of current device */
-#endif /* ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ */
 #if (defined ZB_ZCL_SUPPORT_CLUSTER_WWAH && (defined ZB_ZCL_ENABLE_WWAH_SERVER || defined ZB_ZCL_ENABLE_WWAH_CLIENT))
   /* TODO: Split (client/server) ! */
   zb_zcl_wwah_context_t wwah_ctx;
@@ -2524,10 +2502,7 @@ typedef struct zb_zcl_globals_s
 #if defined ZB_ENABLE_SE || defined ZB_BDB_ENABLE_FINDING_BINDING || defined ZB_ZCL_SUPPORT_CLUSTER_WWAH
   zb_zcl_func_selector_t selector;
 #endif /* ZB_ENABLE_SE || ZB_BDB_ENABLE_FINDING_BINDING || ZB_ZCL_SUPPORT_CLUSTER_WWAH */
-} zb_zcl_globals_t;
 
-typedef struct zb_zcl8_globals_s
-{
   /** @internal ZCL backward compatibility mode for ZCL8 support, packets format depends on the mode */
   zb_uint8_t backward_comp_mode;
 
@@ -2536,7 +2511,10 @@ typedef struct zb_zcl8_globals_s
 
   /** @internal Backward compatible status values mode. When enabled if diversifies some common statuses as it was in zcl6 and zcl7*/
   zb_uint8_t backward_compatible_statuses_mode;
-} zb_zcl8_globals_t;
+
+  /** User callback to notify an application a broadcast EP command received */
+  zb_device_handler_t broadcast_ep_cb;
+} zb_zcl_globals_t;
 
 #define ZCL_SELECTOR() ZG->zcl.selector
 
@@ -2550,15 +2528,6 @@ zb_zcl_globals_t *zb_zcl_get_ctx(void);
 
 /** Returns pointer to ZCL context */
 #define ZCL_CTX() (*zb_zcl_get_ctx())
-
-/**
-   Returns ZCL8 context.
-   @return pointer ZCL8 context
-  */
-zb_zcl8_globals_t *zb_zcl8_get_ctx(void);
-
-/** Returns pointer to ZCL8 context */
-#define ZCL8_CTX() (*zb_zcl8_get_ctx())
 
 /*! @} */ /* ZB_ZCL_INITIALIZATION */
 
@@ -2605,9 +2574,6 @@ zb_bool_t zb_zcl_send_default_handler(zb_uint8_t param,
 void zb_zcl_send_default_resp_ext(zb_uint8_t param,
   const zb_zcl_parsed_hdr_t *cmd_info, zb_zcl_status_t status);
 
-#if defined ZB_APS_ENCRYPTION_PER_CLUSTER
-void zb_zcl_set_cluster_encryption(zb_uint8_t endpoint_id, zb_uint16_t cluster_id, zb_uint8_t encrypt);
-#endif /* ZB_APS_ENCRYPTION_PER_CLUSTER */
 
 /**
    Convert deprecated statuses into ZCL8 statuses.

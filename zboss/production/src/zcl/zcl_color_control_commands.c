@@ -160,7 +160,6 @@ zb_ret_t check_value_color_control_client(zb_uint16_t attr_id, zb_uint8_t endpoi
       }
       break;
     default:
-      ret = RET_OK;
       break;
   }
 
@@ -316,7 +315,7 @@ static zb_ret_t zb_zcl_color_control_invoke_user_and_set_attribute(zb_uint8_t pa
 */
 
 /** @addtogroup ZB_ZCL_COLOR_CONTROL
-    ZCL Color Control cluster Convert color between triplex "Hue,Saturation" - "ColorXY" - "Color Temperature"
+    ZCL Color Control cluster Convert color between "Hue,Saturation" - "ColorXY" - "Color Temperature"
     @{
     Use convert in/out RGB
     Need to recode without use float type.
@@ -614,20 +613,9 @@ static void zb_zcl_color_control_update_color_attrbute(zb_uint8_t endpoint)
   zb_uint16_t y;
   zb_uint16_t temp;
   zb_uint8_t old_mode = zb_zcl_color_control_get8(endpoint, ZB_ZCL_ATTR_COLOR_CONTROL_COLOR_MODE_ID);
-#if defined ZB_ENABLE_ZLL
-  zb_uint16_t ex_hue;
-  old_mode = zb_zcl_color_control_get8(endpoint, ZB_ZCL_ATTR_COLOR_CONTROL_ENHANCED_COLOR_MODE_ID);
-#endif
 
   switch(old_mode)
   {
-#if defined ZB_ENABLE_ZLL
-    case ZB_ZCL_COLOR_CONTROL_COLOR_EX_MODE_HUE_SATURATION_EX:
-      ex_hue = zb_zcl_color_control_get16(endpoint, ZB_ZCL_ATTR_COLOR_CONTROL_ENHANCED_CURRENT_HUE_ID);
-      hue = ex_hue >> 8;
-      zb_zcl_color_control_set8(endpoint, ZB_ZCL_ATTR_COLOR_CONTROL_CURRENT_HUE_ID, hue);
-      // next - run ordinary hue and saturation mode
-#endif
     case ZB_ZCL_COLOR_CONTROL_COLOR_MODE_HUE_SATURATION:
       hue = zb_zcl_color_control_get8(endpoint, ZB_ZCL_ATTR_COLOR_CONTROL_CURRENT_HUE_ID);
       sat = zb_zcl_color_control_get8(endpoint, ZB_ZCL_ATTR_COLOR_CONTROL_CURRENT_SATURATION_ID);
@@ -660,12 +648,6 @@ static void zb_zcl_color_control_update_color_attrbute(zb_uint8_t endpoint)
       break;
   }
 
-#if defined ZB_ENABLE_ZLL
-  if(old_mode!=ZB_ZCL_COLOR_CONTROL_COLOR_EX_MODE_HUE_SATURATION_EX)
-  {
-    zb_zcl_color_control_set16(endpoint, ZB_ZCL_ATTR_COLOR_CONTROL_ENHANCED_CURRENT_HUE_ID, hue << 8);
-  }
-#endif
 }
 
 #endif
@@ -692,7 +674,7 @@ static zb_bool_t zb_zcl_color_control_invoke_user_app(zb_bufid_t buf, zb_uint8_t
   return ((zb_bool_t) zb_zcl_color_control_invoke_user_and_set_attribute(buf));
 }
 
-/** @brief Process one interation of move or step command for one attribute
+/** @brief Process one interaction of move or step command for one attribute
  * @param el_data - pointer on data, @see zb_zcl_color_control_loop_element_t
  * @return result invoke User App */
 static zb_bool_t zb_zcl_process_color_control_element_loop(zb_zcl_color_control_loop_element_t *el_data)
@@ -791,7 +773,7 @@ static zb_bool_t color_control_check_req_options(zb_uint8_t param, zb_uint8_t en
 
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_ON_OFF
     /* ZCL7, 5.2.2.2.1.30 ExecuteIfOff Options Bit
-       Command execution SHALL NOT continue beyond the Options procedding if all of thee criteria
+       Command execution SHALL NOT continue beyond the Options proceeding if all of thee criteria
        are true:
        - The On/Off cluster exists on the same endpoint as this cluster
        - The OnOff attribute of the On/Off cluster, on this endpoint, is 0x00 (FALSE)
@@ -821,74 +803,7 @@ static zb_bool_t color_control_check_req_options(zb_uint8_t param, zb_uint8_t en
   return res;
 }
 
-static zb_bool_t color_control_check_color_capabilities(zb_uint8_t endpoint, zb_uint8_t cmd_id)
-{
-  zb_bool_t res = ZB_FALSE;
-  zb_zcl_attr_t *attr_desc;
-
-  attr_desc = zb_zcl_get_attr_desc_a(
-    endpoint,
-    ZB_ZCL_CLUSTER_ID_COLOR_CONTROL,
-    ZB_ZCL_CLUSTER_SERVER_ROLE,
-    ZB_ZCL_ATTR_COLOR_CONTROL_COLOR_CAPABILITIES_ID);
-
-  if (attr_desc != NULL)
-  {
-    zb_uint16_t color_capabilites = ZB_ZCL_GET_ATTRIBUTE_VAL_16(attr_desc);
-
-    switch (cmd_id)
-    {
-      case ZB_ZCL_CMD_COLOR_CONTROL_MOVE_TO_HUE:
-      case ZB_ZCL_CMD_COLOR_CONTROL_MOVE_HUE:
-      case ZB_ZCL_CMD_COLOR_CONTROL_STEP_HUE:
-      case ZB_ZCL_CMD_COLOR_CONTROL_MOVE_TO_SATURATION:
-      case ZB_ZCL_CMD_COLOR_CONTROL_MOVE_SATURATION:
-      case ZB_ZCL_CMD_COLOR_CONTROL_STEP_SATURATION:
-      case ZB_ZCL_CMD_COLOR_CONTROL_MOVE_TO_HUE_SATURATION:
-        res = (zb_bool_t)(color_capabilites & ZB_ZCL_COLOR_CONTROL_CAPABILITIES_HUE_SATURATION);
-        break;
-
-      case ZB_ZCL_CMD_COLOR_CONTROL_MOVE_TO_COLOR:
-      case ZB_ZCL_CMD_COLOR_CONTROL_MOVE_COLOR:
-      case ZB_ZCL_CMD_COLOR_CONTROL_STEP_COLOR:
-        res = (zb_bool_t)(color_capabilites & ZB_ZCL_COLOR_CONTROL_CAPABILITIES_X_Y);
-        break;
-
-      case ZB_ZCL_CMD_COLOR_CONTROL_ENHANCED_MOVE_TO_HUE:
-      case ZB_ZCL_CMD_COLOR_CONTROL_ENHANCED_MOVE_HUE:
-      case ZB_ZCL_CMD_COLOR_CONTROL_ENHANCED_STEP_HUE:
-      case ZB_ZCL_CMD_COLOR_CONTROL_ENHANCED_MOVE_TO_HUE_SATURATION:
-        res = (zb_bool_t)(color_capabilites & ZB_ZCL_COLOR_CONTROL_CAPABILITIES_EX_HUE);
-        break;
-
-      case ZB_ZCL_CMD_COLOR_CONTROL_COLOR_LOOP_SET:
-        res = (zb_bool_t)(color_capabilites & ZB_ZCL_COLOR_CONTROL_CAPABILITIES_COLOR_LOOP);
-        break;
-
-      case ZB_ZCL_CMD_COLOR_CONTROL_STOP_MOVE_STEP:
-        res = (zb_bool_t)((color_capabilites & ZB_ZCL_COLOR_CONTROL_CAPABILITIES_HUE_SATURATION)
-                       || (color_capabilites & ZB_ZCL_COLOR_CONTROL_CAPABILITIES_EX_HUE)
-                       || (color_capabilites & ZB_ZCL_COLOR_CONTROL_CAPABILITIES_X_Y)
-                       || (color_capabilites & ZB_ZCL_COLOR_CONTROL_CAPABILITIES_COLOR_TEMP));
-        break;
-
-      case ZB_ZCL_CMD_COLOR_CONTROL_MOVE_TO_COLOR_TEMPERATURE:
-      case ZB_ZCL_CMD_COLOR_CONTROL_MOVE_COLOR_TEMPERATURE:
-      case ZB_ZCL_CMD_COLOR_CONTROL_STEP_COLOR_TEMPERATURE:
-        res = (zb_bool_t)(color_capabilites & ZB_ZCL_COLOR_CONTROL_CAPABILITIES_COLOR_TEMP);
-        break;
-
-      default:
-        res = ZB_FALSE;
-    }
-  }
-
-  TRACE_MSG(TRACE_ZCL1, "color_control_check_color_capabilities: supported %hd", (FMT__H, res));
-
-  return res;
-}
-
-/** @brief Process one interation of move command
+/** @brief Process one iteration of move command
  * @param param - buffer with move loop data, @see zb_zcl_color_control_move_loop_t
  *
  * Function convert from time offset between current time and last processed time plus
@@ -920,9 +835,6 @@ static void zb_zcl_process_color_control_move_loop(zb_uint8_t param)
 
   // prepare struct for process each move command
   is_non_stop_attr = ((loop_data.attr_id == ZB_ZCL_ATTR_COLOR_CONTROL_CURRENT_HUE_ID)
-#if defined ZB_ENABLE_ZLL
-        || (loop_data.attr_id == ZB_ZCL_ATTR_COLOR_CONTROL_ENHANCED_CURRENT_HUE_ID)
-#endif /*defined ZB_ENABLE_ZLL*/
         ) ? ZB_TRUE : ZB_FALSE;
 
   // calc delta attribute value and update non-used msec for first attribute
@@ -984,7 +896,7 @@ static void zb_zcl_process_color_control_move_loop(zb_uint8_t param)
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_process_color_control_move_loop", (FMT__0));
 }
 
-/** @brief Process one interation of "move to" command
+/** @brief Process one iteration of "move to" command
  * @param param - buffer with move to loop data, @see zb_zcl_color_control_move_to_loop_t
  *
  * Function convert from time offset between current time and last processed time plus
@@ -1003,6 +915,9 @@ static void zb_zcl_process_color_control_move_to_loop(zb_uint8_t param)
   zb_zcl_attr_t * attr_desc;
   zb_ret_t status;
   zb_bool_t is_16bit;
+
+  /* Unused without trace. */
+  ZVUNUSED(status);
 
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_process_color_control_move_to_loop %hd curr_time %d", (FMT__H_D, param, current_time));
 
@@ -1125,7 +1040,7 @@ static void zb_zcl_process_color_control_move_to_loop(zb_uint8_t param)
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_process_color_control_move_to_loop", (FMT__0));
 }
 
-/** @brief Process one interation of step command
+/** @brief Process one iteration of step command
  * @param param - buffer with step loop data, @see zb_zcl_color_control_step_loop_t
  *
  * Function calculate number steps between between current time and last processed time.
@@ -1199,20 +1114,22 @@ static void zb_zcl_process_color_control_step_loop(zb_uint8_t param)
 }
 
 /** @brief Stop any loop command
- * @param func - address loop funcion
+ * @param func - address loop function
  * @param size_loop_data - sizeof of loop data structure
  *
  * All struct data for loop command (@see zb_zcl_color_control_move_to_loop_t,
  * @see zb_zcl_color_control_move_loop_t, @see zb_zcl_color_control_step_loop_t)
  * contain @see zb_zcl_parsed_hdr_t as first field.
  *
- * Fuction find and remove schedule alarm by 'func' parameters,
+ * Function find and remove schedule alarm by 'func' parameters,
  * get association buffer, copy @see zb_zcl_parsed_hdr_t struct by size_loop_data
  * parameter and invoke ZB_ZCL_PROCESS_COMMAND_FINISH.
  * */
 static void zb_zcl_process_color_control_stop(zb_callback_t func, zb_uint8_t size_loop_data)
 {
   zb_uint8_t param;
+
+  ZVUNUSED(size_loop_data);
 
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_process_color_control_stop %p %hd", (FMT__P_H, func, size_loop_data));
 
@@ -1258,12 +1175,7 @@ static zb_ret_t zb_zcl_process_color_control_move_to_hue_handler(zb_uint8_t para
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_HUE_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_HUE_REQ",
         (FMT__0));
@@ -1350,12 +1262,7 @@ static zb_ret_t zb_zcl_process_color_control_move_hue_handler(zb_uint8_t param, 
   endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint;
 
   ZB_ZCL_COLOR_CONTROL_GET_MOVE_HUE_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_MOVE_HUE_REQ",
         (FMT__0));
@@ -1424,12 +1331,7 @@ static zb_ret_t zb_zcl_process_color_control_step_hue_handler(zb_uint8_t param, 
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_STEP_HUE_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_STEP_HUE_REQ",
         (FMT__0));
@@ -1497,12 +1399,7 @@ static zb_ret_t zb_zcl_process_color_control_move_to_saturation_handler(zb_uint8
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_SATURATION_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_SATURATION_REQ",
         (FMT__0));
@@ -1567,12 +1464,7 @@ static zb_ret_t zb_zcl_process_color_control_move_saturation_handler(zb_uint8_t 
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_MOVE_SATURATION_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_MOVE_SATURATION_REQ",
         (FMT__0));
@@ -1639,12 +1531,7 @@ static zb_ret_t zb_zcl_process_color_control_step_saturation_handler(zb_uint8_t 
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_STEP_SATURATION_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_STEP_SATURATION_REQ",
         (FMT__0));
@@ -1710,12 +1597,7 @@ static zb_ret_t zb_zcl_process_color_control_move_to_hue_saturation_handler(zb_u
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_HUE_SATURATION_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_HUE_SATURATION_REQ",
         (FMT__0));
@@ -1790,12 +1672,7 @@ static zb_ret_t zb_zcl_process_color_control_move_to_color_handler(zb_uint8_t pa
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_COLOR_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_COLOR_REQ",
         (FMT__0));
@@ -1879,12 +1756,7 @@ static zb_ret_t zb_zcl_process_color_control_move_color_handler(zb_uint8_t param
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_MOVE_COLOR_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_MOVE_COLOR_REQ",
         (FMT__0));
@@ -1952,12 +1824,7 @@ static zb_ret_t zb_zcl_process_color_control_step_color_handler(zb_uint8_t param
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_STEP_COLOR_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_STEP_COLOR_REQ",
         (FMT__0));
@@ -2023,12 +1890,7 @@ static zb_ret_t zb_zcl_process_color_control_move_to_color_temp_handler(zb_uint8
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_COLOR_TEMPERATURE_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_MOVE_TO_COLOR_TEMP_REQ",
         (FMT__0));
@@ -2109,12 +1971,7 @@ static zb_ret_t zb_zcl_process_color_control_enhanced_move_to_hue_handler(zb_uin
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_ENHANCED_MOVE_TO_HUE_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_ENHANCED_MOVE_TO_HUE_REQ",
         (FMT__0));
@@ -2198,12 +2055,7 @@ static zb_ret_t zb_zcl_process_color_control_enhanced_move_hue_handler(zb_uint8_
   endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint;
 
   ZB_ZCL_COLOR_CONTROL_GET_ENHANCED_MOVE_HUE_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_ENHANCED_MOVE_HUE_REQ",
         (FMT__0));
@@ -2271,12 +2123,7 @@ static zb_ret_t zb_zcl_process_color_control_enhanced_step_hue_handler(zb_uint8_
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_ENHANCED_STEP_HUE_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_ENHANCED_STEP_HUE_REQ",
         (FMT__0));
@@ -2343,12 +2190,7 @@ static zb_ret_t zb_zcl_process_color_control_enhanced_move_to_hue_saturation_han
   ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
 
   ZB_ZCL_COLOR_CONTROL_GET_ENHANCED_MOVE_TO_HUE_SATURATION_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_ENHANCED_MOVE_TO_HUE_SATURATION_REQ",
         (FMT__0));
@@ -2505,12 +2347,7 @@ static zb_ret_t zb_zcl_process_color_control_color_loop_set_handler(zb_uint8_t p
   endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint;
 
   ZB_ZCL_COLOR_CONTROL_GET_COLOR_LOOP_SET_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_COLOR_LOOP_SET_REQ",
         (FMT__0));
@@ -2618,12 +2455,7 @@ static zb_ret_t zb_zcl_process_color_control_stop_move_step_handler(zb_uint8_t p
     ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
     endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint;
 
-  if (!color_control_check_color_capabilities(endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (color_control_check_req_options(param, endpoint))
+  if (color_control_check_req_options(param, endpoint))
   {
     zb_zcl_color_control_set16(endpoint, ZB_ZCL_ATTR_COLOR_CONTROL_REMAINING_TIME_ID, 0);
 
@@ -2668,12 +2500,7 @@ static zb_ret_t zb_zcl_process_color_control_move_color_temp_handler(zb_uint8_t 
   endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint;
 
   ZB_ZCL_COLOR_CONTROL_GET_MOVE_COLOR_TEMP_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_MOVE_COLOR_TEMP_REQ",
         (FMT__0));
@@ -2744,12 +2571,7 @@ static zb_ret_t zb_zcl_process_color_control_step_color_temp_handler(zb_uint8_t 
   endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint;
 
   ZB_ZCL_COLOR_CONTROL_GET_STEP_COLOR_TEMP_REQ(param, payload, status);
-  if (!color_control_check_color_capabilities(endpoint, cmd_info.cmd_id))
-  {
-    ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, ZB_ZCL_STATUS_UNSUP_CMD);
-    ret = RET_BUSY;   // not need send answer yet
-  }
-  else if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
+  if (status != ZB_ZCL_PARSE_STATUS_SUCCESS)
   {
     TRACE_MSG(TRACE_ZCL1, "Error payload of ZB_ZCL_COLOR_CONTROL_GET_STEP_COLOR_TEMP_REQ",
         (FMT__0));

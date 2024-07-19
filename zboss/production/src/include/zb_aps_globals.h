@@ -464,7 +464,7 @@ typedef void (*zb_aps_binding_added_handler_t)(zb_uint16_t bind_tbl_idx);
 
 typedef struct zb_aps_func_selector_s
 {
-  zb_callback_t authhenticate_child_directly;
+  zb_callback_t authenticate_child_directly;
   zb_aps_binding_added_handler_t new_binding_handler;
 } zb_aps_func_selector_t;
 

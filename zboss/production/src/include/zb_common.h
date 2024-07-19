@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -186,6 +186,7 @@ extern char** g_argv;
 #ifndef ZB_CONFIGURABLE_MEM
 #define ZB_RESYNC_CFG_MEM()
 #else /* ZB_CONFIGURABLE_MEM */
+void zb_assign_global_pointers(void);
 void zb_init_configurable_mem(int clear);
 #define ZB_RESYNC_CFG_MEM() zb_init_configurable_mem(0)
 #endif /* ZB_CONFIGURABLE_MEM */

@@ -2624,7 +2624,7 @@ typedef ZB_PACKED_PRE struct zb_zcl_wwah_context_s
 #define ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_POLL_CONTROL_CHECK_IN_FAILED_CNT 3
 /* FIXME: Is it defined somewhere in WWAH spec? */
 #define ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_RSSI_IS_GOOD(rssi) (rssi >= -100)
-void zb_zcl_wwah_bad_parent_recovery_signal(zb_zcl_wwah_bad_parent_recovery_signal_t sig);
+void zb_zcl_wwah_bad_parent_recovery_signal(zb_bufid_t sig);
 
 zb_ret_t zb_zcl_wwah_request_new_aps_link_key_handler(zb_uint8_t param);
 zb_ret_t zb_zcl_wwah_enable_wwah_app_event_retry_algorithm_handler(zb_uint8_t param);

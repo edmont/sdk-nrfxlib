@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -1154,78 +1154,6 @@ zb_uint8_t zb_zcl_get_next_target_endpoint(
 }
 
 
-#if defined ZB_APS_ENCRYPTION_PER_CLUSTER
-void zb_zcl_set_cluster_encryption(zb_uint8_t endpoint_id, zb_uint16_t cluster_id, zb_uint8_t encrypt)
-{
-  zb_af_endpoint_desc_t *ep_desc;
-  zb_uindex_t i = 0;
-  zb_uint8_t *cluster_encryption;
-  zb_uint8_t clusters_count;
-  TRACE_MSG(TRACE_ZCL2, ">> zb_zcl_set_cluster_encryption, ep %hd, cluster 0x%x, encrypt %d", (FMT__H_D_D, endpoint_id, cluster_id, encrypt));
-  ep_desc = zb_af_get_endpoint_desc(endpoint_id);
-
-  if (ep_desc)
-  {
-    clusters_count = ep_desc->simple_desc->app_input_cluster_count +
-      ep_desc->simple_desc->app_output_cluster_count;
-    cluster_encryption = (zb_uint8_t*)&(ep_desc->simple_desc->app_cluster_list[clusters_count]);
-    while (i < clusters_count)
-    {
-      if (ep_desc->simple_desc->app_cluster_list[i] == cluster_id)
-      {
-        if (encrypt)
-        {
-          ZB_SET_BIT_IN_BIT_VECTOR(cluster_encryption, i);
-          TRACE_MSG(TRACE_ZCL2, "encryption for cluster 0x%x is ON", (FMT__D, cluster_id));
-        }
-        else
-        {
-          ZB_CLR_BIT_IN_BIT_VECTOR(cluster_encryption, i);
-          TRACE_MSG(TRACE_ZCL2, "encryption for cluster 0x%x is OFF", (FMT__D, cluster_id));
-        }
-        /* TODO: Set encryption for different cluster roles independently. */
-        break;
-      }
-      i++;
-    }
-  }
-  TRACE_MSG(TRACE_ZCL2, "<< zb_zcl_set_cluster_encryption", (FMT__0));
-}
-
-zb_bool_t cluster_get_encryption_from_desc(zb_uint8_t endpoint_id, zb_uint16_t cluster_id)
-{
-  zb_af_endpoint_desc_t *ep_desc;
-  zb_uindex_t i = 0;
-  zb_uint8_t *cluster_encryption;
-  zb_uint8_t clusters_count;
-  zb_bool_t res = ZB_FALSE;
-
-  ep_desc = zb_af_get_endpoint_desc(endpoint_id);
-
-  if (ep_desc)
-  {
-    clusters_count = ep_desc->simple_desc->app_input_cluster_count +
-      ep_desc->simple_desc->app_output_cluster_count;
-    cluster_encryption = (zb_uint8_t*)&(ep_desc->simple_desc->app_cluster_list[clusters_count]);
-    while (i < clusters_count)
-    {
-      if (ep_desc->simple_desc->app_cluster_list[i] == cluster_id)
-      {
-        if (ZB_CHECK_BIT_IN_BIT_VECTOR(cluster_encryption, i))
-        {
-          res = ZB_TRUE;
-        }
-        break;
-      }
-      i++;
-    }
-  }
-
-  TRACE_MSG(TRACE_ZCL1, "cluster_get_encryption_from_desc: ep %hd cluster 0x%x res %hd", (FMT__H_D_H, endpoint_id, cluster_id, res));
-
-  return res;
-}
-#endif  /* ZB_APS_ENCRYPTION_PER_CLUSTER */
 
 zb_bool_t cluster_needs_aps_encryption(zb_uint8_t endpoint_id, zb_uint16_t cluster_id)
 {
@@ -1243,44 +1171,12 @@ zb_bool_t cluster_needs_aps_encryption(zb_uint8_t endpoint_id, zb_uint16_t clust
    * encrypted. ZCL clusters without APS encryption shall be located on another (non-Smart Energy)
    * endpoint. The same restrictions shall also apply to manufacturer-specific clusters.
    */
-#ifdef ZB_ENABLE_SE
-  if (profile_id == ZB_AF_SE_PROFILE_ID)
-  {
-    switch (cluster_id)
-    {
-      case ZB_ZCL_CLUSTER_ID_BASIC:
-      case ZB_ZCL_CLUSTER_ID_IDENTIFY:
-      case ZB_ZCL_CLUSTER_ID_ALARMS:
-      case ZB_ZCL_CLUSTER_ID_POWER_CONFIG:
-      case ZB_ZCL_CLUSTER_ID_KEY_ESTABLISHMENT:
-        res = ZB_FALSE;
-        break;
-
-      default:
-        res = ZB_TRUE;
-        break;
-    }
-  }
-  else
-#endif
       if (profile_id == ZB_AF_HA_PROFILE_ID
           && cluster_id == ZB_ZCL_CLUSTER_ID_WWAH)
   {
     /* WWAH cluster is always encrypted */
     res = ZB_TRUE;
   }
-#ifdef ZB_APS_ENCRYPTION_PER_CLUSTER
-  else
-  {
-    res = cluster_get_encryption_from_desc(endpoint_id, cluster_id);
-  }
-#endif
-#if defined ZB_ENABLE_SE && !defined ZB_APS_ENCRYPTION_PER_CLUSTER
-  else
-  {
-    /* MISRA rule 15.7 requires empty 'else' branch. */
-  }
-#endif /* defined ZB_ENABLE_SE && !defined ZB_APS_ENCRYPTION_PER_CLUSTER */
 
   TRACE_MSG(TRACE_ZCL1, "cluster_needs_aps_encryption: ep %hd cluster 0x%x res %hd", (FMT__H_D_H, endpoint_id, cluster_id, res));
 
@@ -1289,6 +1185,7 @@ zb_bool_t cluster_needs_aps_encryption(zb_uint8_t endpoint_id, zb_uint16_t clust
 
 static void ep_process_zcl_cmd(zb_uint8_t param)
 {
+  zb_zcl_parsed_hdr_t* cmd_info_buf_ptr;
   zb_zcl_parsed_hdr_t cmd_info;
   zb_uint8_t ep;
   zb_af_endpoint_desc_t *ep_desc;
@@ -1296,10 +1193,27 @@ static void ep_process_zcl_cmd(zb_uint8_t param)
 
   TRACE_MSG(TRACE_ZCL2, "> ep_process_zcl_cmd, param %hd", (FMT__H, param));
 
-  ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
-  ep = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint;
+  cmd_info_buf_ptr = ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t);
+
+  TRACE_MSG(TRACE_ZCL2, "cmd_id: %hd, cluster_id: 0x%x, is_common_command: %hd",
+            (FMT__H_D_H, cmd_info_buf_ptr->cmd_id, cmd_info_buf_ptr->cluster_id, cmd_info_buf_ptr->is_common_command));
+
+  ep = ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info_buf_ptr).dst_endpoint;
   ep_desc = zb_af_get_endpoint_desc(ep);
   ZB_ASSERT(ep_desc);
+
+  /**
+   * As per Zigbee Specification Revision 22.2, 2.3.3.1
+   * The recipient of the message containing a request using a wild card profile ID
+   * shall respond with the profile ID in its simple descriptor if it is able to process the message
+   *
+   * Replace wildcard profile id with our's here, so all further branches will have correct profile id in the responses they are forming
+   */
+  if (cmd_info_buf_ptr->profile_id == ZB_AF_WILDCARD_PROFILE_ID)
+  {
+    cmd_info_buf_ptr->profile_id = ep_desc->profile_id;
+  }
+  ZB_MEMCPY(&cmd_info, cmd_info_buf_ptr, sizeof(zb_zcl_parsed_hdr_t));
 
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_BASIC
   if(!zb_zcl_check_is_device_enabled(ep, cmd_info.cmd_id, cmd_info.cluster_id, cmd_info.is_common_command))
@@ -1318,31 +1232,6 @@ static void ep_process_zcl_cmd(zb_uint8_t param)
   /*cstat !MISRAC2012-Rule-2.1_b */
   /** @mdr{00010,3} */
   {
-#if !defined ZB_ED_ROLE && defined ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-    zb_bool_t is_dev_suspended = zb_subghz_srv_device_suspended(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).source.u.short_addr);
-    if (
-    /* Special check for ZB_ZCL_CMD_OTA_UPGRADE_IMAGE_BLOCK_ID:
-b. If active, the OTA server shall respond to any Image Block Request
-command with an 3090 Image Block Response command with a status of
-WAIT_FOR_DATA.
-    */
-#if defined ZB_ZCL_SUPPORT_CLUSTER_OTA_UPGRADE && defined ZB_HA_ENABLE_OTA_UPGRADE_SERVER && defined ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-      zb_subghz_catch_ota_image_block_req(&param)
-#else
-      ZB_FALSE
-#endif
-/*
-The Coordinator device shall respond to ZCL-layer messages received
-from any device 3092 whilst in the 'Critical' state with a
-Suspend ZCL Messages command indicating the 3093 required period of
-suspension. The incoming request packet will be ignored.
- */
-      || is_dev_suspended)
-    {
-      status = ZB_ZCL_STATUS_SUCCESS; /* to avoid sending default response */
-      goto send_default_response;
-    }
-#endif  /* ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ */
     /* SE 1.4 spec, sublclause 5.4.6
      *
      * ... all SE applications shall use and validate the Security key usage as listed in Table 5-12.
@@ -1354,23 +1243,12 @@ suspension. The incoming request packet will be ignored.
               (FMT__D_D, cmd_info.cluster_id,
                cluster_needs_aps_encryption(ep, cmd_info.cluster_id)));
 
-#ifdef ZB_ENABLE_SE
-    TRACE_MSG(TRACE_ZCL2, "APS key attrs: 0x%x, key source: 0x%x",
-              (FMT__D_D,
-               cmd_info.addr_data.common_data.aps_key_attrs,
-               cmd_info.addr_data.common_data.aps_key_source));
-#endif
 
     /* SE+BDB mode: May be no APS encryption (0 key attrs, 0 key source).
        TODO: Check somehow that we have any verified key (CBKE or non-CBKE) with src device? */
     /* SE mode: check key is verified by CBKE */
     if (cluster_needs_aps_encryption(ep, cmd_info.cluster_id) == ZB_TRUE &&
         (!ZB_APS_FC_IS_SECURE(cmd_info.addr_data.common_data.fc)
-#ifdef ZB_ENABLE_SE
-         || (ZB_SE_MODE()
-             && (cmd_info.addr_data.common_data.aps_key_source != ZB_SECUR_KEY_SRC_CBKE
-                 || cmd_info.addr_data.common_data.aps_key_attrs != ZB_SECUR_VERIFIED_KEY))
-#endif
           )
       )
     {
@@ -1481,8 +1359,14 @@ static void broadcast_endpoint_delivery_step(zb_uint8_t param, zb_uint16_t bc_bu
      ZCL 6.0
      2.3.2.2 A device processing a ZCL message sent to the broadcast endpoint
      SHOULD jitter messages that are sent in response
+
+     [VK]: It's not required to send responses for ZCL commands received via ZGP,
+     so just use zero jitter.
   */
-  process_command_jitter = ZB_RANDOM_JTR(ZB_ZCL_BROADCAST_ENDPOINT_CMD_RESP_JITTER);
+  process_command_jitter =
+    (ZB_ZCL_ADDR_TYPE_IS_GPD(cmd_info_ptr->addr_data.common_data.source.addr_type)) ?
+    (0U) :
+    (ZB_RANDOM_JTR(ZB_ZCL_BROADCAST_ENDPOINT_CMD_RESP_JITTER));
   ZB_ASSERT(process_command_jitter <= ZB_UINT16_MAX);
   ZB_SCHEDULE_ALARM(ep_process_zcl_cmd, param, (zb_uint16_t)process_command_jitter);
 
@@ -1507,6 +1391,7 @@ static void broadcast_endpoint_delivery_step(zb_uint8_t param, zb_uint16_t bc_bu
     ZB_ASSERT(bc_buf_ref <= ZB_UINT8_MAX);
     ZB_SCHEDULE_ALARM(broadcast_endpoint_call_next_delivery_step, (zb_uint8_t)bc_buf_ref, process_command_jitter);
   }
+  TRACE_MSG(TRACE_ZCL2, "< broadcast_endpoint_delivery_step", (FMT__0));
 }
 
 
@@ -1539,13 +1424,28 @@ void zb_zcl_process_parsed_zcl_cmd(zb_uint8_t param)
     }
     else
     {
-      zb_ret_t ret;
+      zb_ret_t ret = RET_ERROR;
 
-      ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info_ptr).dst_endpoint = ep;
-      ret = zb_buf_get_out_delayed_ext(broadcast_endpoint_delivery_step, param, 0);
+      if (ZCL_CTX().broadcast_ep_cb != NULL)
+      {
+        TRACE_MSG(TRACE_ZCL1, "call ZCL_CTX().broadcast_ep_cb %p", (FMT__P, ZCL_CTX().broadcast_ep_cb));
+        ret = (zb_ret_t)(*ZCL_CTX().broadcast_ep_cb)(param);
+        TRACE_MSG(TRACE_ZCL1, "ret %ld", (FMT__L, ret));
+      }
+
       if (ret != RET_OK)
       {
-        TRACE_MSG(TRACE_ERROR, "Failed zb_buf_get_out_delayed [%d]", (FMT__D, ret));
+        ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info_ptr).dst_endpoint = ep;
+        ret = zb_buf_get_out_delayed_ext(broadcast_endpoint_delivery_step, param, 0);
+        if (ret != RET_OK)
+        {
+          TRACE_MSG(TRACE_ERROR, "Failed zb_buf_get_out_delayed [%d]", (FMT__D, ret));
+          zb_buf_free(param);
+        }
+      }
+      else
+      {
+        TRACE_MSG(TRACE_ZCL1, "a broadcast ep precessed successfully by an app, free buf", (FMT__0));
         zb_buf_free(param);
       }
     }
@@ -1811,21 +1711,6 @@ zb_uint8_t zb_zcl_check_accept_command(zb_uint8_t param)
       status = ZB_ZCL_STATUS_SUCCESS;
     }
 
-#ifdef ZB_ENABLE_SE
-    if (zb_zdo_joined()
-        && !(ZB_IS_DEVICE_ZC() && ZB_SUBGHZ_SWITCH_MODE())
-        && (cluster_desc->cluster_id) == ZB_ZCL_CLUSTER_ID_SUB_GHZ
-        /*cstat !MISRAC2012-Rule-13.5 */
-        /* After some investigation, the following violation of Rule 13.5 seems to be
-         * a false positive. There are no side effect to 'zb_get_current_page()'. This
-         * violation seems to be caused by the fact that 'zb_get_current_page()' is an
-         * external function, which cannot be analyzed by C-STAT. */
-        && zb_get_current_page() == 0U)
-    {
-      status = ZB_ZCL_STATUS_UNSUP_CLUST;
-      TRACE_MSG(TRACE_ZCL2, "Not in SubGHz mode - filter out SubGHz cluster", (FMT__0));
-    }
-#endif
   }
   else
   {
@@ -2033,7 +1918,7 @@ void zb_zcl_send_command_short_schedule(zb_bufid_t buffer,
                                              zb_uint16_t addr, zb_uint8_t dst_addr_mode,
                                              zb_uint8_t dst_ep, zb_uint8_t ep,
                                              zb_uint16_t prof_id, zb_uint16_t cluster_id,
-                                             zb_callback_t cb, zb_uint64_t delay)
+                                             zb_callback_t cb, zb_uint16_t delay)
 {
   zb_apsde_data_req_t *apsde_req;
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_BASIC
@@ -2086,13 +1971,12 @@ void zb_zcl_send_command_short_schedule(zb_bufid_t buffer,
 zb_bool_t zb_zcl_can_cluster_be_fragmented(zb_uint16_t profile_id, zb_uint16_t cluster_id)
 {
   zb_bool_t ret;
-  ZVUNUSED (profile_id);
   /* clusters with variable size fields */
-  /* if (profile_id == ZB_AF_SE_PROFILE_ID)
+  if (profile_id == ZB_AF_SE_PROFILE_ID)
   {
     ret = ZB_TRUE;
-}
-  else */
+  }
+  else
   {
     ret = (cluster_id == ZB_ZCL_CLUSTER_ID_TUNNELING
         || cluster_id == ZB_ZCL_CLUSTER_ID_PRICE
@@ -2116,6 +2000,7 @@ zb_bool_t zb_zcl_can_cluster_be_fragmented(zb_uint16_t profile_id, zb_uint16_t c
 static zb_ret_t zb_zcl_finish_and_send_packet_common(zb_bufid_t buffer,
                                                      zb_uint8_t *ptr,
                                                      zb_callback_t cb,
+                                                     zb_zcl_security_use_option_t security_option,
                                                      zb_bool_t disable_aps_ack,
                                                      zb_uint16_t delay)
 {
@@ -2265,27 +2150,16 @@ static zb_ret_t zb_zcl_finish_and_send_packet_common(zb_bufid_t buffer,
     }
   }
 
-#if defined ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-  if (ZCL_CTX().subghz_ctx.cli.suspend_zcl_messages)
-  {
-    TRACE_MSG(TRACE_ZCL2, "ZCL (out): DROP frame! ZCL messages suspended by SubGHz Cluster", (FMT__0));
-    res = RET_CANCELLED;
-  }
-#endif
 
   if (res == RET_OK)
   {
-    if (cluster_needs_aps_encryption(ep, cluster_id) == ZB_TRUE)
+    if ((security_option == ZB_ZCL_SU_ENABLED) ||
+        ((security_option == ZB_ZCL_SU_AUTO) && (cluster_needs_aps_encryption(ep, cluster_id) == ZB_TRUE)))
     {
       zb_ieee_addr_t dst_ieee;
       zb_aps_device_key_pair_set_t *key = NULL;
       zb_secur_key_attributes_t key_attrib =
-#if defined ZB_CERTIFICATION_HACKS && defined ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-        ZB_CERT_HACKS().zcl_subghz_cluster_test && cluster_id == ZB_ZCL_CLUSTER_ID_SUB_GHZ ?
-          ZB_SECUR_ANY_KEY_ATTR : ZB_SECUR_VERIFIED_KEY;
-#else
           ZB_SECUR_VERIFIED_KEY;
-#endif
 
       TRACE_MSG(TRACE_ZCL2, "ZCL (out): cluster: 0x%x, APS security required: yes",
                 (FMT__D, cluster_id));
@@ -2334,14 +2208,6 @@ static zb_ret_t zb_zcl_finish_and_send_packet_common(zb_bufid_t buffer,
          TODO: For legacy devices it may be no VERIFIED key - what to do?
        */
       if ((key == NULL
-#ifdef ZB_ENABLE_SE
-           || (ZB_SE_MODE()
-               && key->key_source != ZB_SECUR_KEY_SRC_CBKE
-#if defined ZB_CERTIFICATION_HACKS && defined ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-                && !ZB_CERT_HACKS().zcl_subghz_cluster_test
-#endif
-              )
-#endif /* ZB_ENABLE_SE */
            )
           && (dst_addr_mode != ZB_APS_ADDR_MODE_DST_ADDR_ENDP_NOT_PRESENT))
       {
@@ -2376,26 +2242,6 @@ static zb_ret_t zb_zcl_finish_and_send_packet_common(zb_bufid_t buffer,
                 (FMT__D, cluster_id));
     }
 
-#ifdef ZB_ENABLE_SE
-    if (res == RET_OK
-        /*cstat !MISRAC2012-Rule-14.3_b */
-        /** @mdr{00010,6} */
-        && ZB_SE_MODE()
-        /*cstat !MISRAC2012-Rule-13.5 */
-        /* After some investigation, the following violation of Rule 13.5 seems to be
-         * a false positive. There are no side effect to 'se_is_high_freq_msg()'. This
-         * violation seems to be caused by the fact that 'se_is_high_freq_msg()' is an
-         * external function, which cannot be analyzed by C-STAT. */
-        && (ZCL_SELECTOR().is_high_freq_msg != NULL
-            && ZCL_SELECTOR().is_high_freq_msg(buffer)))
-    {
-      zb_uint8_t *hdr = zb_buf_begin(buffer);
-      ZB_ZCL_SET_DISABLE_DEFAULT_RESPONSE(*hdr, 1U);
-      apsde_req->tx_options &= ~ZB_APSDE_TX_OPT_ACK_TX;
-      TRACE_MSG(TRACE_ZCL3, "High frequency message. Remove APS ACK req and disable default resp",
-                (FMT__0));
-    }
-#endif
       /*
        * APS Acknowledgments shall be suppressed on High Frequency messages
        * (messages that are repeated at a rate higher than once every 30
@@ -2465,7 +2311,7 @@ zb_ret_t zb_zcl_finish_and_send_packet(zb_bufid_t  buffer, zb_uint8_t *ptr,
   apsde_req->src_endpoint = (ep);
   apsde_req->profileid = (prof_id);
   apsde_req->clusterid = (cluster_id);
-  return zb_zcl_finish_and_send_packet_common(buffer, ptr, cb, ZB_FALSE, 0);
+  return zb_zcl_finish_and_send_packet_common(buffer, ptr, cb, ZB_ZCL_SU_AUTO, ZB_FALSE, 0);
 }
 
 zb_ret_t zb_zcl_finish_and_send_packet_new(zb_bufid_t  buffer, zb_uint8_t *ptr,
@@ -2484,8 +2330,12 @@ zb_ret_t zb_zcl_finish_and_send_packet_new(zb_bufid_t  buffer, zb_uint8_t *ptr,
   apsde_req->src_endpoint = (ep);
   apsde_req->profileid = (prof_id);
   apsde_req->clusterid = (cluster_id);
-  apsde_req->tx_options = aps_secured ? (zb_uint8_t)ZB_APSDE_TX_OPT_SECURITY_ENABLED : 0U;
-  return zb_zcl_finish_and_send_packet_common(buffer, ptr, cb, disable_aps_ack, delay);
+  if (aps_secured) {
+    apsde_req->tx_options |= ZB_APSDE_TX_OPT_SECURITY_ENABLED;
+  }
+  return zb_zcl_finish_and_send_packet_common(buffer,ptr, cb,
+                                              (aps_secured ? ZB_ZCL_SU_ENABLED : ZB_ZCL_SU_DISABLED),
+                                              disable_aps_ack, delay);
 }
 
 
@@ -2511,16 +2361,9 @@ zb_zcl_globals_t *zb_zcl_get_ctx()
   return &ZG->zcl;
 }
 
-zb_zcl8_globals_t *zb_zcl8_get_ctx()
-{
-  static zb_zcl8_globals_t zb_zcl8_ctx;
-
-  return &zb_zcl8_ctx;
-}
-
 zb_ret_t zb_zcl_set_peer_revision_callback(zb_zcl_peer_revision_cb_t cb)
 {
-  ZCL8_CTX().peer_revision_cb = cb;
+  ZCL_CTX().peer_revision_cb = cb;
 
   /* NULL, if a user wants to reset the callback */
   if (NULL == cb)
@@ -2541,17 +2384,17 @@ zb_ret_t zb_zcl_set_backward_comp_mode(zb_uint8_t mode)
   }
   else
   {
-    ZCL8_CTX().backward_comp_mode = mode;
+    ZCL_CTX().backward_comp_mode = mode;
     return RET_OK;
   }
 }
 
 zb_uint8_t zb_zcl_get_backward_comp_mode(void)
 {
-  return ZCL8_CTX().backward_comp_mode;
+  return ZCL_CTX().backward_comp_mode;
 }
 
-zb_uint16_t zb_zcl_get_cluster_rev_by_mode(zb_uint16_t api_revision, const zb_addr_u *dst_addr, 
+zb_uint16_t zb_zcl_get_cluster_rev_by_mode(zb_uint16_t api_revision, const zb_addr_u *dst_addr,
                                            zb_uint8_t dst_addr_mode, zb_uint8_t dst_ep,
                                            zb_uint16_t cluster_id, zb_uint8_t cluster_role,
                                            zb_uint8_t src_ep)
@@ -2597,12 +2440,12 @@ zb_uint16_t zb_zcl_get_cluster_rev_by_mode(zb_uint16_t api_revision, const zb_ad
       rev = rev_attr_value;
       break;
     case ZB_ZCL_COMPATIBILITY_MODE:
-      if (NULL == ZCL8_CTX().peer_revision_cb)
+      if (NULL == ZCL_CTX().peer_revision_cb)
       {
         rev = ZB_ZCL_CLUSTER_REV_MIN;
       }
       else
-      {        
+      {
         if (dst_addr_mode == ZB_APS_ADDR_MODE_64_ENDP_PRESENT)
         {
           ZB_IEEE_ADDR_COPY(ieee_addr, dst_addr);
@@ -2614,7 +2457,7 @@ zb_uint16_t zb_zcl_get_cluster_rev_by_mode(zb_uint16_t api_revision, const zb_ad
         }
         if (RET_OK == ret)
         {
-          rev = (*ZCL8_CTX().peer_revision_cb)(ieee_addr, cluster_id,
+          rev = (*ZCL_CTX().peer_revision_cb)(ieee_addr, cluster_id,
                                               ZB_ZCL_REVERT_CLUSTER_ROLE(cluster_role), dst_ep);
           if (ZB_ZCL_PEER_CLUSTER_REV_UNKNOWN == rev)
           {
@@ -2643,18 +2486,18 @@ zb_uint16_t zb_zcl_get_cluster_rev_by_mode(zb_uint16_t api_revision, const zb_ad
 
 zb_uint8_t zb_zcl_get_backward_compatible_statuses_mode(void)
 {
-  return ZCL8_CTX().backward_compatible_statuses_mode;
+  return ZCL_CTX().backward_compatible_statuses_mode;
 }
 
 zb_ret_t zb_zcl_set_backward_compatible_statuses_mode(zb_uint8_t statuses_mode)
 {
-  if (statuses_mode > ZB_ZCL_STATUSES_ZCL8_MODE)
+  if (statuses_mode > ZB_ZCL_STATUSES_PRE_ZCL8_MODE)
   {
     return RET_OUT_OF_RANGE;
   }
   else
   {
-    ZCL8_CTX().backward_compatible_statuses_mode = statuses_mode;
+    ZCL_CTX().backward_compatible_statuses_mode = statuses_mode;
     return RET_OK;
   }
 }
@@ -2700,37 +2543,6 @@ zb_zcl_status_t zb_zcl_zcl8_statuses_conversion(zb_zcl_status_t status)
     }
     return ret_status;
   }
-}
-
-zb_zcl_status_t zb_zcl_get_zcl_status_from_ret(zb_ret_t result)
-{
-  zb_zcl_status_t zcl_result;
-
-  switch (result)
-  {
-    case RET_OK:
-      zcl_result = ZB_ZCL_STATUS_SUCCESS;
-      break;
-
-    case RET_INVALID_PARAMETER_1:
-      zcl_result = ZB_ZCL_STATUS_INVALID_FIELD;
-      break;
-
-    case RET_INVALID_PARAMETER:
-      zcl_result = ZB_ZCL_STATUS_INVALID_VALUE;
-      break;
-
-    case RET_NOT_IMPLEMENTED:
-      zcl_result = ZB_ZCL_STATUS_UNSUP_CMD;
-      break;
-
-    default:
-      zcl_result = (zb_zcl_get_backward_compatible_statuses_mode() == ZB_ZCL_STATUSES_ZCL8_MODE) ?
-                  ZB_ZCL_STATUS_FAIL : ZB_ZCL_STATUS_HW_FAIL;
-      break;
-  }
-
-  return zcl_result;
 }
 
 #endif /* defined (ZB_ENABLE_ZCL) */

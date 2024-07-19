@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -122,6 +122,7 @@ typedef struct zp_zdo_handle_s
   zb_bitbool_t rejoin:1;                    /*!< if !0, this is rejoin  */
   zb_bitbool_t tc_significance:1;           /*!< data for permit_joining */
   zb_bitbool_t channel_update_disabled:1;   /*!< if !0, Channel update is disabled */
+  zb_bitbool_t tx_fail_debug_enabled:1;     /*!< if !0, ZC broadcasts zdo_unsol_enh_update_notify with tx failures info */
   zb_uint8_t permit_joining_param;          /*!< if !0, nlme-permit_joining will
                                              * be executed */
   zb_uint8_t permit_duration;               /*!< data for permit_joining */
@@ -133,14 +134,12 @@ typedef struct zp_zdo_handle_s
                                              * set after device was requested to leave the network
                                              * via mgmt_leave_req */
   zb_zdo_rejoin_ctx_t rejoin_ctx;
-#ifdef ZB_MACSPLIT_HOST
-  zb_bool_t start_no_autostart;              /*!< if ZB_TRUE, device started with start_no_autostart
-                                              * Used only for macsplit host*/
-#endif
 } zp_zdo_handle_t;
 
 /* Flag to set and check if channel update is disabled */
 #define ZB_ZDO_NETWORK_MGMT_CHANNEL_UPDATE_IS_DISABLED() (ZG->zdo.handle.channel_update_disabled != 0U)
+
+#define ZB_ZDO_TX_FAIL_DEBUG_ENABLED() (ZG->zdo.handle.tx_fail_debug_enabled != 0U)
 
 /* Flag to set and check if channel update is disabled */
 #define ZB_ZDO_IS_REJOIN_SECURE() (ZG->zdo.handle.rejoin_ctx.secure_rejoin != 0U)
@@ -163,12 +162,14 @@ typedef struct zb_zdo_pim_s
 #ifdef SNCP_MODE
   zb_callback_t single_poll_cb;     /* set when executed Single Poll from Host */
 #endif
+  zb_uint8_t turbo_poll_not_received_data_pkt_cnt;
   zb_bitbool_t turbo_prohibit:1;
   zb_bitbool_t fast_poll_on:1;
   zb_bitbool_t poll_in_progress:1;
   zb_bitbool_t poll_stop:1;
   zb_bitbool_t was_in_turbo_poll:1; /* special value to indicate that pkt was not received,
                                       * the turbo poll should be restarted*/
+  zb_bitbool_t enable_turbo_poll_retry_if_pkt_not_received:1;
 } zb_zdo_pim_t;
 
 /* Callback types */
@@ -187,7 +188,7 @@ typedef ZB_PACKED_PRE struct zdo_cb_hash_ent_s
 
 #define ZB_ZDO_CHECK_FAILS_MASK     1U      /* flag to check if channel interference check is in progress */
 #define ZB_ZDO_SEND_WITH_ACK_MASK   (1U << 1U) /* flag to specify sending with acknowledgement */
-#define ZB_ZDO_CHANNEL_CHANGED_MASK (1U << 2U) /* flag shows that channel change opration was performed recently (server side) */
+#define ZB_ZDO_CHANNEL_CHANGED_MASK (1U << 2U) /* flag shows that channel change operation was performed recently (server side) */
 #define ZB_ZDO_TC_REJOIN_ENABLE_MASK (1U << 3U) /* flag that allows or disallows Trust Center Rejoin (Unsequred rejoin) */
 #define ZB_ZDO_UNAUTH_MASK (1U << 4U) /* indicates unauthenticated join case */
 
@@ -284,6 +285,7 @@ typedef struct zb_zdo_globals_s
   zb_uint8_t      tsn;                              /*!< */
   zb_zdo_tsn_policy_t tsn_policy;                   /*!< see zb_zdo_tsn_policy_e */
 #ifdef ZBOSS_ZDO_APP_TSN_ENABLE
+  zb_callback_t       tsn_lock_cb;                  /*!< callback to be called to sync app tsn allocate  */
   zdo_app_tsn_entry_t app_tsn_table[ZBOSS_ZDO_APP_TSN_TABLE_SIZE];
 #endif
   zb_device_handler_t   af_data_cb;                 /*!< Callback of zb_apsde_data_indication
@@ -482,7 +484,7 @@ typedef struct zb_zdo_globals_s
 
 /* Converts a buffer with data into a packed signal with the data */
 void zb_app_signal_pack_with_data(zb_uint8_t param, zb_uint32_t signal_code, zb_int16_t status);
-/* Buffer is replaced with signal information, data_size bytes are reserved for additional singal data */
+/* Buffer is replaced with signal information, data_size bytes are reserved for additional signal data */
 void *zb_app_signal_pack(zb_uint8_t param, zb_uint32_t signal_code, zb_int16_t status, zb_uint8_t data_size);
 
 void *zb_app_signal_pack_with_detailed_status(zb_uint8_t param, zb_uint32_t signal_code,

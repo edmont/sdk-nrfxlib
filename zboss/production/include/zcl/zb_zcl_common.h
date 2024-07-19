@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -75,6 +75,7 @@
  * enabled, long address is specified). Possibly - recalculate this
  * max size in run-time taking into account current parameters */
 /* TODO: check this value - calculate it correctly!!! */
+#define ZB_MAX_PHY_PAYLOAD_SIZE 127U
 /*
   Let's count:
 - max PHY payload - 127 bytes
@@ -355,6 +356,14 @@ typedef enum zb_zcl_attribute_reporting_status_e
   ZB_ZCL_AR_STATUS_PENDING  = 0x00,  /**< Pending. */
   ZB_ZCL_AR_STATUS_COMPLETE = 0x01  /**< Attribute Reporting Complete. */
 } zb_zcl_attribute_reporting_status_t;
+
+/** @brief Security use option. */
+typedef enum zb_zcl_security_use_option_e
+{
+  ZB_ZCL_SU_DISABLED,
+  ZB_ZCL_SU_ENABLED,
+  ZB_ZCL_SU_AUTO
+} zb_zcl_security_use_option_t;
 
 /**
  * @name ZCL status values
@@ -804,9 +813,7 @@ zb_zcl_attr_t;
     (void*) &(cluster_revision_##attrs_desc_name)                                                  \
   },
 
-/** @endcond */ /* internals_doc */
-
-/*! @brief Start declaration of attributes list with cluster revision */
+/*! @internal @brief Start declaration of attributes list with cluster revision */
 #define ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attrs_desc_name, cluster_name)           \
   zb_uint16_t cluster_revision_##attrs_desc_name = cluster_name##_CLUSTER_REVISION_DEFAULT;        \
   zb_zcl_attr_t attrs_desc_name [] = {                                                             \
@@ -817,8 +824,6 @@ zb_zcl_attr_t;
     ZB_ZCL_NON_MANUFACTURER_SPECIFIC,                                                              \
     (void*) &(cluster_revision_##attrs_desc_name)                                                  \
   },
-
-/** @cond internals_doc */
 
 /*! @internal @brief Start declaration of static attributes list with cluster revision */
 #define ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION_STATIC(attrs_desc_name, cluster_name)    \
@@ -1177,17 +1182,7 @@ typedef ZB_PACKED_PRE  struct zb_zcl_parsed_hdr_s
       zb_uint8_t reserved:4;
 #endif
     } ZB_PACKED_STRUCT common_data;
-#if defined ZB_ENABLE_ZLL
-    ZB_PACKED_PRE struct
-    {
-/* 07/26/2017 EE CR:MINOR Kill that data structure. Utilize src_addr_ext. Kill upper one nesting level. */
-      zb_ieee_addr_t src_addr;  /**< Sender device extended address. */
-    } ZB_PACKED_STRUCT intrp_data;
-#endif /* defined ZB_ENABLE_ZLL */
   } addr_data;
-#if defined ZB_ENABLE_ZLL
-  zb_int8_t rssi;          /**< RSSI of the packet. */
-#endif /* defined ZB_ENABLE_ZLL */
   zb_uint16_t cluster_id;
   zb_uint16_t profile_id;
 
@@ -1559,7 +1554,9 @@ void *zb_zcl_start_command_header(zb_bufid_t zbbuf, zb_uint8_t frame_ctl, zb_uin
 zb_bool_t zb_zcl_can_cluster_be_fragmented(zb_uint16_t profile_id, zb_uint16_t cluster_id);
 
 #define ZB_ZCL_GET_BYTES_AVAILABLE_WITH_FRAGMENTATION(zbbuf, ptr) \
-  (ZB_ASDU_MAX_FRAG_LEN - ZB_ZCL_GET_BYTES_WRITTEN(zbbuf, ptr))
+  ((zb_buf_get_max_size(zbbuf) -\
+   (ZB_MAX_PHY_PAYLOAD_SIZE-ZB_ZCL_HI_WO_IEEE_MAX_PAYLOAD_SIZE))-\
+   ZB_ZCL_GET_BYTES_WRITTEN(zbbuf, ptr))
 
 #define ZB_ZCL_GET_BYTES_AVAILABLE_WO_FRAGMENTATION(zbbuf, ptr) \
   (ZB_ZCL_HI_WO_IEEE_MAX_PAYLOAD_SIZE - ZB_ZCL_GET_BYTES_WRITTEN(zbbuf, ptr))
@@ -1577,6 +1574,9 @@ zb_bool_t zb_zcl_can_cluster_be_fragmented(zb_uint16_t profile_id, zb_uint16_t c
 #define ZB_ZCL_GET_BYTES_AVAILABLE(zbbuf, ptr, profile_id, cluster_id)     \
   ZB_ZCL_GET_BYTES_AVAILABLE_WO_FRAGMENTATION(zbbuf, ptr)
 #endif /* APS_FRAGMENTATION */
+
+#define ZB_ZCL_ATTR_SZ_RAW(attr_size) ((sizeof(zb_zcl_read_attr_res_t)      \
+                                        - sizeof(zb_uint8_t)) + (attr_size))
 
 /**
  *  @brief Put 8-bit value to packet.
@@ -1857,7 +1857,7 @@ zb_ret_t zb_zcl_finish_and_send_packet_new(zb_bufid_t buffer, zb_uint8_t *ptr,
   (void) zb_zcl_finish_and_send_packet((zbbuf), (ptr),(const zb_addr_u *)(const void *)(&(addr)), dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb)
 
 #define ZB_ZCL_FINISH_N_SEND_PACKET_NEW(zbbuf, ptr, addr, dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb, aps_secured, disable_aps_ack, delay)                         \
-  (void) zb_zcl_finish_and_send_packet_new((zbbuf), (ptr),(zb_addr_u *)(void *)(&(addr)), dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb, aps_secured, disable_aps_ack, delay)
+  (void) zb_zcl_finish_and_send_packet_new((zbbuf), (ptr),(const zb_addr_u *)(const void *)(&(addr)), dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb, aps_secured, disable_aps_ack, delay)
 
 /* TODO: Implement via zb_zcl_finish_and_send_packet() */
 #define ZB_ZCL_FINISH_PACKET_O(zbbuf, ptr)                              \
@@ -2095,7 +2095,7 @@ zb_uint8_t zb_zcl_get_attribute_size(zb_uint8_t attr_type, zb_uint8_t *attr_valu
 zb_uint8_t zb_zcl_get_analog_attribute_size(zb_uint8_t attr_type);
 
 /**
- * @brief Check whether type of ZCL attrbiute is analog
+ * @brief Check whether type of ZCL attribute is analog
  * @param attr_type - attribute type in question (see @ref zcl_attr_type)
  *
  * @return ZB_TRUE if type is analog, ZB_FALSE otherwise
@@ -2485,7 +2485,6 @@ void zb_zcl_schedule_status_abort(zb_bufid_t  buffer, zb_addr_u *addr,
 
 zb_bool_t zb_zcl_handle_specific_commands(zb_uint8_t param);
 zb_bool_t cluster_needs_aps_encryption(zb_uint8_t endpoint_id, zb_uint16_t cluster_id);
-zb_zcl_status_t zb_zcl_get_zcl_status_from_ret(zb_ret_t result);
 
 /** @endcond */ /* DOXYGEN_ZCL_SECTION */
 #endif /* ZB_ZCL_COMMON_H */

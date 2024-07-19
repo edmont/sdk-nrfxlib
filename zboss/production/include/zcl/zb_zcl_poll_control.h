@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -60,7 +60,7 @@
 
 /*! @brief Schedule poll control process on given endpoint
  * First check-in will occur after one check-in interval
- * Poll Controll process also starts automatically during ZCL periodic activities
+ * Poll Control process also starts automatically during ZCL periodic activities
  * initialization if Poll Control server cluster is declared
  * @param param - buffer for check-in command
  * @param endpoint - endpoint to start poll control process on */

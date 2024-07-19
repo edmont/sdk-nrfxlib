@@ -52,62 +52,66 @@
  */
 
 
-/*!  NWK NIB Attributes */
-typedef enum zb_nib_attribute_e
-{
+/**
+ * \defgroup nwk_nib_attributes NWK NIB Attributes
+ * @ingroup nwk_ib
+ * @anchor zb_nib_attribute_t
+ * @see ZB R22 spec, table 3-58
+ * @{
+ */
   /**
      A sequence number used to identify outgoing frames.
     */
-  ZB_NIB_ATTRIBUTE_SEQUENCE_NUMBER                   = 0X81,
+#define ZB_NIB_ATTRIBUTE_SEQUENCE_NUMBER                    0X81
   /**
      The maximum time duration in OctetDurations allowed for the parent and
      all child devices to retransmit a broadcast message
      (passive acknowledgment timeout).
     */
-  ZB_NIB_ATTRIBUTE_PASSIVE_ASK_TIMEOUT               = 0X82,
+#define ZB_NIB_ATTRIBUTE_PASSIVE_ASK_TIMEOUT                0X82
   /**
      The maximum number of retries allowed after a broadcast transmission failure.
     */
-  ZB_NIB_ATTRIBUTE_MAX_BROADCAST_RETRIES             = 0X83,
+#define ZB_NIB_ATTRIBUTE_MAX_BROADCAST_RETRIES              0X83
   /**
      The number of children a device is allowed to have on its current network.
      @note When nwkAddrAlloc has a value of 0x02, indicating stochastic
      addressing, the value of this attribute is implementation-dependent.
     */
-  ZB_NIB_ATTRIBUTE_MAX_CHILDREN                      = 0X84,
+#define  ZB_NIB_ATTRIBUTE_MAX_CHILDREN                      0X84
   /**
      The depth a device can have.
     */
-  ZB_NIB_ATTRIBUTE_MAX_DEPTH                         = 0X85,
+#define ZB_NIB_ATTRIBUTE_MAX_DEPTH                          0X85
   /** The number of routers any one device is allowed to have as children.
       This value is determined by the Zigbee coordinator for all devices
       in the network. If nwkAddrAlloc is 0x02 this value not used.
     */
-  ZB_NIB_ATTRIBUTE_MAX_ROUTERS                       = 0X86,
+#define ZB_NIB_ATTRIBUTE_MAX_ROUTERS                        0X86
   /**
      The current set of neighbor table entries in the device.
     */
-  ZB_NIB_ATTRIBUTE_NEIGHBOR_TABLE                    = 0X87,
+#define ZB_NIB_ATTRIBUTE_NEIGHBOR_TABLE                     0X87
   /**
      Time duration in OctetDurations that a broadcast message needs to encompass
      the entire network. This is a calculated quantity based on other NIB
      attributes.
     */
-  ZB_NIB_ATTRIBUTE_BROADCAST_DELIVERY_TIME           = 0X88,
+#define ZB_NIB_ATTRIBUTE_BROADCAST_DELIVERY_TIME            0X88
   /**
      If this is set to 0, the NWK layer shall calculate link cost from all
      neighbor nodes using the LQI values reported by the MAC layer; other-wise,
      it shall report a constant value.
     */
-  ZB_NIB_ATTRIBUTE_REPORT_CONSTANT_COST              = 0X89,
+#define ZB_NIB_ATTRIBUTE_REPORT_CONSTANT_COST               0X89
   /**
      Reserved.
     */
-  ZB_NIB_ATTRIBUTE_ROUTE_DISCOVERY_RETRIES_PERMITTED = 0X8A,
+#define ZB_NIB_ATTRIBUTE_ROUTE_DISCOVERY_RETRIES_PERMITTED  0X8A
   /**
      The current set of routing table entries in the device.
     */
-  ZB_NIB_ATTRIBUTE_ROUTE_TABLE                       = 0X8B,
+#define ZB_NIB_ATTRIBUTE_ROUTE_TABLE                        0X8B
   /**
      The current route symmetry setting:
         - TRUE means that routes are considered to be comprised of symmetric links.
@@ -116,39 +120,39 @@ typedef enum zb_nib_attribute_e
         - FALSE indicates that routes are not consider to be comprised of symmetric
        links. Only the forward route is stored during route discovery.
     */
-  ZB_NIB_ATTRIBUTE_SYM_LINK                          = 0X8E,
+#define ZB_NIB_ATTRIBUTE_SYM_LINK                           0X8E
   /**
      This field shall contain the device capability information established at
      network joining time.
     */
-  ZB_NIB_ATTRIBUTE_CAPABILITY_INFORMATION            = 0X8F,
+#define ZB_NIB_ATTRIBUTE_CAPABILITY_INFORMATION             0X8F
   /**
      A value that determines the method used to assign addresses:
       - 0x00 = use distributed address allocation
       - 0x01 = reserved
       - 0x02 = use stochastic address allocation
     */
-  ZB_NIB_ATTRIBUTE_ADDR_ALLOC                        = 0X90,
+#define ZB_NIB_ATTRIBUTE_ADDR_ALLOC                         0X90
   /**
      A flag that determines whether the NWK layer should assume the ability to
      use hierarchical routing:
       - TRUE = assume the ability to use hierarchical routing.
       - FALSE = never use hierarchical routing.
     */
-  ZB_NIB_ATTRIBUTE_USE_TREE_ROUTING                  = 0X91,
+#define ZB_NIB_ATTRIBUTE_USE_TREE_ROUTING                   0X91
   /**
      The address of the designated network channel manager function.
     */
-  ZB_NIB_ATTRIBUTE_MANAGER_ADDR                      = 0X92,
+#define ZB_NIB_ATTRIBUTE_MANAGER_ADDR                       0X92
   /**
      The maximum number of hops in a source route.
     */
-  ZB_NIB_ATTRIBUTE_MAX_SOURCE_ROUTE                  = 0X93,
+#define ZB_NIB_ATTRIBUTE_MAX_SOURCE_ROUTE                   0X93
   /**
      The value identifying a snapshot of the network settings with which this
      node is operating with.
     */
-  ZB_NIB_ATTRIBUTE_UPDATE_ID                         = 0X94,
+#define ZB_NIB_ATTRIBUTE_UPDATE_ID                          0X94
   /**
      The maximum time (in superframe periods) that a transaction is stored by a
      coordinator and indicated in its beacon. This attribute reflects the value
@@ -156,109 +160,109 @@ typedef enum zb_nib_attribute_e
      made by the higher layer will be reflected in the MAC PIB attribute value
      as well.
     */
-  ZB_NIB_ATTRIBUTE_TRANSACTION_PERSISTENCE_TIME      = 0X95,
+#define ZB_NIB_ATTRIBUTE_TRANSACTION_PERSISTENCE_TIME       0X95
   /**
      The 16-bit address that the device uses to communicate with the PAN.
      This attribute reflects the value of the MAC PIB attribute macShortAddress
      and any changes made by the higher layer will be reflected in the MAC PIB
      attribute value as well.
     */
-  ZB_NIB_ATTRIBUTE_NETWORK_ADDRESS                   = 0X96,
+#define ZB_NIB_ATTRIBUTE_NETWORK_ADDRESS                    0X96
   /**
      The identifier of the Zigbee stack profile in use for this device.
     */
-  ZB_NIB_ATTRIBUTE_STACK_PROFILE                     = 0X97,
+#define ZB_NIB_ATTRIBUTE_STACK_PROFILE                      0X97
   /**
      The current set of broadcast transaction table entries in the device.
     */
-  ZB_NIB_ATTRIBUTE_BROADCAST_TRANSACTION_TABLE       = 0X98,
+#define ZB_NIB_ATTRIBUTE_BROADCAST_TRANSACTION_TABLE        0X98
   /**
      The set of group identifiers, in the range 0x0000 - 0xffff, for groups of
      which this device is a member.
     */
-  ZB_NIB_ATTRIBUTE_GROUP_ID_TABLE                    = 0X99,
+#define ZB_NIB_ATTRIBUTE_GROUP_ID_TABLE                     0X99
   /**
      The Extended PAN Identifier for the PAN of which the device is a member.
      The value 0x0000000000000000 means the Extended PAN Identifier is unknown.
     */
-  ZB_NIB_ATTRIBUTE_EXTENDED_PANID                    = 0X9A,
+#define ZB_NIB_ATTRIBUTE_EXTENDED_PANID                     0X9A
   /**
      A flag determining the layer where multicast messaging occurs.
       - TRUE = multicast occurs at the network layer.
       - FALSE= multicast oc-curs at the APS layer and using the APS header.
     */
-  ZB_NIB_ATTRIBUTE_USE_MULTICAST                     = 0X9B,
+#define ZB_NIB_ATTRIBUTE_USE_MULTICAST                     0X9B
   /**
      The route record table.
     */
-  ZB_NIB_ATTRIBUTE_ROUTE_RECORD_TABLE                = 0X9C,
+#define ZB_NIB_ATTRIBUTE_ROUTE_RECORD_TABLE                 0X9C
   /**
      A flag determining if this device is a concentrator.
       - TRUE = Device is a concentrator.
       - FALSE = Device is not a concentrator.
     */
-  ZB_NIB_ATTRIBUTE_IS_CONCENTRATOR                   = 0X9D,
+#define ZB_NIB_ATTRIBUTE_IS_CONCENTRATOR                    0X9D
   /**
      The hop count radius for concentrator route discoveries.
     */
-  ZB_NIB_ATTRIBUTE_CONCENTRATOR_RADIUS               = 0X9E,
+#define ZB_NIB_ATTRIBUTE_CONCENTRATOR_RADIUS                0X9E
   /**
      The time in seconds between concentrator route discoveries.
      If set to 0x0000, the discoveries are done at start up and by
      the next higher layer only.
     */
-  ZB_NIB_ATTRIBUTE_CONCENTRATOR_DESCOVERY_TIME       = 0X9F,
+#define ZB_NIB_ATTRIBUTE_CONCENTRATOR_DESCOVERY_TIME        0X9F
   /**
      Security attribute defined in Chapter 4. @see ZB R21 specification.
     */
-  ZB_NIB_ATTRIBUTE_SECURITY_LEVEL                    = 0XA0,
+#define ZB_NIB_ATTRIBUTE_SECURITY_LEVEL                     0XA0
   /**
      Security attribute defined in Chapter 4. @see ZB R21 specification.
     */
-  ZB_NIB_ATTRIBUTE_SECURITY_MATERIAL_SET             = 0XA1,
+#define ZB_NIB_ATTRIBUTE_SECURITY_MATERIAL_SET              0XA1
   /**
      Security attribute defined in Chapter 4. @see ZB R21 specification.
     */
-  ZB_NIB_ATTRIBUTE_ACTIVE_KEY_SEQ_NUMBER             = 0XA2,
+#define ZB_NIB_ATTRIBUTE_ACTIVE_KEY_SEQ_NUMBER              0XA2
   /**
      Security attribute defined in Chapter 4. @see ZB R21 specification.
     */
-  ZB_NIB_ATTRIBUTE_ALL_FRESH                         = 0XA3,
+#define ZB_NIB_ATTRIBUTE_ALL_FRESH                          0XA3
   /**
      Not used.
     */
-  ZB_NIB_ATTRIBUTE_SECURE_ALL_FRAMES                 = 0XA5,
+#define ZB_NIB_ATTRIBUTE_SECURE_ALL_FRAMES                  0XA5
   /**
      The time in seconds between link status command frames.
     */
-  ZB_NIB_ATTRIBUTE_LINK_STATUS_PERIOD                = 0XA6,
+#define ZB_NIB_ATTRIBUTE_LINK_STATUS_PERIOD                 0XA6
   /**
      The number of missed link status command frames before resetting the
      link costs to zero.
     */
-  ZB_NIB_ATTRIBUTE_ROUTER_AGE_LIMIT                  = 0XA7,
+#define ZB_NIB_ATTRIBUTE_ROUTER_AGE_LIMIT                   0XA7
   /**
      A flag that determines whether the NWK layer should detect and correct
      conflicting addresses:
      - TRUE = assume ad-dresses are unique.
      - FALSE = addresses may not be unique.
   */
-  ZB_NIB_ATTRIBUTE_UNIQUE_ADDR                       = 0XA8,
+#define ZB_NIB_ATTRIBUTE_UNIQUE_ADDR                        0XA8
   /**
      The current set of 64-bit IEEE to 16-bit network address map.
     */
-  ZB_NIB_ATTRIBUTE_ADDRESS_MAP                       = 0XA9,
+#define ZB_NIB_ATTRIBUTE_ADDRESS_MAP                        0XA9
   /**
      A flag that determines if a time stamp indication is provided on incoming
      and outgoing packets.
       - TRUE= time indication provided.
       - FALSE = no time indication provided.
     */
-  ZB_NIB_ATTRIBUTE_TIME_STAMP                        = 0X8C,
+#define ZB_NIB_ATTRIBUTE_TIME_STAMP                         0X8C
   /**
      This NIB attribute should, at all times, have the same value as macPANId.
     */
-  ZB_NIB_ATTRIBUTE_PAN_ID                            = 0X80,
+#define ZB_NIB_ATTRIBUTE_PAN_ID                             0X80
   /**
      A count of unicast transmissions made by the NWK layer on this device.
      Each time the NWK layer transmits a unicast frame, by invoking the
@@ -267,21 +271,22 @@ typedef enum zb_nib_attribute_e
      or if the value of nwkTxTotal rolls over past 0xffff the NWK layer shall
      reset to 0x00 each Transmit Failure field contained in the neighbor table.
     */
-  ZB_NIB_ATTRIBUTE_TX_TOTAL                          = 0X8D,
+#define ZB_NIB_ATTRIBUTE_TX_TOTAL                           0X8D
   /**
      This policy determines whether or not a remote NWK leave request command
      frame received by the local device is accepted.
     */
-  ZB_NIB_ATTRIBUTE_LEAVE_REQ_ALLOWED                 = 0xAA,
+#define ZB_NIB_ATTRIBUTE_LEAVE_REQ_ALLOWED                  0xAA
 
   /* TODO: FILL MISSING ATTRIBUTES!!! */
 
   /**
      A table of lower-layer interfaces managed by the network layer.
    */
-  ZB_NIB_ATTRIBUTE_MAC_INTERFACE_TABLE               = 0xAF,
-}
-zb_nib_attribute_t;
+#define ZB_NIB_ATTRIBUTE_MAC_INTERFACE_TABLE                0xAF
+/** @} */
+
+typedef zb_uint8_t zb_nib_attribute_t;
 
 /** @brief return NWK sequence number used to identify outgoing frames */
 #define ZB_NIB_SEQUENCE_NUMBER() ZB_NIB().sequence_number
@@ -409,15 +414,21 @@ zb_bool_t zb_is_device_zc_or_zr(void);
 #define ZB_NIB_DEVICE_TYPE() (ZB_NIB().device_type + 0U)
 
 
-#ifdef ZB_PRO_STACK
-/** @brief number of source routes in device source routing table */
-#define ZB_NIB_SRCRT_CNT() ZB_NIB().nwk_src_route_cnt
-#endif
-
 /** @brief Device extended Pan ID */
 #define ZB_NIB_EXT_PAN_ID() ZB_NIB().extended_pan_id
 /** @brief The value of ZB_NIB_ATTRIBUTE_UPDATE_ID attribute */
 #define ZB_NIB_UPDATE_ID() ZB_NIB().update_id
+
+#define ZB_HALF_MAX_UPDATE_ID_VAL (0xFFU/2U)
+
+/**
+   Check that nwkUpdateID id1 is bigger than id2.
+   Keep in mind 1 byte size, take overflow into account.
+   Use same logic as with time compare: suppose that difference can't be more than 1/2 of the entire values space
+ */
+#define ZB_UPDATE_ID_GT(id1, id2)                                       \
+((zb_uint8_t)(id1) != (zb_uint8_t)(id2)                                 \
+   && (zb_uint8_t)((zb_uint8_t)(id1) - (zb_uint8_t)(id2)) < ZB_HALF_MAX_UPDATE_ID_VAL)
 
 /** @brief Device security level; always is 5 */
 #define ZB_NIB_SECURITY_LEVEL() ZB_SECURITY_LEVEL
@@ -486,18 +497,11 @@ zb_bool_t zb_is_device_zc_or_zr(void);
 #endif
 
 /* is leave request allowed? */
-#ifdef ZB_PRO_STACK
 /** Is leave request allowed */
 /** @brief LEAVE_REQ_ALLOWED attribute */
 #define ZB_NIB_GET_LEAVE_REQ_ALLOWED() ZB_NIB().leave_req_allowed
 /** @brief Set LEAVE_REQ_ALLOWED attribute value to 'v' */
 #define ZB_NIB_SET_LEAVE_REQ_ALLOWED( v ) (ZB_NIB().leave_req_allowed = ( v ))
-#else
-/** @brief LEAVE_REQ_ALLOWED - always true */
-#define ZB_NIB_GET_LEAVE_REQ_ALLOWED() ZB_TRUE
-/** @brief \deprecated unsupported */
-#define ZB_NIB_SET_LEAVE_REQ_ALLOWED( v )
-#endif
 
 #ifdef SNCP_MODE
 /** Force route record sending */
@@ -507,17 +511,10 @@ zb_bool_t zb_is_device_zc_or_zr(void);
 #define ZB_NIB_SET_FORCE_RREC_SENDING( v ) (ZB_NIB().nwk_force_rrec_sending = ( v ))
 #endif
 
-#ifdef ZB_PRO_STACK
 /** @brief LEAVE_REQ_WITHOUT_REJOIN_ALLOWED attribute */
 #define ZB_NIB_GET_LEAVE_REQ_WITHOUT_REJOIN_ALLOWED() ZB_NIB().leave_req_without_rejoin_allowed
 /** @brief Set LEAVE_REQ_WITHOUT_REJOIN_ALLOWED attribute value to 'v' */
 #define ZB_NIB_SET_LEAVE_REQ_WITHOUT_REJOIN_ALLOWED( v ) (ZB_NIB().leave_req_without_rejoin_allowed = ( v ))
-#else
-/** @brief LEAVE_REQ_WITHOUT_REJOIN_ALLOWED - always true */
-#define ZB_NIB_GET_LEAVE_REQ_WITHOUT_REJOIN_ALLOWED() ZB_TRUE
-/** @brief \deprecated unsupported */
-#define ZB_NIB_SET_LEAVE_REQ_WITHOUT_REJOIN_ALLOWED( v )
-#endif
 
 #ifndef ZB_LITE_NO_SOURCE_ROUTING
 /** @brief IS_CONCENTRATOR attribute */
@@ -712,13 +709,15 @@ typedef struct zb_nib_s
 
 #ifdef ZB_ROUTER_ROLE
   zb_uint8_t     max_children;           /*!< The number of children a device is allowed to have */
+#ifdef ZB_COUNT_CHILDREN
   zb_uint8_t     router_child_num;       /*!< Number of child devices with router capability */
   zb_uint8_t     ed_child_num;           /*!< Number of child ed devices */
+#endif
 #endif
 
 #if defined ZB_NWK_DISTRIBUTED_ADDRESS_ASSIGN && defined ZB_ROUTER_ROLE
   zb_uint8_t     max_routers;            /*!< The number of routers any one device is allowed to have as children. */
-  zb_uint16_t    cskip;                  /*!< Cskip value - size of the address sub-block beeing distributed */
+  zb_uint16_t    cskip;                  /*!< Cskip value - size of the address sub-block being distributed */
 #endif
   zb_uint8_t     depth;                  /*!< current node depth */
 
@@ -744,7 +743,6 @@ typedef struct zb_nib_s
   zb_uint16_t nwk_manager_addr; /*!< The address of the designated
                                  * network channel manager function. */
 
-#ifdef ZB_PRO_STACK
 #ifndef ZB_LITE_NO_SOURCE_ROUTING
 #ifndef ZB_CONFIGURABLE_MEM
   zb_nwk_rrec_t nwk_src_route_tbl[ZB_NWK_MAX_SRC_ROUTES];
@@ -756,20 +754,21 @@ typedef struct zb_nib_s
   zb_uint8_t nwk_concentrator_radius;      /*!< The hop count radius for concentrator route discoveries */
   zb_uint32_t nwk_concentrator_disc_time;  /*!< The time in seconds between concentrator route discoveries. If set to 0x0000,
                                                 the discoveries are done at start up and by the next higher layer only */
+  zb_bool_t mtorr_after_first_rejoin_sent;
+  zb_bool_t do_aggr_route_add;
 #endif
 
 #ifndef ZB_LITE_NO_CONFIGURABLE_LINK_STATUS
   zb_uint8_t link_status_period;  /*!< Table 3.44 NIB Attributes - nwkLinkStatusPeriod */
   zb_uint8_t router_age_limit;    /*!< Table 3.44 NIB Attributes - nwkRouterAgeLimit */
 #endif
-  /*zb_uint8_t dummy_8_bit;  ES: dummy 8 bit for aligning next bitfield for 32bit word. TI Compiler 18.1.3 at optimization_level=4 rewrite all word at assigning value to bitfield. */
+  /*zb_uint8_t stub_8_bit;  ES: stub 8 bit for aligning next bitfield for 32bit word. TI Compiler 18.1.3 at optimization_level=4 rewrite all word at assigning value to bitfield. */
   zb_bitfield_t leave_req_allowed:1; /*!< See: docs-11-5378-12-0csg-Zigbee-pro-errata-for-r20 NIB entry nwkLeaveRequestAllowed */
   zb_bitfield_t leave_req_without_rejoin_allowed:1; /* DA: parameter set to ignore leave requests w/o rejoin. Reason: R21 core stack spec. */
                                                        /* DA: please note, that I set default value to 1, can't find it in current version of spec */
 #ifndef ZB_NO_NWK_MULTICAST
   zb_bitfield_t nwk_use_multicast:1;     /*!< Multicast determination flag */
 #endif
-#endif  /* ZB_PRO_STACK */
 
   zb_bitfield_t disable_rejoin:1; /*!< Forbid rejoin - for Rejoin request set Rejoin response with error status */
 #ifdef ZB_NWK_TREE_ROUTING
@@ -780,14 +779,10 @@ typedef struct zb_nib_s
   zb_bitfield_t uniq_addr:1;             /*!< Table 3.44 NIB Attributes - nwkUniqueAddr */
 
 
-#if defined (ZB_PRO_STACK)
   zb_bitfield_t reserve:4; /*!< There was security level defined in R22 (spec Table 3-58 NIB Attributes).
                                 Currently, ZBOSS won't run without security.
                                 So, there was a decision to remove possibility of changing security level.
                                 Now, it can be defined only as constant value. */
-#else
-  zb_bitfield_t reserve:7;
-#endif
 
   /* all_fresh is always 0 for Standard security */
   zb_bitfield_t           active_secur_material_i:2; /*!< index in

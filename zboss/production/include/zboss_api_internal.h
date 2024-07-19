@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -351,9 +351,10 @@ typedef ZB_PACKED_PRE struct zb_neighbor_tbl_ent_s /* not need to pack it at IAR
 
   zb_bitfield_t             need_rejoin:1; 	/*!< Need send rejoin response without receive request */
 
-  zb_bitfield_t             send_via_routing: 1;  /*!< Due to bad link to that device send packets
-                                                   *   via NWK routing.
-                                                   */
+  /* there was send_via_routing field which marked asymmetrical links when we
+   * can head the device but it can't hear us. Now that functionality is
+   * implemented using outgoing_cost field. */
+  zb_bitfield_t             reserved:1;
 
   zb_bitfield_t             keepalive_received:1; /*!< This value indicates at least one keepalive
                                                    *   has been received from the end device since
@@ -520,7 +521,7 @@ typedef ZB_PACKED_PRE struct zb_mac_diagnostic_info_s
                                       * Transactions. So if the Mac send a
                                       * single packet, it will be retried 4
                                       * times without ack, that counts as 1 failure */
-  zb_uint16_t mac_tx_ucast_retries; /* Total number of Mac Retries regardles of
+  zb_uint16_t mac_tx_ucast_retries; /* Total number of Mac Retries regardless of
                                      * whether the transaction resulted in
                                      * success or failure. */
 
@@ -535,6 +536,12 @@ typedef ZB_PACKED_PRE struct zb_mac_diagnostic_info_s
   zb_uint8_t period_of_time;    /* Time period over which MACTx results are measured */
   zb_uint8_t last_msg_lqi;      /* LQI value of the last received packet */
   zb_int8_t last_msg_rssi;      /* RSSI value of the last received packet */
+  zb_uint32_t cca_retries;         /* Total number of CCA retries */
+  zb_uint32_t pta_lo_pri_req;      /* Total number of low priority PTA request */
+  zb_uint32_t pta_hi_pri_req;      /* Total number of high priority PTA request */
+  zb_uint32_t pta_lo_pri_denied;   /* Total number of low priority PTA request denied by master */
+  zb_uint32_t pta_hi_pri_denied;   /* Total number of high priority PTA request denied by master */
+  zb_uint32_t pta_denied_rate;     /* PTA deny rate*/
 } ZB_PACKED_STRUCT
 zb_mac_diagnostic_info_t;
 
@@ -639,7 +646,7 @@ typedef ZB_PACKED_PRE struct zdo_diagnostics_info_s
   /** A non-standard counter of the number of times the NWK broadcast was
    *  dropped because the broadcast table was full.
    *  01/15/2021 In ZBOSS fired if any of the broadcast_transaction or
-   *  broadcast_retransmition tables are full */
+   *  broadcast_retransmission tables are full */
   zb_uint16_t nwk_bcast_table_full;
 
 } ZB_PACKED_STRUCT zdo_diagnostics_info_t;

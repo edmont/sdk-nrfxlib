@@ -455,10 +455,15 @@ zb_nlme_status_indication_t;
                                               ZB_PAGE0_2_4_GHZ_START_CHANNEL_NUMBER  + 1U)
 /** @cond DOXYGEN_SE_SECTION */
 /**
-   Maximal number of channels for all pages
+   Maximal number of ed scan channels for all pages
 */
 #define ZB_ED_SCAN_MAX_CHANNELS_COUNT                                   \
   ((ZB_IO_BUF_SIZE - sizeof(zb_uint8_t)) / sizeof(zb_energy_detect_channel_info_t))
+/**
+   Max # of network descriptors which can fit into a single buffer.
+*/
+#define ZB_ACTIVE_SCAN_MAX_NETWORK_COUNT                                   \
+  ((ZB_IO_BUF_SIZE - sizeof(zb_nlme_network_discovery_confirm_t)) / sizeof(zb_nlme_network_descriptor_t))
 
 #define ZB_CHANNEL_PAGE_MAX_CHANNELS_COUNT ZB_PAGE28_SUB_GHZ_MAX_CHANNELS_COUNT
 /** @endcond */ /* DOXYGEN_SE_SECTION */
@@ -815,9 +820,9 @@ typedef ZB_PACKED_PRE struct zb_nwk_nbr_iterator_entry_s
                                          *   This field shall be present in every neighbour table entry.
                                          *   @if DOXYGEN_INTERNAL_DOC See @ref nwk_relationship @endif
                                          */
-  zb_uint8_t      send_via_routing;     /*!< Due to bad link to that device send packets
-                                         *   via NWK routing.
-                                         */
+  zb_uint8_t      send_via_routing;     /*!< That field is deprecated. Removed
+                                         * from zb_neighbor_tbl_ent_t, always 0
+                                         * here. */
 
   zb_uint8_t      keepalive_received;   /*!< This value indicates at least one keepalive
                                          *   has been received from the end device since

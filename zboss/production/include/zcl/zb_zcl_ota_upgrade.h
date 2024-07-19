@@ -44,12 +44,8 @@
 #ifndef ZB_ZCL_OTA_UPGRADE_H
 #define ZB_ZCL_OTA_UPGRADE_H 1
 
-#ifndef ZB_WINDOWS
 #include "zcl/zb_zcl_common.h"
 #include "zcl/zb_zcl_commands.h"
-#else
-#pragma pack(1)
-#endif
 
 #if defined ZB_ZCL_SUPPORT_CLUSTER_OTA_UPGRADE || defined ZB_USE_OSIF_OTA_ROUTINES || defined DOXYGEN
 
@@ -813,6 +809,7 @@ enum zb_zcl_ota_upgrade_image_status_e
     @endcond endcond */ /* OTA Upgrade cluster internals */
 
 /** @brief Declare attribute list for OTA Upgrade cluster - client side
+    @attention All attributes are required by built-in OTA client so passing NULL pointers in parameters is prohibited!
     @param attr_list - attribute list name
     @param upgrade_server - pointer to variable to store UpgradeServerID attribute
     @param file_offset - pointer to variable to store FileOffset attribute
@@ -853,6 +850,76 @@ enum zb_zcl_ota_upgrade_image_status_e
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID         , (server_ep))            \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_OTA_UPGRADE_CLIENT_DATA_ID,         &(client_var_##attr_list))   \
    ZB_ZCL_FINISH_DECLARE_ATTRIB_LIST
+
+/**
+ *  @brief OTA Upgrade cluster attributes structure
+ */
+typedef struct zb_zcl_ota_upgrade_attrs_s
+{
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ID
+   */
+  zb_ieee_addr_t upgrade_server;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_FILE_OFFSET_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_FILE_OFFSET_ID
+   */
+  zb_uint32_t file_offset;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_FILE_VERSION_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_FILE_VERSION_ID
+   */
+  zb_uint32_t file_version;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_STACK_VERSION_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_STACK_VERSION_ID
+   */
+  zb_uint16_t stack_version;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID
+   */
+  zb_uint32_t downloaded_file_ver;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_STACK_VERSION_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_STACK_VERSION_ID
+   */
+  zb_uint16_t downloaded_stack_ver;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_STATUS_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_STATUS_ID
+   */
+  zb_uint8_t image_status;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID
+   */
+  zb_uint16_t manufacturer;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID
+   */
+  zb_uint16_t image_type;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_MIN_BLOCK_REQUE_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_MIN_BLOCK_REQUE_ID
+   */
+  zb_uint16_t min_block_reque;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_STAMP_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_STAMP_ID
+   */
+  zb_uint16_t image_stamp;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ADDR_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ADDR_ID
+   */
+  zb_uint16_t server_addr;
+  /** @copydoc ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID
+   * @see ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID
+   */
+  zb_uint8_t server_ep;
+} zb_zcl_ota_upgrade_attrs_t;
+
+/** @brief Declare attribute list for OTA upgrade cluster (using structure)
+ *  @param[in]  attr_list - attribute list variable name
+ *  @param[in]  attrs - pointer to @ref zb_zcl_ota_upgrade_attrs_s structure
+ */
+#define ZB_ZCL_DECLARE_OTA_UPGRADE_ATTR_LIST(attr_list, attrs)                            \
+    ZB_ZCL_DECLARE_OTA_UPGRADE_ATTRIB_LIST(attr_list, &attrs.upgrade_server,              \
+      &attrs.file_offset, &attrs.file_version, &attrs.stack_version,                      \
+      &attrs.downloaded_file_ver,&attrs.downloaded_stack_ver,&attrs.image_status,         \
+      &attrs.manufacturer,&attrs.image_type,&attrs.min_block_reque,&attrs.image_stamp,    \
+      &attrs.server_addr,&attrs.server_ep)
 
 /** @brief Declare attribute list for OTA Upgrade cluster - server side
     @param attr_list - attribute list name
@@ -2117,8 +2184,6 @@ void zb_zcl_ota_upgrade_set_ota_status(zb_uint8_t endpoint, zb_uint8_t status);
 
 zb_uint8_t zb_zcl_ota_upgrade_get_ota_status(zb_uint8_t endpoint);
 
-zb_uint8_t zb_zcl_process_ota_upgrade_default_response_commands(zb_uint8_t param);
-
 void zb_zcl_ota_upgrade_send_upgrade_end_req(zb_uint8_t param, zb_uint8_t status);
 
 void zb_zcl_ota_restart_after_rejoin(zb_uint8_t endpoint);
@@ -2165,6 +2230,7 @@ typedef struct zb_zcl_ota_upgrade_cli_ctx_s
   zb_uint_t resend_retries;
   zb_uint8_t ota_restart_after_rejoin;
   zb_uint16_t ota_period_backup;
+  zb_uint32_t ota_dfv;
 } zb_zcl_ota_upgrade_cli_ctx_t;
 #endif
 

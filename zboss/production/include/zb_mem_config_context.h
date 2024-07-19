@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -123,7 +123,7 @@
 
 
 /**
-   If user did not owerwrite default memory configuration, that variable value is 1, else 0.
+   If user did not overwrite default memory configuration, that variable value is 1, else 0.
 
    Currently used in trace only, but, maybe, implement user API for it if customer require it?
  */
@@ -212,7 +212,6 @@ ZB_CONFIG_PRE zb_uint32_t gc_pending_bitmap[ZB_CONFIG_PENDING_BITMAP_SIZE] ZB_CO
 
 #ifdef ZB_MAC_POLL_INDICATION_CALLS_REDUCED
 ZB_CONFIG_PRE zb_time_t gc_poll_timestamp_table[ZB_CONFIG_CHILD_HASH_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
-ZB_CONFIG_PRE zb_uint16_t gc_poll_timeout_table[ZB_CONFIG_CHILD_HASH_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
 #endif /* ZB_MAC_POLL_INDICATION_CALLS_REDUCED */
 
 #endif  /* ZB_MAC_SOFTWARE_PB_MATCHING */
@@ -289,9 +288,6 @@ ZB_CONFIG_PRE zb_uint_t gc_addr_table_size ZB_CONFIG_POST = ZB_CONFIG_IEEE_ADDR_
 ZB_CONFIG_PRE zb_uint8_t gc_passive_ack[ZB_NWK_BRR_TABLE_SIZE][((ZB_CONFIG_NEIGHBOR_TABLE_SIZE + 7) / 8)] ZB_CONFIG_POST = { 0 };
 #endif
 
-#ifdef ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-ZB_CONFIG_PRE zb_address_ieee_ref_t gc_subghz_dev[ZB_CONFIG_NEIGHBOR_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
-#endif
 
 ZB_CONFIG_PRE zb_neighbor_tbl_ent_t gc_neighbor[ZB_CONFIG_NEIGHBOR_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
 ZB_CONFIG_PRE zb_uint_t gc_neighbor_table_size ZB_CONFIG_POST = ZB_CONFIG_NEIGHBOR_TABLE_SIZE;

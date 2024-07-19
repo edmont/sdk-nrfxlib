@@ -104,7 +104,7 @@ zb_ret_t check_value_basic_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_u
 static void zb_zcl_basic_reset_invoke_user_app(zb_uint8_t param)
 {
   zb_zcl_parsed_hdr_t cmd_info;
-  zb_ret_t result = RET_NOT_IMPLEMENTED;
+  zb_ret_t result = RET_OK;
 
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_basic_reset_invoke_user_app param %hd", (FMT__H, param));
 
@@ -119,7 +119,9 @@ static void zb_zcl_basic_reset_invoke_user_app(zb_uint8_t param)
     ZB_ZCL_RESET_TO_FACTORY_DEFAULTS_USER_APP(param, ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, result);
   }
 
-  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, zb_zcl_get_zcl_status_from_ret(result));
+  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, result==RET_OK ? ZB_ZCL_STATUS_SUCCESS :
+                               (zb_zcl_get_backward_compatible_statuses_mode() == ZB_ZCL_STATUSES_ZCL8_MODE) ?
+                                ZB_ZCL_STATUS_FAIL : ZB_ZCL_STATUS_HW_FAIL);
 
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_basic_reset_invoke_user_app", (FMT__0));
 }
@@ -147,8 +149,7 @@ zb_bool_t zb_zcl_check_is_device_enabled(zb_uint8_t ep_id, zb_uint8_t cmd_id, zb
                                    cmd_id == ZB_ZCL_CMD_WRITE_ATTRIB_UNDIV ||
                                    cmd_id == ZB_ZCL_CMD_WRITE_ATTRIB_RESP ||
                                    cmd_id == ZB_ZCL_CMD_WRITE_ATTRIB_NO_RESP)) ||
-            (!is_common_command && cluster_id == ZB_ZCL_CLUSTER_ID_IDENTIFY) ||
-            (is_common_command && cmd_id == ZB_ZCL_CMD_DEFAULT_RESP && cluster_id == ZB_ZCL_CLUSTER_ID_IDENTIFY))
+            ((cmd_id == ZB_ZCL_CMD_DEFAULT_RESP || !is_common_command) && cluster_id == ZB_ZCL_CLUSTER_ID_IDENTIFY))
         {
           ret = ZB_TRUE;
         }

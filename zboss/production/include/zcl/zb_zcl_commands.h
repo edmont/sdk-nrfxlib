@@ -127,7 +127,7 @@ typedef zb_uint8_t zb_zcl_cmd_t;
 #define ZB_ZCL_BROADCAST_ENDPOINT   0xFFU
 
 /** @brief Minimum time delay between responses to ZCL command sent to broadcast endpoint */
-#define ZB_ZCL_BROADCAST_ENDPOINT_CMD_RESP_JITTER (ZB_MILLISECONDS_TO_BEACON_INTERVAL(500))
+#define ZB_ZCL_BROADCAST_ENDPOINT_CMD_RESP_JITTER (ZB_MILLISECONDS_TO_BEACON_INTERVAL(100))
 
 /** @cond internals_doc */
 
@@ -260,12 +260,11 @@ void zb_zcl_send_command_short_alias(zb_bufid_t buffer,
     buffer, ptr, addr, dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb, random_delay)           \
   (void) zb_zcl_finish_and_send_packet_new((buffer), (ptr), (zb_addr_u *)(void *)(&(addr)), dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb, ZB_FALSE, ZB_TRUE, ZB_RANDOM_VALUE(random_delay))
 
-
 void zb_zcl_send_command_short_schedule(zb_bufid_t buffer,
                                              zb_uint16_t addr, zb_uint8_t dst_addr_mode,
                                              zb_uint8_t dst_ep, zb_uint8_t ep,
                                              zb_uint16_t prof_id, zb_uint16_t cluster_id,
-                                             zb_callback_t cb, zb_uint64_t delay);
+                                             zb_callback_t cb, zb_uint16_t delay);
 
 /** @internal @brief Send ZCL request command with delay (ms)
 
@@ -495,6 +494,21 @@ void zb_zcl_send_command_short_schedule(zb_bufid_t buffer,
                               (_prof_id), (_cluster_id), (_callback));                             \
   }
 
+#define ZB_ZCL_SEND_DEFAULT_RESP_EXT_SECURED(_buffer, _dst_addr, _dst_addr_mode, _dst_ep, _src_ep,                    \
+                                     _prof_id, _cluster_id, _seq_num, _cmd, _status_code,                             \
+                                     _direction, _is_manuf_specific, _manuf_code, _callback, _aps_secured)            \
+  {                                                                                                                   \
+    zb_uint8_t *_ptr;                                                                                                 \
+    _ptr = ZB_ZCL_START_PACKET(_buffer);                                                                              \
+    ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_RESP_FRAME_CONTROL_A(_ptr, (_direction),                                         \
+                                                          (_is_manuf_specific));                                      \
+    ZB_ZCL_CONSTRUCT_COMMAND_HEADER_EXT(_ptr, (_seq_num), (_is_manuf_specific), (_manuf_code),                        \
+                                        ZB_ZCL_CMD_DEFAULT_RESP);                                                     \
+    *(_ptr++) = (_cmd);                                                                                               \
+    *(_ptr++) = (_status_code);                                                                                       \
+    ZB_ZCL_FINISH_N_SEND_PACKET_NEW((_buffer), _ptr, (_dst_addr), (_dst_addr_mode), (_dst_ep), (_src_ep), (_prof_id), \
+                                    (_cluster_id), (_callback), (_aps_secured), ZB_FALSE, 0);                         \
+  }
 
 /** @brief Send default response command.
  *  @param buffer - ID zb_bufid_t of a buffer with payload

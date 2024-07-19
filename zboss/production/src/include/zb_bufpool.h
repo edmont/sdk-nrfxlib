@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -65,7 +65,7 @@
 
 #define ZB_BUF_IS_OOM_STATE() (ZB_BUF_IS_OOM_STATE_IN() || ZB_BUF_IS_OOM_STATE_OUT())
 
-#if !defined ZB_MACSPLIT_DEVICE && !defined ZB_MINIMAL_CONTEXT
+#if !defined ZB_MACSPLIT_DEVICE && !defined ZB_MINIMAL_CONTEXT && !defined ZB_ZGPD_ROLE
 #define ZB_NWK_UNLOCK_IN(bufid) zb_nwk_unlock_in((bufid))
 #else
 #define ZB_NWK_UNLOCK_IN(bufid)
@@ -185,40 +185,6 @@ zb_uint8_t *zb_buf_data0_func(TRACE_PROTO zb_bufid_t buf);
 zb_bufid_t zb_buf_from_data0_func(TRACE_PROTO void *ptr);
 #define zb_buf_from_data0(a) zb_buf_from_data0_func(TRACE_CALL (a));
 
-#ifdef ZB_MACSPLIT
-/**
-   Serialize internal buffer structure into linear array.
-   Output structure is: | header | body | parameter w/o leading zeros |
-
-   @param buf - buffer id
-   @param ptr - pointer for data output
-   @return serialized data size
- */
-zb_uint8_t zb_buf_serialize_func(TRACE_PROTO zb_bufid_t buf, zb_uint8_t *ptr);
-#define zb_buf_serialize(a, b) zb_buf_serialize_func(TRACE_CALL (a), (b))
-
-/**
-   Deserialize linear array into ZBOSS buffer.
-   Array structure must be the same as in @see zb_buf_serialize_func.
-
-   @param buf - buffer id
-   @param ptr - pointer to array
-   @param payload_size - array size
- */
-void zb_buf_deserialize_func(TRACE_PROTO zb_bufid_t buf, zb_uint8_t *ptr, zb_uint8_t payload_size);
-#define zb_buf_deserialize(a, b, c) zb_buf_deserialize_func(TRACE_CALL (a),(b),(c))
-
-/**
-   Partial deserialize linear array.
-   Calculate body pointer and its offset from ptr.
-
-   @param ptr - pointer to array
-   @param size - header size
-   @return pointer to serialized body
- */
-zb_uint8_t *zb_buf_partial_deserialize_func(TRACE_PROTO zb_uint8_t *ptr, zb_uint8_t *size);
-#define zb_buf_partial_deserialize(a, b) zb_buf_partial_deserialize_func(TRACE_CALL (a),(b))
-#endif /* ZB_MACSPLIT*/
 
 #ifdef ZB_TH_ENABLED
 /**
@@ -275,5 +241,23 @@ zb_ret_t zb_buf_requalify_in_to_out_func(TRACE_PROTO zb_bufid_t buf);
    Note: internal call.
  */
 void zb_init_buffers(void);
+
+
+/**
+   Allocation optimized for using in ISR receiving packet.
+
+   The idea is to be faster in MAC LL ISR.
+   Start packet from the buffer begin. Do not fill buffer by zeroes: it is done earlier in mac.c.
+   No need to unlock NWK here.
+ */
+void *zb_buf_initial_alloc_in(zb_bufid_t buf, zb_uint_t size);
+
+/**
+   Cut single byte from the buffer beginning
+
+   To be used in MAC LL ISR to cut length byte.
+ */
+void zb_buf_cut_left_byte(zb_bufid_t buf);
+
 
 #endif /* ZB_BUFPOOL_H */

@@ -38,7 +38,7 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* PURPOSE: ZCL Level Contol cluster specific commands handling
+/* PURPOSE: ZCL Level Control cluster specific commands handling
 */
 
 #define ZB_TRACE_FILE_ID 2072
@@ -118,7 +118,6 @@ static zb_ret_t check_value_level_control_server(zb_uint16_t attr_id, zb_uint8_t
       }
       break;
     default:
-      ret = RET_OK;
       break;
   }
 
@@ -140,7 +139,6 @@ static zb_ret_t check_value_level_control_client(zb_uint16_t attr_id, zb_uint8_t
       }
       break;
     default:
-      ret = RET_OK;
       break;
   }
 
@@ -254,10 +252,10 @@ static zb_bool_t level_control_check_req_options(zb_uint8_t param, zb_uint8_t en
                                  ZB_ZCL_LEVEL_CONTROL_OPTIONS_EXECUTE_IF_OFF);
       }
     }
-  
+
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_ON_OFF
     /* ZCL8, 3.10.2.2.8.1 ExecuteIfOff Options Bit
-       Command execution SHALL NOT continue beyond the Options procedding if all of thee criteria
+       Command execution SHALL NOT continue beyond the Options proceeding if all of thee criteria
        are true:
        - The command is on of the "without On/Off" commands
        - The On/Off cluster exists on the same endpoint as this cluster

@@ -97,12 +97,13 @@ constants etc.
 #define ZB_ENABLE_ZGP_DIRECT
 #define ZB_ENABLE_ZGP_SECUR
 #define APP_ONLY_NVRAM
+#define ZB_MAC_INTERFACE_SINGLE
 #elif defined ZB_ENABLE_ZGP && !defined ZB_ENABLE_ZGP_TARGET && defined ZB_ED_ROLE
 #undef ZB_ENABLE_ZGP
 #endif
 
 
-#if defined ZB_ENABLE_ZGP && !defined ZB_ZGPD_ROLE
+#if (defined ZB_ENABLE_ZGP && !defined ZB_ZGPD_ROLE) || defined ZB_DOCUMENT_ZGP
 
 /*
 #define ZB_ENABLE_ZGP_ADVANCED
@@ -122,14 +123,24 @@ constants etc.
 #define ZB_ENABLE_ZGP_TX_QUEUE
 #endif
 
-/** Maximum payload length in translation table entry */
-#ifndef ZB_ZGP_TRANSL_CMD_PLD_MAX_SIZE
-#define ZB_ZGP_TRANSL_CMD_PLD_MAX_SIZE  3U
-#endif
-
 #if (defined ZB_ENABLE_ZGP_COMBO || defined ZB_ENABLE_ZGP_TARGET || defined ZB_ENABLE_ZGP_TARGET_PLUS || defined ZGP_COMMISSIONING_TOOL)
 #define ZB_ENABLE_ZGP_SINK
 
+/* Old implementation of 8 bit vector handling on ZGP Sink Side is deprecated now.
+ *   Let's keep it until SC will decide to discontinue it
+ *   All the code under this define should be removed once it will be discontinued */
+#ifndef ZB_ZGP_SINK_SUPPORT_LEGACY_8BIT_VECTOR_HANDLING
+#define ZB_ZGP_SINK_SUPPORT_LEGACY_8BIT_VECTOR_HANDLING
+#endif
+
+/**< ZGP Sink Match Info is legacy and is deprecated now.
+ *   Let's keep it until SC will decide to discontinue it
+ *   All the code under this define should be removed once it will be discontinued */
+#ifndef ZB_ZGP_SINK_SUPPORT_LEGACY_MATCH_INFO
+#define ZB_ZGP_SINK_SUPPORT_LEGACY_MATCH_INFO
+#endif
+
+#ifdef ZB_ZGP_SINK_SUPPORT_LEGACY_MATCH_INFO
 /** Max number of command identifiers in one
  *  functionality matching table entry */
 #define ZB_ZGP_MATCH_TBL_MAX_CMDS_FOR_MATCH 5U
@@ -137,6 +148,8 @@ constants etc.
 /** Max number of cluster identifiers in one
  *  functionality matching table entry */
 #define ZB_ZGP_TBL_MAX_CLUSTERS 5U
+#endif  /* ZB_ZGP_SINK_SUPPORT_LEGACY_MATCH_INFO */
+
 #endif
 
 /** Sink table size */
@@ -144,13 +157,6 @@ constants etc.
 #define ZB_ZGP_SINK_TBL_SIZE 32U
 #endif /* ZB_ZGP_SINK_TBL_SIZE */
 
-
-
-/* Obsolete define to support old sink table migration
- * Looks like for correct migration needs to upgrade old system to zgp_dataset_info_ver_6_0_s using
- * the same ZB_ZGP_SINK_TBL_SIZE number */
-/* Anyway we don't need do migration for translation table so let's keep this define as is. */
-#define ZB_ZGP_TRANSL_TBL_SIZE 4U*ZB_ZGP_SINK_TBL_SIZE
 
 /* 5.1.2.3.2 test specification - The default value for DUT-GPP being a Basic Combo pr a Basic Proxy
  * is "ZigBeeAlliance09", i.e. {0x5A 0x69 0x67 0x42 0x65 0x65 0x41 0x6C 0x6C 0x69 0x61 0x6E
@@ -173,10 +179,26 @@ constants etc.
 #define ZB_ZGP_PROXY_COMMISSIONING_DEFAULT_COMMUNICATION_MODE ZGP_PROXY_COMM_MODE_UNICAST
 #endif
 
-#define ZB_ZGP_DEFAULT_COMMISSIONING_EXIT_MODE ZGP_COMMISSIONING_EXIT_MODE_ON_GP_PROXY_COMMISSIONING_MODE_EXIT
+/*! \addtogroup ZB_CONFIG */
+/*! @{ */
 
-#define ZB_ZGP_DEFAULT_SEC_LEVEL_PROTECTION_WITH_GP_LINK_KEY 0U
-#define ZB_ZGP_DEFAULT_SEC_LEVEL_INVOLVE_TC 0U
+/**
+ * Default commissioning exit mode. According to spec should be "On pairing success" (0x01)
+ *
+ * @see ZGP spec, A.3.3.2 Server Attributes */
+#define ZB_ZGP_DEFAULT_COMMISSIONING_EXIT_MODE ZGP_COMMISSIONING_EXIT_MODE_ON_PAIRING_SUCCESS
+
+/*! @} */ /* ZB_CONFIG */
+
+/* A.3.3.2 Server Attributes, default value gpsSecurityLevel = 0x06
+  Minimal GPD Security Level = 0x02
+  Protection with gpLinkKey = 1
+  Involve TC = 0
+*/
+#define ZB_ZGP_DEFAULT_SEC_LEVEL_MIN_GPD_SEC_LEVEL ZB_ZGP_SEC_LEVEL_FULL_NO_ENC
+#define ZB_ZGP_DEFAULT_SEC_LEVEL_PROTECTION_WITH_GP_LINK_KEY ZB_ZGP_SEC_LEVEL_PROTECTION_WITH_GP_LINK_KEY
+#define ZB_ZGP_DEFAULT_SEC_LEVEL_INVOLVE_TC ZB_ZGP_SEC_LEVEL_PROTECTION_DO_NOT_INVOLVE_TC
+
 #define ZB_ZGP_MAX_TEMP_MASTER_COUNT 0x03U
 #define ZB_ZGP_DMAX_FOR_ACCUMULATE_TEMP_MASTER_INFO 100U
 #define ZB_ZGP_MIN_SINK_TABLE_ENTRY_SIZE 8U
@@ -186,11 +208,11 @@ constants etc.
 #define ZB_GP_DMIN_U_MS 5U
 #define ZB_GP_DMIN_D_MS 32U
 
+/* A.3.3.2 Server Attributes, default value 0x01 */
 #ifndef ZB_ZGP_DEFAULT_COMMUNICATION_MODE
-#define ZB_ZGP_DEFAULT_COMMUNICATION_MODE ZGP_COMMUNICATION_MODE_LIGHTWEIGHT_UNICAST
+#define ZB_ZGP_DEFAULT_COMMUNICATION_MODE ZGP_COMMUNICATION_MODE_GROUPCAST_DERIVED
 #endif
 
-#define ZB_ZGP_DEFAULT_SECURITY_LEVEL ZB_ZGP_SEC_LEVEL_NO_SECURITY
 
 #ifdef ZB_ENABLE_ZGP_PROXY
 #ifndef ZB_ZGP_PROXY_TBL_SIZE
@@ -205,11 +227,6 @@ constants etc.
    ZB_ENABLE_SE_MIN_CONFIG - enables CBKE-related structures and functionality
    can be defined in vendor file directly, or enabled, when ZB_ENABLE_SE is defined
 */
-#ifdef ZB_ENABLE_SE
-#ifndef ZB_ENABLE_SE_MIN_CONFIG
-#define ZB_ENABLE_SE_MIN_CONFIG
-#endif
-#endif
 /** @endcond */ /* DOXYGEN_INTERNAL_DOC */
 
 #if defined ZB_ENABLE_SE_MIN_CONFIG
@@ -250,9 +267,6 @@ constants etc.
  * ZB_SUBGHZ_ONLY_MODE  - only Sub-GHz band supported
  * Nothing of above     - only 2.4GHz band supported
  */
-#if defined ZB_SUBGHZ_ONLY_MODE && defined ZB_R22_MULTIMAC_MODE
-#error ZB_SUBGHZ_ONLY_MODE && ZB_R22_MULTIMAC_MODE defined!
-#endif /* ZB_SUBGHZ_ONLY_MODE && ZB_R22_MULTIMAC_MODE */
 
 #if defined ZB_SUBGHZ_ONLY_MODE || defined ZB_R22_MULTIMAC_MODE
 /* Sub-GHz is used without reference to 2.4GHz band enabled */
@@ -367,52 +381,7 @@ Ideally should rework the whole zb_config.h to suit better for that new concept.
 #endif
 
 
-#if defined(ZB_SUB_GHZ)
-#if defined(ZB_SUB_GHZ_EU1)
-#define ZB_TRANSCEIVER_MAX_CHANNEL_NUMBER     34U
-#define ZB_TRANSCEIVER_START_CHANNEL_NUMBER   0U
 
-#elif defined(ZB_SUB_GHZ_EU2)
-#define ZB_TRANSCEIVER_MAX_CHANNEL_NUMBER     17U
-#define ZB_TRANSCEIVER_START_CHANNEL_NUMBER   0U
-
-#elif defined(ZB_SUB_GHZ_EU3)
-#define ZB_TRANSCEIVER_MAX_CHANNEL_NUMBER     17U
-#define ZB_TRANSCEIVER_START_CHANNEL_NUMBER   0U
-
-#elif defined(ZB_SUB_GHZ_US)
-#define ZB_TRANSCEIVER_MAX_CHANNEL_NUMBER     10U
-#define ZB_TRANSCEIVER_START_CHANNEL_NUMBER   0U
-#elif defined ZB_SUB_GHZ_JP
-#error "FixMe VS"
-//#define ZB_TRANSCEIVER_MAX_CHANNEL_NUMBER     10
-//#define ZB_TRANSCEIVER_START_CHANNEL_NUMBER   0
-#elif defined ZB_SUB_GHZ_CN
-#error "FixMe VS"
-//#define ZB_TRANSCEIVER_MAX_CHANNEL_NUMBER     10
-//#define ZB_TRANSCEIVER_START_CHANNEL_NUMBER   0
-#else
-#error "define Region!! (EU or US or JP or CN)"
-#endif
-#endif  /* ZB_SUB_GHZ */
-
-#ifdef ZB_SUB_GHZ
-#if defined(ZB_SUB_GHZ_EU1)    /* European countries and Russia */
-//#define ZB_TRANSCEIVER_ALL_CHANNELS_MASK   0x00000001 /* 0000.0000 0000.0000 0000.0000 0000.0001 */
-#error "Define ZB_TRANSCEIVER_ALL_CHANNELS_MASK for EU1"
-#elif defined(ZB_SUB_GHZ_EU2)    /* European countries and Russia */
-#define ZB_TRANSCEIVER_ALL_CHANNELS_MASK   0x0001FFFFU /* 0000.0000 0000.0001 1111.1111 1111.1111 */
-#elif defined(ZB_SUB_GHZ_EU3)    /* European countries and Russia */
-#define ZB_TRANSCEIVER_ALL_CHANNELS_MASK   0x0001FFFFU /* 0000.0000 0000.0001 1111.1111 1111.1111 */
-#elif defined(ZB_SUB_GHZ_US)  /* US channels */
-//#define ZB_TRANSCEIVER_ALL_CHANNELS_MASK   0x000007FE /* 0000.0000 0000.0000 0000.0111 1111.1110 */
-#error "Define ZB_TRANSCEIVER_ALL_CHANNELS_MASK for USA"
-#elif defined(ZB_SUB_GHZ_JP)
-#error "Define ZB_TRANSCEIVER_ALL_CHANNELS_MASK for Japan"
-#elif defined(ZB_SUB_GHZ_CN)
-#error "Define ZB_TRANSCEIVER_ALL_CHANNELS_MASK for China"
-#endif
-#else
 /* #define ZB_TRANSCEIVER_ALL_CHANNELS_MASK   (0xffff << 11) */ /* 0000.0111 1111.1111 1111.1000 0000.0000*/
 /* C51 doesn't like long shifts, it just cut last two bytes. (11-26) */
 /* TODO: Remove old subgig definitions */
@@ -430,7 +399,6 @@ Ideally should rework the whole zb_config.h to suit better for that new concept.
 #else
 #define ZB_TRANSCEIVER_ALL_CHANNELS_MASK   0x07FFF800U /* 0000.0111 1111.1111 1111.1000 0000.0000*/
 #endif /* !ZB_SUBGHZ_BAND_ENABLED */
-#endif /*ZB_SUB_GHZ*/
 
 #define MAC_DEVICE_TABLE_SIZE 4U
 
@@ -438,61 +406,11 @@ Ideally should rework the whole zb_config.h to suit better for that new concept.
 #define ZB_MAC_EXT_DATA_REQ
 #endif /* defined ZB_ENABLE_INTER_PAN_EXCHANGE && ! defined ZB_MAC_EXT_DATA_REQ */
 
-#ifdef ZB_MACSPLIT_DEVICE
 
-#ifndef ZB_MACSPLIT
-#define ZB_MACSPLIT
-#endif
 
-#define NVRAM_NOT_AVAILABLE
-#ifdef ZB_ED_ROLE
-#undef ZB_ED_ROLE
-#endif
-#ifdef ZB_USE_NVRAM
-#undef ZB_USE_NVRAM
-#endif
-#ifdef ZB_ENABLE_HA
-#undef ZB_ENABLE_HA
-#endif
-#ifdef ZB_BDB_MODE
-#undef ZB_BDB_MODE
-#endif
-#ifdef ZB_DISTRIBUTED_SECURITY_ON
-#undef ZB_DISTRIBUTED_SECURITY_ON
-#endif
-#ifdef ZB_CONFIGURABLE_MEM
-#undef ZB_CONFIGURABLE_MEM
-#endif
-#endif  /* ZB_MACSPLIT_DEVICE */
-
-#ifdef ZB_MACSPLIT_HOST
-
-#ifndef ZB_MACSPLIT
-#define ZB_MACSPLIT
-#endif
-
-#endif  /* ZB_MACSPLIT_HOST */
-
-#ifdef ZB_MACSPLIT
-#if defined ZB_MACSPLIT_TRANSPORT_SERIAL || defined ZB_TRANSPORT_LINUX_UART
-#define ZB_MACSPLIT_TRANSPORT_TYPE ZB_MACSPLIT_TRANSPORT_TYPE_SERIAL
-#endif
-#ifdef ZB_MACSPLIT_TRANSPORT_USERIAL
-#define ZB_MACSPLIT_TRANSPORT_TYPE ZB_MACSPLIT_TRANSPORT_TYPE_USERIAL
-#endif
-#ifdef ZB_MACSPLIT_TRANSPORT_SPI
-#define ZB_MACSPLIT_TRANSPORT_TYPE ZB_MACSPLIT_TRANSPORT_TYPE_SPI
-#endif
-#endif  /* ZB_MACSPLIT */
 
 
 /* MAC transport in Linux, line NSNG, uart/macsplit etc */
-#ifdef MAC_TRANSPORT_USES_SELECT
-/* Since we are waiting for event inside select() call in the same
- * thread as main loop runs, we have no radio which can wake up MCU, so
- * ZR can't sleep. Only sleepy ZED can be put asleep. */
-#define ZB_MAC_RADIO_CANT_WAKEUP_MCU
-#endif
 
 /***********************************************************************/
 /****************************General stack options**********************/
@@ -561,41 +479,16 @@ Ideally should rework the whole zb_config.h to suit better for that new concept.
 
 /* ZB_DEFAULT_APS_CHANNEL_MASK can be redefined in zb_vendor.h */
 #ifndef ZB_DEFAULT_APS_CHANNEL_MASK
-#ifdef ZB_SUB_GHZ
-#if defined(ZB_SUB_GHZ_EU1)    /* European countries and Russia */
-//#define ZB_TRANSCEIVER_ALL_CHANNELS_MASK   0x00000001 /* 0000.0000 0000.0000 0000.0000 0000.0001 */
-#error "Define ZB_DEFAULT_APS_CHANNEL_MASK for EU1"
-#elif defined(ZB_SUB_GHZ_EU2)    /* European countries and Russia */
-//#define ZB_DEFAULT_APS_CHANNEL_MASK ((1l<<11))
-#define ZB_DEFAULT_APS_CHANNEL_MASK ((1Ul<<11U))
-#elif defined(ZB_SUB_GHZ_EU3)    /* European countries and Russia */
-#define ZB_DEFAULT_APS_CHANNEL_MASK ((1Ul<<11U))
-#elif defined(ZB_SUB_GHZ_US)  /* US channels */
-//#define ZB_DEFAULT_APS_CHANNEL_MASK ((1l<<11))
-#error "Define ZB_DEFAULT_APS_CHANNEL_MASK for USA"
-#elif defined(ZB_SUB_GHZ_JP)
-#error "Define ZB_DEFAULT_APS_CHANNEL_MASK for Japan"
-#elif defined(ZB_SUB_GHZ_CN)
-#error "Define ZB_DEFAULT_APS_CHANNEL_MASK for China"
-#endif
-#else
 //#define ZB_DEFAULT_APS_CHANNEL_MASK ((1l<<11))
 /* Change that place if you want to set channel for internal tests */
 //#define ZB_DEFAULT_APS_CHANNEL_MASK ((1l<<11))
 /* #define ZB_DEFAULT_APS_CHANNEL_MASK ((1l<<16)) */
 #define ZB_DEFAULT_APS_CHANNEL_MASK (ZB_TRANSCEIVER_ALL_CHANNELS_MASK)
-#endif
 #endif  /* ZB_DEFAULT_APS_CHANNEL_MASK */
 /** @} */ /* ZB_CONFIG */
 
 
 /*  PRO stack specific details */
-#ifndef ZB_PRO_STACK
-/**
-   NWK: If defined, use distributed address assigning for tree and for mesh routing (Zigbee 2007).
-*/
-#define ZB_NWK_DISTRIBUTED_ADDRESS_ASSIGN
-#else /*ZB_PRO_STACK*/
 /**
    NWK: If defined, use stochastic address assignment (Zigbee PRO).
 */
@@ -610,7 +503,23 @@ Ideally should rework the whole zb_config.h to suit better for that new concept.
 /*! Expiration time of the source route table (300 sec) */
 #define ZB_NWK_SRC_ROUTE_TABLE_EXPIRY 60U
 
-#endif /*ZB_PRO_STACK*/
+/**
+   Minimal time between MTORR when ZBOSS decided to run MTORR at some event
+ */
+#define ZB_MIN_TIME_BETWEEN_MTORR ZB_MILLISECONDS_TO_BEACON_INTERVAL(10000u)
+/**
+   If advised to send MTORR, do it after that delay
+ */
+#define ZB_DELAY_BEFORE_ADVISED_MTORR ZB_MILLISECONDS_TO_BEACON_INTERVAL(2000u)
+
+
+#define ZB_DELAY_BEFORE_ADVISED_MTORR_HIPRI ZB_MILLISECONDS_TO_BEACON_INTERVAL(500u)
+
+/**
+   Delay to Send MTORR just after boot
+ */
+#define ZB_DELAY_BEFORE_MTORR_AT_BOOT ZB_MILLISECONDS_TO_BEACON_INTERVAL(100u)
+
 
 
 #if defined ZB_MAC_PENDING_BIT_SOURCE_MATCHING
@@ -865,7 +774,7 @@ ZB_ED_RX_OFF_WHEN_IDLE
 
 #ifndef ZB_APS_GROUP_TABLE_SIZE
 /**
-   APS: man number of groups in the system
+   APS: max number of groups in the system
 */
 #define ZB_APS_GROUP_TABLE_SIZE       16U
 #endif
@@ -901,7 +810,7 @@ ZB_ED_RX_OFF_WHEN_IDLE
 
 #ifndef ZB_APS_GROUP_TABLE_SIZE
 /**
-   APS: man number of groups in the system
+   APS: max number of groups in the system
 */
 #define ZB_APS_GROUP_TABLE_SIZE       4U
 #endif
@@ -948,12 +857,7 @@ ZB_ED_RX_OFF_WHEN_IDLE
 
    See Zigbee specification revision 22 subclause 4.4.11
 */
-#ifdef ZB_PRO_STACK
 #define ZB_APS_SECURITY_TIME_OUT_PERIOD ZB_MILLISECONDS_TO_BEACON_INTERVAL(1700U)
-#else
-/* i.e. 700 milliseconds on 2.4 GHz */
-#define ZB_APS_SECURITY_TIME_OUT_PERIOD ZB_MILLISECONDS_TO_BEACON_INTERVAL(700U)
-#endif
 
 /**
  APS: Get APS ACK wait time for the device depending on its receiver on when idle
@@ -985,11 +889,13 @@ ZB_ED_RX_OFF_WHEN_IDLE
  *
  *   @note This is a default value of the define. This value can be changed by user.
 */
+#ifndef ZB_IEEE_ADDR_TABLE_SIZE
 #ifndef ZB_MEMORY_COMPACT
 #define ZB_IEEE_ADDR_TABLE_SIZE 101U
-#else
+#else /* ZB_MEMORY_COMPACT */
 #define ZB_IEEE_ADDR_TABLE_SIZE 32U
-#endif
+#endif /* ZB_MEMORY_COMPACT */
+#endif /* ZB_IEEE_ADDR_TABLE_SIZE */
 
 #ifndef ZB_PANID_TABLE_SIZE
 /**
@@ -1029,17 +935,12 @@ ZB_ED_RX_OFF_WHEN_IDLE
 
 #else  /* ZB_TRACE_LEVEL */
 
-#ifndef ZB_NSNG
 /* SNCP release build has enabled trace and in the same time requires to have scan duration value set to 3 */
 #ifdef SNCP_MODE
 #define ZB_DEFAULT_SCAN_DURATION 3U
 #else
 #define ZB_DEFAULT_SCAN_DURATION 5U
 #endif /* SNCP_MODE */
-#else
-/* Increase scan duration for NSNG: usually it runs with high trace level, so we can miss beacons if scan too fast */
-#define ZB_DEFAULT_SCAN_DURATION 6U
-#endif
 
 #if defined ZB_SUBGHZ_BAND_ENABLED
 #define ZB_DEFAULT_SCAN_DURATION_SUB_GHZ 7U
@@ -1136,12 +1037,11 @@ exponent.
 /*! @endcond */ /* DOXYGEN_INTERNAL_DOC */
 
 #ifdef ZB_MAC_POLL_INDICATION_CALLS_REDUCED
-#ifndef ZB_MAC_POLL_INDICATION_CALL_MAX_TIMEOUT
 /**
-   Default maximum value of Poll Indication calls timeout (in sec)
+    The shortest timeout according to the spec is 10 sec, and the spec recommends to send
+    keepalive message thrice during timeout period. 3.6.10.3 Zigbee/r22 spec
  */
-#define ZB_MAC_POLL_INDICATION_CALL_MAX_TIMEOUT 3600U
-#endif
+#define MAC_POLL_TIMEOUT_THRESHOLD (3U * ZB_TIME_ONE_SECOND)
 #endif /* ZB_MAC_POLL_INDICATION_CALLS_REDUCED */
 
 /** @cond DOXYGEN_INTERNAL_DOC */
@@ -1177,11 +1077,7 @@ exponent.
 /***************************STACK FEATURES**********************/
 
 /** @cond DOXYGEN_INTERNAL_DOC *//* Current stack profile */
-#if defined ZB_PRO_STACK
 #define ZB_STACK_PROFILE        STACK_PRO
-#else
-#define ZB_STACK_PROFILE        STACK_2007
-#endif
 
 /**
    Protocol version selection: see table 1.1(pro-specification)
@@ -1361,6 +1257,12 @@ exponent.
 #define ZB_BINARY_TRACE
 /* #define ZB_TRAFFIC_DUMP_ON */
 /* #define ZB_TRAF_DUMP_V2 */
+
+/* If trace baudrate isn't set, set it to 115200 by default */
+#ifndef ZB_TRACE_SERIAL_BAUDRATE
+#define ZB_TRACE_SERIAL_BAUDRATE 115200U
+#endif /* ZB_TRACE_SERIAL_BAUDRATE */
+
 #endif /*ZB_SERIAL_FOR_TRACE || defined ZB_TRACE_OVER_JTAG || defined ZB_NET_TRACE*/
 #endif /*ZB_PLATFORM_LINUX*/
 
@@ -1368,9 +1270,7 @@ exponent.
 #ifdef ZB_PLATFORM_LINUX
 
 /* NSNG run in the single thread */
-#if (defined ZB_NSNG && defined NCP_MODE) || (!defined ZB_NSNG)
 #define ZB_THREADS
-#endif
 #ifndef ZB_INIT_HAS_ARGS
 #define ZB_INIT_HAS_ARGS
 #endif
@@ -1476,7 +1376,7 @@ exponent.
 
 /************************Special modes for testing*******************/
 
-#if defined DEBUG && defined ZB_CERTIFICATION_HACKS
+#if defined ZB_CERTIFICATION_HACKS
 
 /**
  * This define turns on/off test profile
@@ -1485,12 +1385,11 @@ exponent.
 #define ZB_TEST_PROFILE
 #endif
 
-#endif /* DEBUG && ZB_CERTIFICATION_HACKS */
+#endif /* ZB_CERTIFICATION_HACKS */
 
 
 /* Testing mode for some pro certification tests */
 /** @cond DOXYGEN_INTERNAL_DOC */
-#ifdef ZB_PRO_STACK
 
 /* See: certification test TP_PRO_BV-11 */
 #ifdef ZB_CERTIFICATION_HACKS
@@ -1514,56 +1413,13 @@ exponent.
 /* Compatibility tests (with Ember Zigbee platform ISA3)*/
 
 /* Ember + ZBOSS stack with ZLL Profile*/
-#ifdef ZB_ENABLE_ZLL
-#define ZLL_TEST_WITH_EMBER
-#endif /*ZB_ENABLE_ZLL*/
 
 /* Ember + ZBOSS Core Pro stack */
 //#define ZB_EMBER_TESTS
-#ifdef ZB_EMBER_TESTS
-/* Used with compatibility tests (ember data secured by preconfigured global key, if pair key in
-   ember side absent -> use preconfigured key) */
-/* hash2 */
-//#define ZB_EMBER_SEC_DATA_PRECONF_HASH2
-/* hash1*/
-//#define ZB_EMBER_SEC_DATA_PRECONF_HASH0
-/* non-hashed; see: EMBER_TRUST_CENTER_USES_ HASHED_LINK_KEY */
-#define ZB_EMBER_SEC_DATA_PRECONF_NONHASH
-
-/* Use hashed data link key(pair key) for compatibility tests with Ember, by default used
-   non-hashed plain key, it is Only for testing purpose */
-
-#if 0
-/* Currently isn't used, by default non-hashed key */
-#define ZB_EMBER_SEC_DATA_LINK_HASH0
-#define ZB_EMBER_SEC_DATA_LINK_HASH2
-#define ZB_EMBER_SEC_DATA_LINK_NONHASH
-#endif
-
-/* Used with compatibility tests (ember data secured by preconfigured global key) */
-#define ZB_EMBER_SEC_TRANSPORT_KEY_UNIQ_APS
-
-/* Accept APS unencrypted Transport Key from Ember */
-#define ZB_EMBER_SEC_ACCEPT_APS_UNSECURED_TRANSPORT_KEY
-
-/* Disable waiting ack for key request */
-//#define ZB_EMBER_DISABLE_APS_ACK_REQ_FOR_REQUEST_KEY_CMD
-
-/* Disable waiting ack for transport key */
-//#define ZB_EMBER_DISABLE_APS_ACK_REQ_FOR_TRANSPORT_KEY_CMD
-
-/* Disable waiting ack for tunnel command */
-//#define ZB_EMBER_DISABLE_APS_ACK_REQ_FOR_TUNNEL_CMD
-
-/* Check frame counters from Aux security header */
-#define ZB_CHECK_INCOMING_SECURE_APS_FRAME_COUNTERS
-
-#endif  /* ZB_EMBER_TESTS */
 
 /* Send messages with empty payload without APS-security */
 #define ZB_SEND_EMPTY_DATA_WITHOUT_APS_ENCRYPTION
 
-#endif /* ZB_PRO_STACK */
 
 //* Definitions for 802.15.4 certification hacks */
 
@@ -1657,6 +1513,16 @@ exponent.
 #define ZB_GPD_COMMISSIONING_RETRY_INTERVAL ZB_MILLISECONDS_TO_BEACON_INTERVAL(500)
 #endif /* ZB_ZGPD_ROLE */
 
+/** The maximum number of reports that GPD can send in the Application Description. */
+#ifndef ZB_ZGP_APP_DESCR_REPORTS_NUM
+#define ZB_ZGP_APP_DESCR_REPORTS_NUM 3U
+#endif /* ZB_ZGP_APP_DESCR_REPORTS_NUM */
+
+/** The maximum report descriptor length that GPD can send in the Application Description. */
+#ifndef ZB_ZGP_APP_DESCR_REPORT_DATA_SIZE
+#define ZB_ZGP_APP_DESCR_REPORT_DATA_SIZE 32U
+#endif /* ZB_ZGP_APP_DESCR_REPORT_DATA_SIZE */
+
 #ifdef ZB_ENABLE_ZGP_DIRECT
 /* Old GP GPD sensors (until May, 2014) use
  * 5 ms offset. New sensors use 20 ms offset.*/
@@ -1685,10 +1551,7 @@ exponent.
 /************************NVRAM SUPPORT*******************/
 
 #if defined ZB_USE_NVRAM
-/**
-   Storing NWK security counter in NVRAM
-*/
-#define ZB_STORE_COUNTERS
+
 /**
    Interval in which counter is stored
 */
@@ -1848,7 +1711,7 @@ compatibility with some old code. */
 /**
    Do not try to inject LEAVE on data request from ZED which we already timed out.
 
-   That define removes stupid r21 feature which requires from us to always set
+   That define removes some r21 feature which requires from us to always set
    pending bit in any our real devices (just because we are a) not so fast to check
    _absence_ of device in the neighbor table and replay with MAC ACK and b) want
    to use auto-ack feature of radio which support it - like TI devices).
@@ -1939,61 +1802,6 @@ compatibility with some old code. */
 
 #endif  /* ZB_ZBOSS_LITE_MAX */
 
-#ifdef ZB_LITE_FOR_GW
-#define ZB_COORDINATOR_ONLY
-#define ZB_LITE_BDB_ONLY_COMMISSIONING
-#define ZB_LITE_ALWAYS_SECURE
-#define ZB_LITE_NO_TRUST_CENTER_REQUIRE_KEY_EXCHANGE
-//#define ZB_LITE_NO_SOURCE_ROUTING
-#define ZB_LITE_NO_NLME_ROUTE_DISCOVERY
-//#define ZB_NO_NWK_MULTICAST
-#define ZB_LITE_NO_ORPHAN_SCAN
-#define ZB_LITE_NO_STORE_APS_COUNTERS
-//#define ZB_LITE_NO_FULL_FUNCLIONAL_MGMT_NWK_UPDATE
-#define ZB_LITE_NO_ZDO_SYSTEM_SERVER_DISCOVERY
-#define ZB_LITE_NO_ZDO_MGMT_RTG
-#define ZB_LITE_APS_DONT_TX_PACKET_TO_MYSELF
-
-#ifdef ZB_SECURITY_INSTALLCODES
-#undef ZB_SECURITY_INSTALLCODES
-#endif
-
-#ifdef ZB_CERTIFICATION_HACKS
-#undef ZB_CERTIFICATION_HACKS
-#endif
-
-#ifdef ZB_TEST_PROFILE
-#undef ZB_TEST_PROFILE
-#endif
-
-#ifndef ZB_LITE_NO_INDIRECT_MGMT_LEAVE
-/**
-   Disable mgmt leave with requires sending leave to third device.
- */
-#define ZB_LITE_NO_INDIRECT_MGMT_LEAVE
-/* Need to store only one entry - about leave myself */
-#ifdef ZB_ZDO_PENDING_LEAVE_SIZE
-#undef ZB_ZDO_PENDING_LEAVE_SIZE
-#define ZB_ZDO_PENDING_LEAVE_SIZE 1U
-#endif
-#endif
-
-#ifndef ZB_LITE_LIMIT_PIB_ACCESS
-/**
-   Limit access to PIB to values really used by the stack
- */
-#define ZB_LITE_LIMIT_PIB_ACCESS
-#endif
-
-
-#ifndef ZB_LITE_NO_END_DEVICE_BIND
-/**
-   Disable end device bind
- */
-#define ZB_LITE_NO_END_DEVICE_BIND
-#endif
-
-#endif  /* ZB_LITE_FOR_GW */
 
 #ifdef ZB_COORDINATOR_ONLY
 #undef ZB_DISTRIBUTED_SECURITY_ON
@@ -2096,9 +1904,6 @@ compatibility with some old code. */
 #ifdef ZB_BDB_TOUCHLINK
 #undef ZB_BDB_TOUCHLINK
 #endif
-#ifdef ZB_ENABLE_ZLL
-#undef ZB_ENABLE_ZLL
-#endif
 #ifdef ZB_ENABLE_INTER_PAN_EXCHANGE
 #undef ZB_ENABLE_INTER_PAN_EXCHANGE
 #endif
@@ -2111,9 +1916,7 @@ compatibility with some old code. */
 #endif
 
 #ifdef ZB_ED_ROLE
-#ifndef ZB_MACSPLIT_HOST
 #define ZB_USE_SLEEP
-#endif
 #endif
 
 #ifdef ZB_ENABLE_INTER_PAN_NON_DEFAULT_CHANNEL
@@ -2136,10 +1939,42 @@ compatibility with some old code. */
  *
  * Note: These values were members of `enum zb_production_config_version_e` type but were converted
  * to a set of macros due to MISRA violations.
+ *
+ * Versions description:
+ * v1:
+ *    stack compatibility: R21
+ *    supported channels: only 2.4Ghz 11-26
+ *    features: R21 compatible, its own crc `zb_crc32_next_v2`, supports tx_power settings for 2.4GHz
+ * v2:
+ *    stack compatibility: R22
+ *    supported channels:
+ *      1. 2.4 GHz 11-26
+ *      2. Subghz page 28 channels 0-26
+ *      2. Subghz page 29 channels 27-34, 62
+ *      2. Subghz page 30 channels 35-61
+ *      2. Subghz page 31 channels 0-26
+ *    features: not compatible with R21, normal crc, less memory consumed,
+ *              most devices in fields support it, supports tx_power settings for 2.4GHz and 4 subghz pages
+ *
+ * v3:
+ *    stack compatibility: R22
+ *    supported channels:
+ *      1. 2.4 GHz 11-26
+ *      2. Subghz page 23 channels 0-24
+ *      2. Subghz page 24 channels 56-76
+ *      2. Subghz page 25 channels 0-26
+ *      2. Subghz page 26 channels 27-34
+ *      2. Subghz page 27 channels 35-55
+ *      2. Subghz page 28 channels 0-26
+ *      2. Subghz page 29 channels 27-34, 62
+ *      2. Subghz page 30 channels 35-61
+ *      2. Subghz page 31 channels 0-26
+ *    features: not compatible with R21, normal crc, supports tx_power for 2.4 GHz and 9 subghz pages.
  */
 /** @{ */
 #define ZB_PRODUCTION_CONFIG_VERSION_1_0 0x01U
 #define ZB_PRODUCTION_CONFIG_VERSION_2_0 0x02U
+#define ZB_PRODUCTION_CONFIG_VERSION_3_0 0x03U
 /** @} */
 
 #define ZB_PRODUCTION_CONFIG_CURRENT_VERSION   ZB_PRODUCTION_CONFIG_VERSION_2_0
@@ -2175,10 +2010,6 @@ compatibility with some old code. */
 
 #endif /* ZB_DISABLE_BIN_TRACE_DUMP_EXPOSE_KEYS */
 
-#ifndef ZB_USE_ERROR_INDICATION
-#define ZB_USE_ERROR_INDICATION
-#endif /* !ZB_USE_ERROR_INDICATION */
-
 #if defined NCP_MODE_HOST && !defined SNCP_MODE
 #define HAVE_TOP_LEVEL_ERROR_HANDLER
 #endif /* NCP_MODE_HOST && !SNCP_MODE */
@@ -2196,7 +2027,7 @@ compatibility with some old code. */
 
 /** @cond DOXYGEN_MULTIMAC_SECTION */
 /* Monolithic MAC is a default interface and used when enabled interfaces are not specified in vendors */
-#if !defined(ZB_MAC_MONOLITHIC) && !defined(ZB_MACSPLIT_HOST) && !defined(ZB_MACSPLIT_DEVICE) && !defined(ZB_MAC_SUBGHZ) && !defined(NCP_MODE_HOST)
+#if !defined(ZB_MAC_MONOLITHIC) && !defined(ZB_MACSPLIT_HOST) && !defined(ZB_MACSPLIT_DEVICE) && !defined(ZB_MAC_SUBGHZ) && !defined(NCP_MODE_HOST) && !defined (ZB_EXTMAC)
   #define ZB_MAC_MONOLITHIC
 #endif /* !ZB_MAC_MONOLITHIC && !ZB_MACSPLIT_HOST && !ZB_MACSPLIT_DEVICE && !ZB_MAC_SUBGHZ &&  */
 
@@ -2204,5 +2035,14 @@ compatibility with some old code. */
   #define ZB_COMPILE_MAC_MONOLITHIC
 #endif
 /** @endcond */ /* DOXYGEN_MULTIMAC_SECTION */
+
+#ifndef ZB_NWK_ADDR_REQ_PENDING_LIMIT
+#define ZB_NWK_ADDR_REQ_PENDING_LIMIT 3U
+#endif
+
+/* By default keep counting children: it covered by ZOI CI, don't want to update it.. */
+#if !defined ZB_NO_COUNT_CHILDREN && !defined ZB_COUNT_CHILDREN
+#define ZB_COUNT_CHILDREN
+#endif
 
 #endif /* ZB_CONFIG_H */

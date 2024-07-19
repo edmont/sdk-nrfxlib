@@ -179,25 +179,16 @@ extern zb_intr_globals_t g_izb;
 #include "zb_scheduler.h"
 #include "zb_sleep.h"
 #include "zb_bufpool_globals.h"
-#if (!(defined ZB_MACSPLIT_DEVICE)) || (defined ZB_TH_ENABLED)
 #include "zb_addr_globals.h"
 #include "zb_nwk_globals.h"
 #include "zb_aps_globals.h"
 #include "zb_zdo_globals.h"
 #include "zb_commissioning.h"
-#endif  /* (!(defined ZB_MACSPLIT_DEVICE)) || (defined ZB_TH_ENABLED) */
 
-#ifdef ZB_ENABLE_ZLL
-#include "zll/zb_zll_config.h"
-#include "zboss_api_tl.h"
-#endif
 
 #include "zb_ha.h"
 #include "zb_zcl.h"
 
-#ifdef ZB_ENABLE_ZLL
-#include "zll/zb_zll_common.h"
-#endif
 
 #include "zb_time.h"
 
@@ -209,9 +200,7 @@ extern zb_intr_globals_t g_izb;
 #include "zb_led_button.h"
 #endif
 
-#ifdef ZB_USE_ERROR_INDICATION
 #include "zb_error_indication.h"
-#endif
 
 #ifdef USE_ZB_WATCHDOG
 #include "zb_watchdog.h"
@@ -228,10 +217,6 @@ extern zb_intr_globals_t g_izb;
 /* Declaration of zb_io_ctx_t on some MAC platforms, like nsng */
 #include "zb_mac.h"
 
-#if defined ZB_MACSPLIT
-/* Host side of out MAC split - for zb_io_ctx_t */
-#include "zb_macsplit_transport.h"
-#endif /* defined ZB_MACSPLIT */
 
 /* Alien MAC connected via some serial protocol: not our MAC split,
  * but similar concept. In Linux it shares some i/o logic with our
@@ -387,6 +372,11 @@ typedef struct zb_cert_hacks_s
                                                                  in arguments.
                                                                  @see fb-pre-tc-03a */
 
+  zb_callback_t mcps_data_confirm_handler_cb; /*!< Callback that will be called
+                                                                    when handling confirmation after
+                                                                    completion of request.
+                                                                    @see rtp_bdb_23 */
+
   zb_bitfield_t override_tc_significance_flag: 1;              /*!< Allows to override default value
                                                                     of tc_significance in MgmtPermitJoin;
                                                                     Default value is 0 -
@@ -540,9 +530,6 @@ typedef struct zb_cert_hacks_s
   zb_bitfield_t nwk_leave_from_unknown_addr:1; /*!< Send all nwk leave_req with src ieee addr=<nwk_leave_unknown_addr>
                                                     and short=<nwk_leave_unknown_short> */
   zb_bitfield_t low_ram_concentrator:1;       /*!< Forces coordinator to send no route cache in mtorr */
-#ifdef ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-  zb_bitbool_t zcl_subghz_cluster_test:1;          /*!< If ZCL cluster needs APS encryption - ignore it; MAC duty cycle substituted mode */
-#endif
 
   zb_bitfield_t tc_rejoin_mac_cap_wrong_dev_type:1; /* Toggle FFD bit in MAC capabilities for rejoin req */
   zb_bitfield_t tc_rejoin_mac_cap_wrong_rx_on_when_idle:1; /* Toggle FFD bit in MAC capabilities for rejoin req */
@@ -552,10 +539,20 @@ typedef struct zb_cert_hacks_s
   zb_bitfield_t tc_rejoin_aps_decrypt_error:1; /* Simulate TC rejoin without known aps key */
   zb_ieee_addr_t nwk_leave_from_unknown_ieee_addr; /*!< IEEE source address used in nwk_leave if `nwk_leave_from_unknown_addr` is set */
   zb_uint16_t nwk_leave_from_unknown_short_addr; /*!< Short source address used in nwk_leave if `nwk_leave_from_unknown_addr` is set */
+#ifdef ZB_R22_CERT_MULTITEST_MANUAL_RUN
+  zb_bitfield_t nwk_parent_information_bit_reset_on_rejoin_rsp:1; /*!< Reset nwkParentInformation on rejoin response so the next packets until End Device Timeout response have End Device Initiator to 0 */
+#endif /* ZB_R22_CERT_MULTITEST_MANUAL_RUN */
+  zb_uint8_t joins_ctr; /*!< count of joins to our device */
+  zb_uint8_t max_joins; /*!< max number of successful joins */
+  zb_bitfield_t nwk_seq_number_prev:1; /*!< Use previous NWK sequency number, once */
+  zb_bitfield_t aps_counter_prev:1; /*!< Use previous APS counter, once */
 } zb_cert_hacks_t;
 
 #define ZB_CERT_HACKS() ZG->cert_hacks
-#endif
+
+/* Value that means that ZB_CERT_HACKS().max_joins is uninitialized */
+#define ZB_MAX_JOINS_UNINITIALIZED ZB_UINT8_MAX
+#endif /* ZB_CERTIFICATION_HACKS */
 
 #ifdef ZB_STACK_REGRESSION_TESTING_API
 
@@ -570,7 +567,7 @@ typedef struct zb_cert_hacks_s
 
 typedef struct zb_reg_api_s
 {
-  zb_uint8_t zcl_ota_custom_query_jitter;		/*!< Custom value of ota query jitter instead of
+  zb_uint8_t zcl_ota_custom_query_jitter;               /*!< Custom value of ota query jitter instead of
                                                          *   randomly chosen
                                                          */
   zb_int8_t osif_interrupts_balance;                    /*!< The difference between
@@ -592,7 +589,7 @@ typedef struct zb_reg_api_s
                                                          *   on NVRAM write */
   zb_bool_t disable_sending_nwk_key;                    /*!< Do not send nwk key during association to
                                                          *   the next device which attempts to associate.
-                                                         *   After one first usage flag will be resetted. */
+                                                         *   After one first usage flag will be reset. */
   zb_bool_t extended_beacon_send_delay;                 /*!< If set to 1, a larger delay will be
                                                          *    used when handling a beacon request. */
   zb_bool_t enable_custom_best_parent;                  /*!< Enable custom short address for the first
@@ -608,6 +605,8 @@ typedef struct zb_reg_api_s
                                                          *   from Trust Center */
   zb_bool_t disable_aps_acknowledgements;               /*!< Disable APS ACKs for incoming
                                                          *   APS packets. */
+  zb_bool_t send_leave_instead_of_tclk; /*!< Send leave instead of tclk on every second request for a TCLK */
+  zb_bool_t send_rejoin_instead_of_tclk_on_every_second_request; /*!< Send leave with rejoin set to true instead of tclk on every second request for a TCLK */
 } zb_reg_api_t;
 
 #define ZB_REGRESSION_TESTS_API() ZG->reg_api
@@ -653,29 +652,20 @@ struct zb_globals_s
 {
   zb_sched_globals_t      sched;    /*!< Global schedule context */
   zb_buf_pool_t           bpool;    /*!< Global buffer pool context */
-#if (!(defined ZB_MACSPLIT_DEVICE)) || (defined ZB_TH_ENABLED)
   zb_addr_globals_t       addr;     /*!< Global address context */
-#endif /* (!(defined ZB_MACSPLIT_DEVICE)) || (defined ZB_TH_ENABLED) */
 
 #ifndef NCP_MODE_HOST
-#if (!(defined ZB_MACSPLIT_DEVICE)) || (defined ZB_TH_ENABLED)
   zb_nwk_globals_t        nwk;      /*!< Global NWK context - NIB */
   zb_aps_globals_t        aps;      /*!< Global APS context - AIB */
   zb_zdo_globals_t        zdo;      /*!< Global ZDO context - ZDO_CTX */
-#endif /* (!(defined ZB_MACSPLIT_DEVICE)) || (defined ZB_TH_ENABLED) */
   zb_sec_globals_t        sec;      /*!< Global security context - SEC_CTX */
 #endif /* !defined NCP_MODE_HOST */
 
-#if !defined ZB_MACSPLIT_DEVICE || defined ZB_TH_ENABLED
   zb_commissioning_ctx_t commissioning_ctx;
-#endif /* !defined ZB_MACSPLIT_DEVICE || defined ZB_TH_ENABLED */
 
 #if defined ZB_ENABLE_ZCL || defined ZB_ENABLE_ZGPD_ATTR_REPORTING
   zb_zcl_globals_t        zcl;      /*!< Global ZCL context - ZCL_CTX */
 #endif /* defined ZB_ENABLE_ZCL || defined ZB_ENABLE_ZGPD_ATTR_REPORTING */
-#if defined ZB_ENABLE_ZLL
-  zb_zll_ctx_t            zll;
-#endif /* defined ZB_ENABLE_ZLL */
 #if defined ZB_ENABLE_ZGP_INFRA
   zb_zgp_ctx_t            zgp;
 #endif /* defined ZB_ENABLE_ZGP_EP */
@@ -685,9 +675,7 @@ struct zb_globals_s
 #ifdef ZB_USE_BUTTONS
   zb_buttons_global_t    button;
 #endif
-#ifdef ZB_USE_ERROR_INDICATION
   zb_error_indication_ctx_t err_ind;
-#endif /* ZB_USE_ERROR_INDICATION */
 #ifdef USE_ZB_WATCHDOG
   zb_watchdog_t watchdog[ZB_N_WATCHDOG];
 #endif
@@ -731,9 +719,6 @@ struct zb_intr_globals_s
   zb_io_ctx_t             ioctx;
 #endif
 /* Note: MAC split I/O context is not used on hardware, but it's used on Linux platform */
-#if defined(ZB_MACSPLIT_HOST) || (defined(ZB_MACSPLIT_DEVICE) && defined(ZB_PLATFORM_LINUX))
-  zb_macsplit_io_ctx_t    macsplit_ioctx;
-#endif
 #if defined( ENABLE_USB_SERIAL_IMITATOR )
   zb_usbc_ctx_t           usbctx; /*!< USB imitator IO context. */
 #endif /* defined( ENABLE_USB_SERIAL_IMITATOR ) */

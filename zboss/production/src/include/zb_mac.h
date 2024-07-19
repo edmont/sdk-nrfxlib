@@ -50,7 +50,11 @@
 #include "zb_config_common.h"
 
 /* Include platform-specific MAC stuff from the separate repo */
+#ifndef ZB_EXTMAC
 #include "mac_platform.h"
+#else
+#include "zb_extmac_hdr.h"
+#endif
 
 #ifndef ZB_TRANSCEIVER_START_CHANNEL_NUMBER
   #define ZB_TRANSCEIVER_START_CHANNEL_NUMBER 11U
@@ -159,11 +163,6 @@
 */
 #define MAX_PENDING_ADDRESSES          7U
 
-/**
-   MAC overhead for unicast frame with Pan ID compression (normal case when
-   sending via nwk), including FCS bytes
-*/
-#define MAX_MAC_OVERHEAD_SHORT_ADDRS  11U
 /**
    Maximal beacon overhead
 */
@@ -307,7 +306,7 @@
 /** @} */
 
 
-/* Frame control field macroses */
+/* Frame control field macros */
 
 /**
    Sets frame type subfield in frame control field ( FCF )
@@ -678,11 +677,6 @@ zb_ushort_t zb_mac_get_beacon_payload_offset(zb_uint8_t *beacon);
 #define MAC_SECUR_LEV5_KEYID1_AUX_HDR_SIZE 0U
 #endif
 
-#if defined ZB_MAC_TESTING_MODE
-#define MAC_SECUR_CERT_AUX_HDR_SIZE    5U
-#define MAC_SECUR_CERT_FRAME_COUNTER   4U
-#define MAC_SECUR_CERT_KEY_SEQ_COUNTER 5U
-#endif
 
 /**
    Remove MAC header from the packet.
@@ -775,7 +769,7 @@ zb_mac_purge_confirm_t;
     PAN. It is also used by the coordinator to instruct an associated device to leave the
    PAN.
 
-   @param buf - pointer ot zb_buf_t container
+   @param buf - pointer to zb_buf_t container
 
    @param device_addr_mode - ( valid values  ZB_ADDR_16BIT_DEV_OR_BROADCAST or
 
@@ -824,7 +818,7 @@ zb_mac_disassociate_indication_t;
    Returns pointer to zb_mac_disassociate_indication_t structure
    located somewhere in buf.
 
-   @param buf    - pointer ot zb_buf_t container
+   @param buf    - pointer to zb_buf_t container
    @param outptr - out pointer to zb_mac_associate_confirm_t struct located
    somewhere inside buf
 */
@@ -866,7 +860,7 @@ zb_mac_disassociate_confirm_t;
    Returns pointer to zb_mac_disassociate_confirm_t structure
    located somewhere in buf.
 
-   @param buf    - pointer ot zb_buf_t container
+   @param buf    - pointer to zb_buf_t container
    @param outptr - out pointer to zb_mac_associate_confirm_t struct located
    somewhere inside buf
 */
@@ -1188,6 +1182,9 @@ zb_mac_beacon_payload_t;
 
 #define ZB_MAC_GET_SUPERFRAME_PAN_COORDINATOR( p_sfs ) ((zb_uint_t)((((zb_uint8_t*) (p_sfs))[ZB_PKT_16B_FIRST_BYTE] >> 6U) & 1U))
 
+#define ZB_MAC_INVALID_LOGICAL_PAGE    0xFFU
+#define ZB_MAC_INVALID_LOGICAL_CHANNEL 0xFFU
+
 
 /**
    Defines Pan descriptor structure
@@ -1231,9 +1228,6 @@ typedef ZB_PACKED_PRE struct zb_mac_pan_descriptor_s    // 7.1.5.1.1 table-41
   zb_uint8_t            link_quality;
   /* Zigbee does not use security and uses beaconless mode, so skip other Pan descriptor
      fields - for timestamp and security  */
-#if defined ZB_MAC_TESTING_MODE
-  zb_time_t             timestamp; /* Optional Timestamp field */
-#endif
 #if defined ZB_ENHANCED_BEACON_SUPPORT
   zb_uint16_t           enh_beacon_nwk_addr; /* the field is required for enhanced beacons handling */
 #endif /* ZB_ENHANCED_BEACON_SUPPORT */
@@ -1263,7 +1257,7 @@ zb_pending_address_spec_t;
 
    Parameters for MLME-SCAN.request primitive
 
-   @param buf      - pointer ot zb_buf_t container
+   @param buf      - pointer to zb_buf_t container
    @param type     - one value of @ref mac_scan_type
 
    @param _channel_page - the channel page on which to perform the scan
@@ -1271,12 +1265,12 @@ zb_pending_address_spec_t;
    @param _channels - bitmap. Only first 27 bits are used.
    Bits (b0, b1,... b26) indicate which channels are to be scanned
    ( 1 = scan, 0 = do not scan) for each of the 27 channels supported by hardware.
-   UBEK transciever maps 16 IEEE 802.15.4 2.4GHz band channels to following interval [ 11, 26 ].
+   UBEK transceiver maps 16 IEEE 802.15.4 2.4GHz band channels to following interval [ 11, 26 ].
    So values of all others bits except bits from 11 to 26 are ignored
 
    @param duration - a value used to calculate the length of time to spend scanning each channel for ED,
    active, and passive scans. This parameter is ignored for orphan scans. The time spent scanning
-   each channel is [ aBaseSuperframeDuration * ( 2n + 1 ) ] symbols, where n is the value of the
+   each channel is [ aBaseSuperframeDuration * ( 2**n + 1 ) ] symbols, where n is the value of the
    ScanDuration parameter.
 
    @param mac_iface_id - index of interface that will be used for scanning
@@ -1417,11 +1411,25 @@ zb_mac_scan_confirm_t;
 #define ZB_PIB_ATTRIBUTE_IEEE_EXPIRY_INTERVAL           0x88U /*!< mibIeeeExpiryInterval, r22 */
 #define ZB_PIB_ATTRIBUTE_IEEE_EXPIRY_INTERVAL_COUNTDOWN 0x89U /*!< mibIeeeExpiryIntervalCountdown */
 #define ZB_PIB_ATTRIBUTE_SKIP_ALL_GPF                   0x8AU /*!< zgp_skip_all_packets */
+#define ZB_PIB_ATTRIBUTE_BEACON_JITTER                  0x8BU /*!< Beacon jitter (custom option) */
 
 /* ZBOSS MAC custom attributes */
 #define ZB_PIB_ATTRIBUTE_IEEE_DIAGNOSTIC_INFO      0x8FU /*!< Get diagnostics counters. */
 /** Get and clear diagnostics counters. Only ZCL counters will be cleared. */
 #define ZB_PIB_ATTRIBUTE_GET_AND_CLEANUP_DIAG_INFO 0x90U
+
+#define ZB_PIB_ATTRIBUTE_PTA_OPTIONS               0x91U
+#define ZB_PIB_ATTRIBUTE_PTA_STATE                 0x92U
+#define ZB_PIB_ATTRIBUTE_PTA_PRIORITY              0x93U
+#define ZB_PIB_ATTRIBUTE_COEX_SHUTDOWN_DURATION    0x94U /*!< Coexistence shutdown duration */
+
+/** Set/Clear ZB Temp Channel
+ *  Temp channel is used for GP TX/RX operation on temp channel
+ *  To set ZB Temp Channel just set the PIB state of this
+ *  To clear ZB Temp Channel and get back to operational state - just set (-1) value into this
+ *  Please note, it is not allowed to deal with this PIB attr until operational value is not set for ZB_PHY_PIB_CURRENT_CHANNEL
+ */
+#define ZB_PHY_PIB_TEMP_CHANNEL                    0x95U
 /** @} */
 
 /**
@@ -1516,6 +1524,7 @@ typedef zb_uint8_t zb_mac_capability_info_t;
 #define MAC_UNSUPPORTED_SECURITY    0xdfU /*!< Security on received frame is not supported */
 #define MAC_PURGED                  0xdaU /*!< Custom status: the packet has been purged */
 #define MAC_INTERRUPTED             0xd0U /*!< Custom status: the operation has been interrupted */
+#define MAC_PENDING_DATA_TIMEOUT    0xd9U /*!< Custom status: Frame pending bit was set, but no actual data received */
 /** @} */
 
 /**
@@ -1631,17 +1640,6 @@ typedef ZB_PACKED_PRE struct zb_mcps_data_req_params_s
   zb_uint8_t      key_index;        /**< */
 #endif
   zb_uint8_t iface_id;
-#ifdef ZB_MAC_TESTING_MODE
-  ZB_PACKED_PRE struct
-  {
-    zb_bitfield_t invalid_fcs: 1;                 /**< Invalid FCS for TP/154/MAC/FRAME-VALIDATION-01 */
-    zb_bitfield_t reserved_frame_type: 1;         /**< Reserved frame type for TP/154/MAC/FRAME-VALIDATION-02 */
-    zb_bitfield_t security_enabled: 1;            /**< Security enabled frame for TP/154/MAC/FRAME-VALIDATION-03 */
-    zb_bitfield_t delay_frame_transmission: 1;    /* Delay to be able to send packet at the end of
-                                                   * tx window (for TP/154/MAC/DATA-04) */
-    zb_bitfield_t reserved: 4;                    /**< Reserved bits */
-  } ZB_PACKED_STRUCT cert_hacks;
-#endif /* ZB_MAC_TESTING_MODE */
 } ZB_PACKED_STRUCT
 zb_mcps_data_req_params_t;
 
@@ -1679,9 +1677,6 @@ typedef ZB_PACKED_PRE struct zb_mcps_data_confirm_params_s
   zb_uint8_t nwk_retry_cnt;
 #endif
   zb_uint8_t msdu_handle;   /**< MSDU handle value. */
-#if defined ZB_MAC_TESTING_MODE
-  zb_time_t timestamp;      /**< Timestamp of TX done */
-#endif
   zb_uint8_t iface_id;
 } ZB_PACKED_STRUCT zb_mcps_data_confirm_params_t;
 
@@ -1698,7 +1693,7 @@ void zb_mcps_data_request(zb_uint8_t param);
  *  layer.
  *  @note This function must be defined in the NWK layer!  MAC layer just calls this
  *  function.
- *  @param param - reference to buffer, conatains nsdu, the set of octets comprising the NSDU to be
+ *  @param param - reference to buffer, contains nsdu, the set of octets comprising the NSDU to be
  *  transferred (with length).
  *
  *  Other fields got from MAC nsdu by macros
@@ -1730,7 +1725,7 @@ void zb_mcps_data_confirm(zb_uint8_t param);
  *  This function called via scheduler by the MAC layer to pass information from
  *  incoming data poll to the NWK layer.
  *  @note This function must be defined in the NWK layer!  MAC layer just calls this function.
- *  @param param - reference to buffer, conatains nsdu, the set of octets comprising the NSDU to be
+ *  @param param - reference to buffer, contains nsdu, the set of octets comprising the NSDU to be
  *  transferred (with length).
  *
  *  Other fields got from MAC nsdu by macros
@@ -1917,8 +1912,6 @@ zb_mlme_start_req_t;
  *  @brief Handles start request.
  *  @param param - reference to buffer, contains zb_mlme_start_req_t parameters for start.
  *
- *  @snippet tp_pro_bv_29_zc2.c zb_mlme_start_request
- *
  */
 void zb_mlme_start_request(zb_uint8_t param);
 
@@ -1938,16 +1931,6 @@ typedef ZB_PACKED_PRE struct zb_mlme_reset_request_s
                                            their values prior to the generation of the
                                            MLME-RESET.request primitive.  */
   zb_uint8_t iface_id;
-#ifdef ZB_MAC_TESTING_MODE
-  ZB_PACKED_PRE struct
-  {
-    zb_bitfield_t allow_empty_beacon_payload:1;   /**< Allow sending/receiving empty Beacon payload */
-    zb_bitfield_t allow_sending_empty_frames:1;   /**< Allow responding with empty frames to indirect transmission */
-    zb_bitfield_t reset_init_only_radio:1;        /**< Only init radio during MLME-RESET.request (for TP_154_MAC_WARM_START_01) */
-    zb_bitfield_t lbt_radio_busy_disabled: 1;     /**< Disable blocking radio by LBT while sending frame TP/154/MAC/CHANNEL-ACCESS-04 test procedure 2 */
-    zb_bitfield_t reserved: 4;                    /**< Reserved bits */
-  } ZB_PACKED_STRUCT cert_hacks;
-#endif /* ZB_MAC_TESTING_MODE */
 } ZB_PACKED_STRUCT
 zb_mlme_reset_request_t;
 
@@ -2079,7 +2062,7 @@ typedef ZB_PACKED_PRE struct zb_mac_beacon_notify_indication_s
   zb_pending_address_spec_t pend_addr_spec;
   zb_addr_u                 addr_list[ MAX_PENDING_ADDRESSES ];
   zb_uint8_t                ebsn;
-  zb_mac_beacon_type_t      beacon_type;
+  zb_uint8_t                beacon_type;
   zb_uint8_t                sdu_length;
   zb_uint8_t                total_hie_size;
   zb_uint8_t                total_pie_size;
@@ -2214,7 +2197,7 @@ zb_mlme_associate_response_t;
 
 /**
  *  @brief Defines structure for MLME-ASSOCIATE confirm primitive.
- *  @param assoc_short_addres - the short device address allocated by the coordinator on successful
+ *  @param assoc_short_address - the short device address allocated by the coordinator on successful
  *  association. This parameter will be equal to 0xffff if the association attempt was
  *  unsuccessful.
  *  @param status - the status of the association attempt (value from @ref mac_status).
@@ -2252,7 +2235,7 @@ typedef ZB_PACKED_PRE struct zb_mlme_associate_confirm_s
 void zb_mlme_associate_request(zb_uint8_t param);
 
 /**
- *  @brief Associate responce - coordinator side.
+ *  @brief Associate response - coordinator side.
  *  Send response to device.
  *  @param param - reference to buffer.
  *
@@ -2302,7 +2285,7 @@ typedef ZB_PACKED_PRE struct zb_mlme_sync_loss_ind_s
 {
   zb_uint16_t pan_id; /* Pan ID with which the device lost
 	                   * synchronization or to which it was realigned */
-  zb_uint8_t loss_reason; /* Lost syncronization reason */
+  zb_uint8_t loss_reason; /* Lost synchronization reason */
   zb_uint8_t logical_channel; /* Logical channel */
   zb_uint8_t channel_page; /* Channel page */
 } ZB_PACKED_STRUCT
@@ -2641,19 +2624,15 @@ zb_ret_t zb_mac_logic_iteration(void);
 
 #define ZB_MAC_LOGIC_ITERATION() zb_multimac_mac_logic_iteration_proxy()
 
-#if !defined ZB_MACSPLIT_HOST && !defined NCP_MODE_HOST
+
 /**
   Checks that MAC allows to perform blocking transport iteration.
 */
 zb_bool_t zb_mac_allows_transport_iteration(void);
+zb_bool_t zb_mm_mac_allows_transport_iteration_proxy(void);
 
-#define ZB_MAC_ALLOWS_TRANSPORT_ITERATION() (zb_mac_allows_transport_iteration())
+#define ZB_MAC_ALLOWS_TRANSPORT_ITERATION() zb_mm_mac_allows_transport_iteration_proxy()
 
-#else
-
-#define ZB_MAC_ALLOWS_TRANSPORT_ITERATION() ZB_TRUE
-
-#endif
 
 #ifdef ZB_MAC_SPECIFIC_GET_LQI_RSSI
 /**
@@ -2666,15 +2645,6 @@ void zb_mac_diag_data_get(zb_uint16_t short_address, zb_uint8_t *lqi, zb_int8_t 
 /** @} */
 /** @endcond */
 
-#ifdef ZB_MAC_TESTING_MODE
-/**
-   Handles MLME-purge.request
-
-   @param param - parameter (packet buffer), @see zb_mlme_purge_request_t is on its tail
-*/
-void zb_mlme_purge_request(zb_uint8_t param);
-
-#endif /* ZB_MAC_TESTING_MODE */
 
 #if defined MAC_CERT_TEST_HACKS || defined ZB_MAC_TESTING_MODE
 
@@ -2698,21 +2668,6 @@ typedef zb_mlme_purge_request_t zb_mlme_purge_confirm_t;
 
 #endif
 
-#ifdef ZB_MAC_TESTING_MODE
-/**
-   Handles PLME-CCA.request
-
-   @param param - parameter (packet buffer)
-*/
-void zb_plme_cca_request(zb_uint8_t param);
-
-/**
-   Handles PLME-CCA.confirm
-
-   @param param - parameter (packet buffer), with status
-*/
-void zb_plme_cca_confirm(zb_uint8_t param);
-#endif /* ZB_MAC_TESTING_MODE */
 
 #if defined ZB_MAC_PENDING_BIT_SOURCE_MATCHING
 
@@ -2736,9 +2691,6 @@ typedef ZB_PACKED_PRE struct zb_mac_src_match_params_s
   zb_uint8_t addr_mode;         /**< Address mode. Valid values are ZB_ADDR_16BIT_DEV_OR_BROADCAST or
                                  * ZB_ADDR_64BIT_DEV */
   zb_addr_u addr;               /**< Address  */
-#ifdef ZB_MAC_POLL_INDICATION_CALLS_REDUCED
-  zb_uint16_t poll_timeout;     /**< Poll indication calls timeout (in sec) */
-#endif /* ZB_MAC_POLL_INDICATION_CALLS_REDUCED */
 } ZB_PACKED_STRUCT zb_mac_src_match_params_t;
 
 #if defined(ZB_MAC_SOFTWARE_PB_MATCHING) || defined(ZB_MAC_CONTROLLABLE_PB_MATCHING)
@@ -2749,8 +2701,6 @@ typedef ZB_PACKED_PRE struct zb_mac_src_match_params_s
 #ifdef ZB_MAC_POLL_INDICATION_CALLS_REDUCED
 #define MAC_POLL_TIMESTAMP_GET(idx) (MAC_CTX().poll_timestamp_table[(idx)])
 #define MAC_POLL_TIMESTAMP_UPD(idx) MAC_CTX().poll_timestamp_table[(idx)] = ZB_TIMER_GET()
-#define MAC_POLL_TIMEOUT_GET(idx)   (MAC_CTX().poll_timeout_table[(idx)] * ZB_TIME_ONE_SECOND)
-#define MAC_POLL_TIMEOUT_SET(idx, tmo) MAC_CTX().poll_timeout_table[(idx)] = tmo
 #endif /* ZB_MAC_POLL_INDICATION_CALLS_REDUCED */
 
 #endif /* ZB_MAC_SOFTWARE_PB_MATCHING || ZB_MAC_CONTROLLABLE_PB_MATCHING */
@@ -2758,19 +2708,15 @@ typedef ZB_PACKED_PRE struct zb_mac_src_match_params_s
 #endif  /* ZB_MAC_PENDING_BIT_SOURCE_MATCHING */
 
 
-#if defined(ZB_MAC_INTERFACE_SINGLE)
-  #if defined(ZB_MACSPLIT_HOST)
-    #define ZB_MAC_CALL_INTERFACE(interface_id, primitive, param) ((void)interface_id, ZB_SCHEDULE_CALLBACK(zb_##primitive##_macsplit, param))
-    #define ZB_MAC_CALL_INTERFACE_ALARM(interface_id, primitive, param, delay) ((void)interface_id, ZB_SCHEDULE_ALARM(zb_##primitive##_macsplit, param, delay))
-  #elif defined(ZB_MACSPLIT_DEVICE)
-    #define ZB_MAC_CALL_INTERFACE(interface_id, primitive, param) ((void)interface_id, ZB_SCHEDULE_CALLBACK(zb_##primitive, param))
-    #define ZB_MAC_CALL_INTERFACE_ALARM(interface_id, primitive, param, delay) ((void)interface_id, ZB_SCHEDULE_ALARM(zb_##primitive, param, delay))
-  #elif defined(ZB_MAC_MONOLITHIC)
+  #if   defined(ZB_MAC_MONOLITHIC)
     #define ZB_MAC_CALL_INTERFACE(interface_id, primitive, param) ((void)interface_id, ZB_SCHEDULE_CALLBACK(zb_##primitive, param))
     #define ZB_MAC_CALL_INTERFACE_ALARM(interface_id, primitive, param, delay) ((void)interface_id, ZB_SCHEDULE_ALARM(zb_##primitive, param, delay))
   #elif defined(ZB_MAC_BLE)
     #define ZB_MAC_CALL_INTERFACE(interface_id, primitive, param) ((void)interface_id, ZB_SCHEDULE_CALLBACK(zb_##primitive##_ble, param))
     #define ZB_MAC_CALL_INTERFACE_ALARM(interface_id, primitive, param, delay) ((void)interface_id, ZB_SCHEDULE_ALARM(zb_##primitive##ble, param, delay))
+  #elif defined(ZB_EXTMAC)
+    #define ZB_MAC_CALL_INTERFACE(interface_id, primitive, param) ((void)interface_id, ZB_SCHEDULE_CALLBACK(zb_##primitive##_extmac, param))
+    #define ZB_MAC_CALL_INTERFACE_ALARM(interface_id, primitive, param, delay) ((void)interface_id, ZB_SCHEDULE_ALARM(zb_##primitive##_extmac, param, delay))
   #elif defined(ZB_MAC_SUBGHZ)
     #define ZB_MAC_CALL_INTERFACE(interface_id, primitive, param) ((void)interface_id, ZB_SCHEDULE_CALLBACK(zb_##primitive##_subghz, param))
     #define ZB_MAC_CALL_INTERFACE_ALARM(interface_id, primitive, param, delay) ((void)interface_id, ZB_SCHEDULE_ALARM(zb_##primitive##_subghz, param, delay))
@@ -2782,33 +2728,6 @@ typedef ZB_PACKED_PRE struct zb_mac_src_match_params_s
   #endif
 
   #define ZB_MULTIMAC_IS_INTERFACE_ACTIVE(interface_id) (ZB_TRUE)
-#else
-  #define ZB_MAC_CALL_INTERFACE(interface_id, primitive, param)                                   \
-    do {                                                                                          \
-      if (ZB_U2B(ZB_NWK_MAC_IFACE_TBL_ENTRY(interface_id)->state))                                \
-      {                                                                                           \
-        ZB_SCHEDULE_CALLBACK(ZG->nwk.mac_interfaces[interface_id].primitive, param);              \
-      }                                                                                           \
-      else                                                                                        \
-      {                                                                                           \
-        ZB_ASSERT(ZB_FALSE);                                                                      \
-      }                                                                                           \
-    } while (0)
-
-  #define ZB_MAC_CALL_INTERFACE_ALARM(interface_id, primitive, param, delay)                      \
-    do {                                                                                          \
-      if (ZB_U2B(ZB_NWK_MAC_IFACE_TBL_ENTRY(interface_id)->state))                                \
-      {                                                                                           \
-        ZB_SCHEDULE_ALARM(ZG->nwk.mac_interfaces[interface_id].primitive, param, delay);          \
-      }                                                                                           \
-      else                                                                                        \
-      {                                                                                           \
-        ZB_ASSERT(ZB_FALSE);                                                                      \
-      }                                                                                           \
-    } while (0)
-
-    #define ZB_MULTIMAC_IS_INTERFACE_ACTIVE(interface_id) ZB_U2B(ZB_NWK_MAC_IFACE_TBL_ENTRY(interface_id)->state)
-#endif
 
 /**
  * @brief This parameter is added to buffer on MAC interface layer to
@@ -2851,6 +2770,7 @@ typedef struct zb_mac_interface_s {
     zb_mac_interface_func_t mlme_orphan_response;
     zb_mac_interface_func_t mlme_start_request;
     zb_mac_interface_func_t mac_resp_by_empty_frame;
+    zb_mac_interface_func_t mac_cancel_scan;
 } zb_mac_interface_t;
 
 
@@ -2885,6 +2805,13 @@ void zb_gp_mcps_data_indication(zb_uint8_t param);
 typedef zb_ret_t (*zb_tx_power_provider_t)(zb_uint8_t page, zb_uint8_t channel, zb_int8_t *power_dbm);
 
 void zb_mac_set_tx_power_provider_function(zb_tx_power_provider_t new_provider);
+void zb_mac_set_tx_power_async_confirm(zb_bufid_t param);
+void zb_mac_get_tx_power_async_confirm(zb_bufid_t param);
+
+/**
+ * @brief Update transceiver power for each page and channel synchronously according to power provider.
+*/
+void zb_mac_update_channel_pages(void);
 
 #endif /* #ifdef ZB_MAC_CONFIGURABLE_TX_POWER */
 
@@ -2922,20 +2849,44 @@ void zb_mcps_purge_indirect_queue_confirm(zb_uint8_t param);
 
 #endif
 
-#ifdef ZB_MACSPLIT_HOST
-/**
-   Reset macsplit device
-*/
-void zb_mlme_dev_reset(zb_uint8_t param);
-#endif /* ZB_MACSPLIT_HOST */
 
 #if defined ZB_TRAFFIC_DUMP_ON && !defined ZB_TRANSPORT_OWN_TRAFFIC_DUMP_ON
-void zb_mac_traffic_dump(zb_bufid_t buf, zb_bool_t is_w);
-#define ZB_DUMP_INCOMING_DATA(buf) zb_mac_traffic_dump((buf), ZB_FALSE)
-#define ZB_DUMP_OUTGOING_DATA(buf) zb_mac_traffic_dump((buf), ZB_TRUE)
+#include "zb_mac_transport.h"
+#define ZB_DUMP_IFACE_DEFAULT ZB_DUMP_IFACE_ZIGBEE
+void zb_mac_traffic_dump_no_buf(zb_uint8_t* data, zb_uint8_t len, zb_bool_t is_w, zb_uint8_t interface_type, zb_uint8_t interface_id);
+void zb_mac_traffic_dump(zb_bufid_t buf, zb_bool_t is_w, zb_uint8_t interface_type, zb_uint8_t interface_id);
+#if defined ZB_MULTIMAC
+#define ZB_DUMP_INCOMING_DATA(buf, iface_type, iface_id) zb_mac_traffic_dump((buf), ZB_FALSE, iface_type, iface_id)
+#define ZB_DUMP_OUTGOING_DATA(buf, iface_type, iface_id) zb_mac_traffic_dump((buf), ZB_TRUE,  iface_type, iface_id)
 #else
+#define zb_mac_dump_mac_ack(is_out, data_pending, dsn) zb_mac_dump_mac_ack_iface(is_out, data_pending, dsn, ZB_DUMP_IFACE_DEFAULT, 0)
+#define ZB_DUMP_INCOMING_DATA(buf) zb_mac_traffic_dump((buf), ZB_FALSE, ZB_DUMP_IFACE_DEFAULT, 0)
+#define ZB_DUMP_OUTGOING_DATA(buf) zb_mac_traffic_dump((buf), ZB_TRUE,  ZB_DUMP_IFACE_DEFAULT, 0)
+#endif
+#else
+#if defined ZB_MULTIMAC
+#define ZB_DUMP_INCOMING_DATA(buf, iface_type, iface_id) \
+{                                                        \
+  ZVUNUSED(buf);                                         \
+  ZVUNUSED(iface_type);                                  \
+  ZVUNUSED(iface_id);                                    \
+}
+#define ZB_DUMP_OUTGOING_DATA(buf, iface_type, iface_id) \
+{                                                        \
+  ZVUNUSED(buf);                                         \
+  ZVUNUSED(iface_type);                                  \
+  ZVUNUSED(iface_id);                                    \
+}
+#else
+#define zb_mac_dump_mac_ack(is_out, data_pending, dsn)   \
+{                                                        \
+  ZVUNUSED(is_out);                                      \
+  ZVUNUSED(data_pending);                                \
+  ZVUNUSED(dsn);                                         \
+}
 #define ZB_DUMP_INCOMING_DATA(buf) ZVUNUSED(buf)
 #define ZB_DUMP_OUTGOING_DATA(buf) ZVUNUSED(buf)
+#endif
 #endif
 
 void mac_clear_filters(void);
@@ -2978,12 +2929,236 @@ void zb_mac_phy_testing_mode_statistics_request(zb_bufid_t param);
 void zb_mac_phy_testing_tx_done(void);
 
 /*
- * Notify upper layer that the transceiver entered the PHY testing mode
- * or that the test has finished.
-*/
+ * Notify upper layer about an event:
+ * 1. Test is started
+ * 2. Test is finished
+ * 3. Statistics is sent
+ */
 void zb_mac_phy_testing_mode_notification(zb_bufid_t param);
 
 #endif
+
+
+#if defined ZB_MAC_API_TRACE_PRIMITIVES
+
+/* MAC API trace functions */
+void zb_mac_api_trace_association_request(zb_uint8_t param);
+void zb_mac_api_trace_association_response(zb_uint8_t param);
+void zb_mac_api_trace_association_confirm(zb_uint8_t param);
+void zb_mac_api_trace_association_indication(zb_uint8_t param);
+void zb_mac_api_trace_reset_request(zb_uint8_t param);
+void zb_mac_api_trace_reset_confirm(zb_uint8_t param);
+void zb_mac_api_trace_beacon_notify_indication(zb_uint8_t param);
+void zb_mac_api_trace_comm_status_indication(zb_uint8_t param);
+void zb_mac_api_trace_orphan_indication(zb_uint8_t param);
+void zb_mac_api_trace_orphan_response(zb_uint8_t param);
+void zb_mac_api_trace_scan_request(zb_uint8_t param);
+void zb_mac_api_trace_scan_confirm(zb_uint8_t param);
+void zb_mac_api_trace_poll_request(zb_uint8_t param);
+void zb_mac_api_trace_poll_confirm(zb_uint8_t param);
+void zb_mac_api_trace_start_request(zb_uint8_t param);
+void zb_mac_api_trace_start_confirm(zb_uint8_t param);
+void zb_mac_api_trace_set_request(zb_uint8_t param);
+void zb_mac_api_trace_set_confirm(zb_uint8_t param);
+void zb_mac_api_trace_purge_request(zb_uint8_t param);
+void zb_mac_api_trace_purge_confirm(zb_uint8_t param);
+void zb_mac_api_trace_data_request(zb_uint8_t param);
+void zb_mac_api_trace_data_confirm(zb_uint8_t param);
+void zb_mac_api_trace_data_indication(zb_uint8_t param);
+void zb_mac_api_trace_get_request(zb_uint8_t param);
+void zb_mac_api_trace_get_confirm(zb_uint8_t param);
+void zb_mac_api_trace_cca_confirm(zb_uint8_t param);
+
+#endif /* ZB_MAC_API_TRACE_PRIMITIVES */
+
+#ifdef ZB_MAC_API_TRACE_PRIMITIVES
+
+#define ZB_MAC_API_TRACE_ASSOCIATION_REQUEST(param)       zb_mac_api_trace_association_request(param)
+#define ZB_MAC_API_TRACE_ASSOCIATION_CONFIRM(param)       zb_mac_api_trace_association_confirm(param)
+#define ZB_MAC_API_TRACE_ASSOCIATION_INDICATION(param)    zb_mac_api_trace_association_indication(param)
+#define ZB_MAC_API_TRACE_ASSOCIATION_RESPONSE(param)      zb_mac_api_trace_association_response(param)
+#define ZB_MAC_API_TRACE_START_REQUEST(param)             zb_mac_api_trace_start_request(param)
+#define ZB_MAC_API_TRACE_START_CONFIRM(param)             zb_mac_api_trace_start_confirm(param)
+#define ZB_MAC_API_TRACE_ORPHAN_RESPONSE(param)           zb_mac_api_trace_orphan_response(param)
+#define ZB_MAC_API_TRACE_ORPHAN_INDICATION(param)         zb_mac_api_trace_orphan_indication(param)
+#define ZB_MAC_API_TRACE_COMM_STATUS_INDICATION(param)    zb_mac_api_trace_comm_status_indication(param)
+#define ZB_MAC_API_TRACE_BEACON_NOTIFY_INDICATION(param)  zb_mac_api_trace_beacon_notify_indication(param)
+#define ZB_MAC_API_TRACE_PURGE_REQUEST(param)             zb_mac_api_trace_purge_request(param)
+#define ZB_MAC_API_TRACE_PURGE_CONFIRM(param)             zb_mac_api_trace_purge_confirm(param)
+#define ZB_MAC_API_TRACE_DATA_REQUEST(param)              zb_mac_api_trace_data_request(param)
+#define ZB_MAC_API_TRACE_DATA_CONFIRM(param)              zb_mac_api_trace_data_confirm(param)
+#define ZB_MAC_API_TRACE_DATA_INDICATION(param)           zb_mac_api_trace_data_indication(param)
+#define ZB_MAC_API_TRACE_POLL_REQUEST(param)              zb_mac_api_trace_poll_request(param)
+#define ZB_MAC_API_TRACE_POLL_CONFIRM(param)              zb_mac_api_trace_poll_confirm(param)
+#define ZB_MAC_API_TRACE_GET_REQUEST(param)               zb_mac_api_trace_get_request(param)
+#define ZB_MAC_API_TRACE_GET_CONFIRM(param)               zb_mac_api_trace_get_confirm(param)
+#define ZB_MAC_API_TRACE_SET_REQUEST(param)               zb_mac_api_trace_set_request(param)
+#define ZB_MAC_API_TRACE_SET_CONFIRM(param)               zb_mac_api_trace_set_confirm(param)
+#define ZB_MAC_API_TRACE_SCAN_REQUEST(param)              zb_mac_api_trace_scan_request(param)
+#define ZB_MAC_API_TRACE_SCAN_CONFIRM(param)              zb_mac_api_trace_scan_confirm(param)
+#define ZB_MAC_API_TRACE_RESET_REQUEST(param)             zb_mac_api_trace_reset_request(param)
+#define ZB_MAC_API_TRACE_RESET_CONFIRM(param)             zb_mac_api_trace_reset_confirm(param)
+#define ZB_MAC_API_TRACE_CCA_CONFIRM(param)               zb_mac_api_trace_cca_confirm(param)
+
+#else
+
+#define ZB_MAC_API_TRACE_ASSOCIATION_REQUEST(param)
+#define ZB_MAC_API_TRACE_ASSOCIATION_CONFIRM(param)
+#define ZB_MAC_API_TRACE_ASSOCIATION_INDICATION(param)
+#define ZB_MAC_API_TRACE_ASSOCIATION_RESPONSE(param)
+#define ZB_MAC_API_TRACE_START_REQUEST(param)
+#define ZB_MAC_API_TRACE_START_CONFIRM(param)
+#define ZB_MAC_API_TRACE_ORPHAN_RESPONSE(param)
+#define ZB_MAC_API_TRACE_ORPHAN_INDICATION(param)
+#define ZB_MAC_API_TRACE_COMM_STATUS_INDICATION(param)
+#define ZB_MAC_API_TRACE_BEACON_NOTIFY_INDICATION(param)
+#define ZB_MAC_API_TRACE_PURGE_REQUEST(param)
+#define ZB_MAC_API_TRACE_PURGE_CONFIRM(param)
+#define ZB_MAC_API_TRACE_DATA_REQUEST(param)
+#define ZB_MAC_API_TRACE_DATA_CONFIRM(param)
+#define ZB_MAC_API_TRACE_DATA_INDICATION(param)
+#define ZB_MAC_API_TRACE_POLL_REQUEST(param)
+#define ZB_MAC_API_TRACE_POLL_CONFIRM(param)
+#define ZB_MAC_API_TRACE_GET_REQUEST(param)
+#define ZB_MAC_API_TRACE_GET_CONFIRM(param)
+#define ZB_MAC_API_TRACE_SET_REQUEST(param)
+#define ZB_MAC_API_TRACE_SET_CONFIRM(param)
+#define ZB_MAC_API_TRACE_SCAN_REQUEST(param)
+#define ZB_MAC_API_TRACE_SCAN_CONFIRM(param)
+#define ZB_MAC_API_TRACE_RESET_REQUEST(param)
+#define ZB_MAC_API_TRACE_RESET_CONFIRM(param)
+#define ZB_MAC_API_TRACE_CCA_CONFIRM(param)
+
+#endif /* ZB_MAC_API_TRACE_PRIMITIVES */
+
+#if defined ZB_MAC_DIAGNOSTICS
+
+typedef ZB_PACKED_PRE struct zb_mac_diagnostic_ent_s
+{
+  zb_uint16_t mac_tx_ucast_total; /* Total number of Mac Tx Transactions to
+                                   * attempt to send a message (but not
+                                   * counting retries) */
+  zb_uint16_t mac_tx_ucast_failures; /* Total number of failed Tx
+                                      * Transactions. So if the Mac send a
+                                      * single packet, it will be retried 4
+                                      * times without ack, that counts as 1 failure */
+  zb_uint16_t mac_tx_ucast_retries; /* Total number of Mac Retries regardless of
+                                     * whether the transaction resulted in
+                                     * success or failure. */
+} ZB_PACKED_STRUCT
+zb_mac_diagnostic_ent_t;
+
+typedef ZB_PACKED_PRE struct zb_mac_diagnostic_ctx_s
+{
+  zb_mac_diagnostic_ent_t filter[ZB_MAC_DIAGNOSTICS_FILTER_SIZE];
+  zb_uint32_t mac_rx_bcast;     /* A counter that is incremented each time
+                                 * the MAC layer receives a broadcast. */
+  zb_uint32_t mac_tx_bcast;     /* A counter that is incremented each time
+                                 * the MAC layer transmits a broadcast. */
+  zb_uint32_t mac_rx_ucast;     /* A counter that is incremented each time the
+                                 * MAC layer receives a unicast. */
+
+  zb_uint32_t mac_tx_for_aps_messages; /* Counter used to calculate average_mac_retry_per_aps_message_sent */
+
+  /* These 3 counters are required not to break
+   * ZDO channel management logic that
+   * uses normalized counters values.
+   */
+  zb_uint32_t mac_tx_ucast_total_zcl;    /* The same as mac_tx_ucast_total, but non-normalized */
+  zb_uint16_t mac_tx_ucast_failures_zcl; /* The same as mac_tx_ucast_failures, but non-normalized */
+  zb_uint16_t mac_tx_ucast_retries_zcl;  /* The same as mac_tx_ucast_retries, but non-normalized*/
+
+  zb_uint16_t phy_to_mac_que_lim_reached;  /* A counter that is incremented each time
+                                            * when MAC RX queue if full. */
+
+  zb_uint16_t mac_validate_drop_cnt; /* How many times the packet was dropped at the packet
+                                      * validation stage for length or bad formatting. */
+
+  zb_uint16_t phy_cca_fail_count;   /* Number of the PHY layer was unable
+                                     * to transmit due to a failed CCA */
+
+  zb_uint8_t last_msg_lqi;      /* LQI value of the last received packet */
+  zb_int8_t last_msg_rssi;      /* RSSI value of the last received packet */
+  zb_bitfield_t write_idx:4;    /* Index of the current bucket */
+  zb_bitfield_t written:4;      /* Number of used buckets of the filter */
+} ZB_PACKED_STRUCT
+zb_mac_diagnostic_ctx_t;
+
+
+void zb_mac_diagnostics_init(zb_mac_diagnostic_ctx_t *ctx);
+void zb_mac_diagnostics_periodic_handler(zb_uint8_t unused);
+void zb_mac_diagnostics_get_info(zb_mac_diagnostic_ex_info_t *diag_info);
+void zb_mac_diagnostics_cleanup_info(void);
+void zb_mac_diagnostics_inc_tx_total(void);
+void zb_mac_diagnostics_inc_tx_failed(void);
+void zb_mac_diagnostics_inc_tx_retry(void);
+void zb_mac_diagnostics_inc_tx_bcast(void);
+void zb_mac_diagnostics_inc_rx_que_full(zb_uint8_t counts);
+void zb_mac_diagnostics_inc_validate_drop_cnt(void);
+void zb_mac_diagnostics_inc_phy_cca_fail(void);
+void zb_mac_diagnostics_inc_tx_for_aps_messages(void);
+void zb_mac_update_rx_zcl_diagnostic(zb_mac_mhr_t *mhr, zb_bufid_t buf);
+
+#define ZB_MAC_DIAGNOSTIC_UNICAST_TX_TOTAL_INC()  zb_mac_diagnostics_inc_tx_total()
+#define ZB_MAC_DIAGNOSTIC_UNICAST_TX_FAILED_INC() zb_mac_diagnostics_inc_tx_failed()
+#define ZB_MAC_DIAGNOSTIC_UNICAST_TX_RETRY_INC()  zb_mac_diagnostics_inc_tx_retry()
+#define ZB_MAC_DIAGNOSTIC_BCAST_TX_TOTAL_INC()    zb_mac_diagnostics_inc_tx_bcast()
+#define ZB_MAC_UPDATE_RX_ZCL_DIAGNOSTIC(mhr, buf) zb_mac_update_rx_zcl_diagnostic((mhr), (buf))
+#define ZB_MAC_DIAGNOSTICS_RX_QUE_FULL_INC(counts) zb_mac_diagnostics_inc_rx_que_full((counts))
+#define ZB_MAC_DIAGNOSTICS_VALIDATE_DROP_CNT_INC() zb_mac_diagnostics_inc_validate_drop_cnt()
+#define ZB_MAC_DIAGNOSTICS_PHY_CCA_FAIL_INC() zb_mac_diagnostics_inc_phy_cca_fail()
+#define ZB_MAC_DIAGNOSTICS_INC_TX_FOR_APS_MESSAGES() zb_mac_diagnostics_inc_tx_for_aps_messages()
+
+#else
+
+#define ZB_MAC_DIAGNOSTIC_UNICAST_TX_TOTAL_INC()
+#define ZB_MAC_DIAGNOSTIC_UNICAST_TX_FAILED_INC()
+#define ZB_MAC_DIAGNOSTIC_UNICAST_TX_RETRY_INC()
+#define ZB_MAC_DIAGNOSTIC_BCAST_TX_TOTAL_INC()
+#define ZB_MAC_UPDATE_RX_ZCL_DIAGNOSTIC(mhr, buf)
+#define ZB_MAC_DIAGNOSTICS_RX_QUE_FULL_INC(counts)
+#define ZB_MAC_DIAGNOSTICS_VALIDATE_DROP_CNT_INC()
+#define ZB_MAC_DIAGNOSTICS_PHY_CCA_FAIL_INC()
+#define ZB_MAC_DIAGNOSTICS_INC_TX_FOR_APS_MESSAGES()
+
+#endif  /* ZB_MAC_DIAGNOSTICS */
+
+#ifndef ZB_MAC_MAX_PTA_OPTIONS_LEN
+#define ZB_MAC_MAX_PTA_OPTIONS_LEN 127u
+#endif
+
+#ifdef ZB_MAC_COEX_CONTROL
+/*
+ * Extra time of the association duration (defined experimentally).
+ * The whole coex shutdown duration time for association is calculated
+ * as ZB_MAC_PIB_RESPONSE_WAIT_TIME (converted to msec) + this extra time.
+ */
+#define ZB_COEX_SHUTDOWN_ASSOC_EXTRA_DELAY             (50U)
+
+/* Rejoin duration (defined experimentally) */
+#define ZB_COEX_SHUTDOWN_DURATION_REJOIN               (100U)
+/* Rejoin duration for sleepy ED (defined experimentally) */
+#define ZB_COEX_SHUTDOWN_DURATION_REJOIN_SED           (600U)
+/* Authentication duration, it also includes subsequent commissioning (defined experimentally). */
+#define ZB_COEX_SHUTDOWN_DURATION_AUTH                 (1000U)
+/* Authentication duration for sleepy ED, it also includes subsequent commissioning (defined experimentally). */
+#define ZB_COEX_SHUTDOWN_DURATION_AUTH_SED             (2000U)
+/* GP Channel configuration duration (defined experimentally) */
+#define ZB_COEX_SHUTDOWN_DURATION_GP_CHANNEL_CFG       (1000U)
+/* GP Commissioning duration (defined experimentally) */
+#define ZB_COEX_SHUTDOWN_DURATION_GP_COMMIS            (2000U)
+/* GP Commissioning with App descriptor duration (defined experimentally) */
+#define ZB_COEX_SHUTDOWN_DURATION_GP_COMMIS_APP_DESCR  (3000U)
+
+/*
+ * Requests MAC to shutdown other radios during some critical
+ * operations for the specified period of time (in msec).
+ * Note: it's an API for upper layers.
+ */
+void zb_set_coex_shutdown_duration(zb_bufid_t buf, zb_uint32_t duration, zb_callback_t cb);
+#endif /* ZB_MAC_COEX_CONTROL */
+
+void zb_mac_clear_indirect_q(void);
 
 /**
     Parses association response from pkt body

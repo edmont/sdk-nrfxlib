@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -86,6 +86,8 @@ zb_bool_t zb_zcl_process_identify_specific_commands_cli(zb_uint8_t param);
 
 void zb_zcl_identify_write_attr_hook_server(zb_uint8_t endpoint, zb_uint16_t attr_id, zb_uint8_t *new_value, zb_uint16_t manuf_code);
 
+static void zb_zcl_call_identify_time_attr_device_cb(zb_uint8_t param, zb_uint16_t endpoint);
+
 void zb_zcl_identify_init_server()
 {
   zb_zcl_add_cluster_handlers(ZB_ZCL_CLUSTER_ID_IDENTIFY,
@@ -119,7 +121,7 @@ zb_ret_t check_value_identify_server(zb_uint16_t attr_id, zb_uint8_t endpoint, z
  *
  * Invoke User App with effect parameters : EffectId and EffectVariant
  * if invoke result RET_OK then schedule invoke User App with attribute Identify
- * else send responce command with error
+ * else send response command with error
  */
 void zb_zcl_identify_effect_invoke_user_app(zb_uint8_t param)
 {
@@ -146,10 +148,12 @@ void zb_zcl_identify_effect_invoke_user_app(zb_uint8_t param)
   }
   else
   {
-    result = RET_NOT_IMPLEMENTED;
+    result = RET_ERROR;
   }
 
-  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, zb_zcl_get_zcl_status_from_ret(result));
+  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, result==RET_OK ? ZB_ZCL_STATUS_SUCCESS :
+                               (zb_zcl_get_backward_compatible_statuses_mode() == ZB_ZCL_STATUSES_ZCL8_MODE) ?
+                                ZB_ZCL_STATUS_FAIL : ZB_ZCL_STATUS_HW_FAIL);
 
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_on_off_effect_invoke_user_app param", (FMT__0));
 }
@@ -287,6 +291,44 @@ zb_bool_t zb_zcl_process_identify_specific_commands_cli(zb_uint8_t param)
   return zb_zcl_process_identify_specific_commands(param);
 }
 
+static void zb_zcl_call_identify_time_attr_device_cb(zb_uint8_t param, zb_uint16_t endpoint)
+{
+  zb_uint16_t identify_time_val;
+  zb_uint8_t dst_ep = (zb_uint8_t)endpoint;
+  zb_zcl_attr_t *attr_desc;
+  zb_zcl_device_callback_param_t *user_app_invoke_data =
+    ZB_BUF_GET_PARAM(param, zb_zcl_device_callback_param_t);
+
+  TRACE_MSG(TRACE_ZCL1, ">>zb_zcl_call_identify_time_attr_device_cb()", (FMT__0));
+
+  attr_desc = zb_zcl_get_attr_desc_a(
+    dst_ep,
+    ZB_ZCL_CLUSTER_ID_IDENTIFY,
+    ZB_ZCL_CLUSTER_SERVER_ROLE,
+    ZB_ZCL_ATTR_IDENTIFY_IDENTIFY_TIME_ID);
+
+  ZB_ASSERT(attr_desc);
+
+  identify_time_val = *((zb_uint16_t*)attr_desc->data_p);
+
+  TRACE_MSG(TRACE_ZCL3, "param %hd, dst_ep %hd, identify_time_val %d",
+            (FMT__H_H_D, param, dst_ep, identify_time_val));
+
+  user_app_invoke_data->device_cb_id = ZB_ZCL_SET_ATTR_VALUE_CB_ID;
+  user_app_invoke_data->endpoint = dst_ep;
+  user_app_invoke_data->cb_param.set_attr_value_param.cluster_id = ZB_ZCL_CLUSTER_ID_IDENTIFY;
+  user_app_invoke_data->cb_param.set_attr_value_param.attr_id = ZB_ZCL_ATTR_IDENTIFY_IDENTIFY_TIME_ID;
+  user_app_invoke_data->cb_param.set_attr_value_param.values.data16 = identify_time_val;
+  user_app_invoke_data->status = RET_OK;
+
+  ZB_ASSERT(ZCL_CTX().device_cb != NULL);
+  (ZCL_CTX().device_cb)(param);
+
+  zb_buf_free(param);
+
+  TRACE_MSG(TRACE_ZCL3, "<<zb_zcl_call_identify_time_attr_device_cb()", (FMT__0));
+}
+
 /* Assumes param contains an endpoint number */
 void zb_zcl_identify_time_handler(zb_uint8_t param)
 {
@@ -301,7 +343,9 @@ void zb_zcl_identify_time_handler(zb_uint8_t param)
         ZB_ZCL_ATTR_IDENTIFY_IDENTIFY_TIME_ID);
   if (attr_desc && attr_desc->data_p)
   {
+    zb_ret_t ret;
     zb_uint16_t * value_ptr = (zb_uint16_t*)attr_desc->data_p;
+
     if (*value_ptr)
     {
       (*value_ptr)--;
@@ -317,6 +361,16 @@ void zb_zcl_identify_time_handler(zb_uint8_t param)
         ZB_SCHEDULE_CALLBACK(identify_handler, ZB_FALSE);
       }
     }
+
+    if (ZCL_CTX().device_cb != NULL)
+    {
+      ret = zb_buf_get_out_delayed_ext(zb_zcl_call_identify_time_attr_device_cb, param, 0U);
+      if (ret != RET_OK)
+      {
+        TRACE_MSG(TRACE_ERROR, "could not get buf to call a device_cb for the identify time attr, dst_ep %hd, tmo %d",
+                  (FMT__H_D, param, *value_ptr));
+      }
+    }
   }
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_identify_time_handler", (FMT__0));
 }
@@ -328,7 +382,7 @@ zb_uint8_t zb_zcl_start_identifying(zb_uint8_t endpoint, zb_uint16_t timeout)
   zb_uint16_t old_timeout;
   zb_callback_t identify_handler;
 
-  TRACE_MSG(TRACE_ZCL1, "> zb_zcl_start_identifying endpoint %hd timeout %ds", (FMT__D_H, endpoint, timeout));
+  TRACE_MSG(TRACE_ZCL1, "> zb_zcl_start_identifying endpoint %hd timeout %ds", (FMT__H_D, endpoint, timeout));
   attr_desc = zb_zcl_get_attr_desc_a(
     endpoint,
     ZB_ZCL_CLUSTER_ID_IDENTIFY,
@@ -340,9 +394,24 @@ zb_uint8_t zb_zcl_start_identifying(zb_uint8_t endpoint, zb_uint16_t timeout)
   }
   else
   {
+    zb_ret_t ret;
     /* TODO read attribute call? */
     old_timeout = *(zb_uint16_t*)attr_desc->data_p;
     ZB_ZCL_SET_DIRECTLY_ATTR_VAL16(attr_desc, timeout);
+
+    if (old_timeout != timeout)
+    {
+      if (ZCL_CTX().device_cb != NULL)
+      {
+        ret = zb_buf_get_out_delayed_ext(zb_zcl_call_identify_time_attr_device_cb, endpoint, 0U);
+        if (ret != RET_OK)
+        {
+          TRACE_MSG(TRACE_ERROR, "could not get buf to call a device_cb for the identify time attr, dst_ep %hd, tmo %d",
+                    (FMT__H_D, endpoint, timeout));
+        }
+      }
+    }
+
     if (*(zb_uint16_t*)attr_desc->data_p)
     {
       if (!old_timeout)

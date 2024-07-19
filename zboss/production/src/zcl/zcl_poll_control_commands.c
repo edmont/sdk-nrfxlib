@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -393,7 +393,7 @@ static void check_in_res_handler_pack_params(zb_bufid_t param,
   zb_size_t params_size = payload_size_aligned + sizeof(*cmd_info);
   zb_uint8_t *ptr = NULL;
 
-  ptr = zb_buf_initial_alloc(param, params_size);
+  ptr = zb_buf_initial_alloc(param, (zb_uint_t)params_size);
 
   ZB_MEMCPY(ptr, payload, sizeof(*payload));
   ptr += payload_size_aligned;
@@ -551,6 +551,7 @@ static zb_ret_t check_in_res_handler(zb_uint8_t param)
 }
 
 
+#ifndef ZB_COORDINATOR_ONLY
 static void fast_poll_stop_handler_send_default_response(zb_uint8_t param)
 {
   /* ZCL8: Table 2-12. Enumerated Command Status Values:
@@ -569,6 +570,7 @@ static void fast_poll_stop_handler_send_default_response(zb_uint8_t param)
   cmd_info = (zb_zcl_parsed_hdr_t*)zb_buf_begin(param);
   poll_control_send_default_response(param, cmd_info, status);
 }
+#endif
 
 
 static void fast_poll_stop_handler_check_binding_response_cb(zb_bufid_t param)
@@ -813,7 +815,7 @@ zb_bool_t zb_zcl_process_poll_control_specific_commands_srv(zb_uint8_t param)
 }
 
 
-/** @brief Run Check-in command if Check in Responce not receive
+/** @brief Run Check-in command if Check in Response not receive
  * */
 void zb_zcl_poll_control_check_in_non_response(zb_uint8_t endpoint)
 {
