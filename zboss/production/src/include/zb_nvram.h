@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -51,59 +51,39 @@
  * like ZGP dataset */
 #define ZB_NVRAM_32BIT_TL
 
-/**
-   NVRAM time label (initially): 16 bits, 0xffff is reserved (negative)
-   Cortex M3 can write by 32-bit words only. Use 32-bit time.
- */
-#ifdef ZB_PLATFORM_CORTEX_M3
-#ifndef ZB_NVRAM_32BIT_TL
-#define ZB_NVRAM_32BIT_TL
-#endif
-/** if defined, after erase memory contents is zero, else -1 */
-#endif
-
-#if (defined ZB_PLATFORM_XAP5 || defined ZB_PLATFORM_CORTEX_M3)
-#define ZB_NVRAM_ERASE_TO_ZERO
-#endif
-
-#ifndef ZB_NVRAM_32BIT_TL
-typedef zb_uint16_t zb_nvram_tl_t;
-#else
+#ifdef ZB_NVRAM_32BIT_TL
 typedef zb_uint32_t zb_nvram_tl_t;
-#endif
+#define ZB_NVRAM_TL_MAX_VAL ZB_UINT32_MAX
+#else
+typedef zb_uint16_t zb_nvram_tl_t;
+#define ZB_NVRAM_TL_MAX_VAL ZB_UINT16_MAX
+#endif /* ZB_NVRAM_32BIT_TL */
+
+#define ZB_NVRAM_TL_HALF_MAX_VAL (ZB_NVRAM_TL_MAX_VAL / 2U)
 
 #ifdef ZB_NVRAM_ERASE_TO_ZERO
 #define ZB_NVRAM_TL_RESERVED 0U
-#endif
-
-#ifndef ZB_NVRAM_32BIT_TL
-
-#ifndef ZB_NVRAM_ERASE_TO_ZERO
-#define ZB_NVRAM_TL_RESERVED 0xffffU
-#endif
-
-#define ZB_NVRAM_TL_MASK 0x7fff
-
 #else
+#define ZB_NVRAM_TL_RESERVED ZB_NVRAM_TL_MAX_VAL
+#endif /* ZB_NVRAM_ERASE_TO_ZERO */
 
-#ifndef ZB_NVRAM_ERASE_TO_ZERO
-#define ZB_NVRAM_TL_RESERVED  (zb_uint32_t)(~0u)
-#endif
+/* Increment time label, with overflow
+ * If a+1 is reserved (produced by erase), jump over it */
+#define ZB_NVRAM_TL_INC(a) (zb_nvram_tl_t)((a) + 1U == ZB_NVRAM_TL_RESERVED ? (a) + 2U : (a) + 1U)
 
-#define ZB_NVRAM_TL_MASK 0x7fffffffU
-#endif
+/**
+   Compare time label a and b - check that a >= b
 
-#define ZB_NVRAM_HALF_MAX_TL_VAL (ZB_NVRAM_TL_MASK / 2U)
+   Taking into account overflow and unsigned values arithmetic and supposing
+   difference between a and b can't be > 1/2 of the overall time values
+   diapason,
+   a >= b only if a - b < values_diapason/2
 
-#ifndef ZB_NVRAM_ERASE_TO_ZERO
-#define ZB_NVRAM_TL_INC(a) (zb_nvram_tl_t)(((a) + 1U) & ZB_NVRAM_TL_MASK)
-#else
-/* Increment time label, with overflow. If 0 is reserved (produced by erase), jump over it. */
-#define ZB_NVRAM_TL_INC(a) (zb_nvram_tl_t)((a) == ZB_NVRAM_TL_MASK ? 1U : (a) + 1U)
-#endif
-
-#define ZB_NVRAM_TL_GE(a, b) ((((a) - (b)) & ZB_NVRAM_TL_MASK) < ZB_NVRAM_HALF_MAX_TL_VAL)
-#define ZB_NVRAM_TL_GT(a, b) ((a) != (b) && ZB_NVRAM_TL_GE(a, b))
+   @param a - first time value to compare
+   @param b - second time value to compare
+   @return 1 is a >= b, 0 otherwise
+ */
+#define ZB_NVRAM_TL_GT(a, b) ((zb_nvram_tl_t)((a) - (b)) < ZB_NVRAM_TL_HALF_MAX_VAL)
 
 #define ZB_NVRAM_TL_INITIAL 1U
 
@@ -158,15 +138,9 @@ typedef ZB_PACKED_PRE struct zb_nvram_dataset_hdr_7_0_s
      4 bytes time label and 4 bytes for other fields. */
   /* Note: to simplify migration keep that field in nvram v8 (with data set trailers). */
   zb_nvram_tl_t time_label;     /*!< Time index - not real or ZigBee time */
-#ifndef ZB_NVRAM_32BIT_TL
-#warning ("check maximum dataset length")
-  zb_lbitfield_t data_len:11;    /*!< Record length. It equal header length + dataset length  <= 2k - is it enough? */
-  zb_bitfield_t data_set_type:5;    /*!< Dataset type. See @par zb_nvram_dataset_types_t  */
-#else
   /* If must align anyway, need not use bitfields */
   zb_uint16_t data_len;    /*!< Record length. It equal header length + dataset length  */
   zb_uint16_t data_set_type;    /*!< Dataset type. See @par zb_nvram_dataset_types_t  */
-#endif /* 32 bit */
   zb_uint16_t data_set_version; /*!< Dataset version. Unique per each
                                  * dataset  */
   zb_uint8_t transaction_status; /*!< Current transaction status. @see @ref nvram_transaction_state  */
@@ -310,11 +284,14 @@ typedef struct zb_nvram_position_s
 #define ZB_NVRAM_VER_7_0  6U /* Used for ZBOSS SDK: stub for the next versions */
 #define ZB_NVRAM_VER_8_0  7U /* Used before introducing dataset tails */
 #define ZB_NVRAM_VER_9_0  8U /* Version of NVRAM having additional dataset trailers */
-#define ZB_NVRAM_VER_10_0 9U /* Version with unused CRC field in tail */
-#define ZB_NVRAM_VER_11_0 10U /* Version with used CRC field in tail */
+#define ZB_NVRAM_VER_10_0 9U /* Version with UNUSED CRC (it'll be ignored) field in tail (hdr v7, tail v9) */
+#define ZB_NVRAM_VER_11_0 10U /* Version with used CRC field in tail (hdr v7, tail v9) */
 #define ZB_NVRAM_VER_12_0 11U /* Version with guarantee that all dataset sizes are forcefully aligned to 4 */
-#define ZB_NVRAM_LAST_VER ZB_NVRAM_VER_12_0 /* Should always be equal to the highest version */
-/*------------------*/
+/* 13-14 - a gap for some nvram improvements in r22 codebase */
+#define ZB_NVRAM_VER_15_0 14U /* First r23 version */
+#define ZB_NVRAM_VER_R23_FIRST ZB_NVRAM_VER_15_0
+#define ZB_NVRAM_LAST_VER ZB_NVRAM_VER_15_0 /* Should always be equal to the highest version */
+  /*------------------*/
 #define ZB_NVRAM_VER_COUNT (ZB_NVRAM_LAST_VER + 1U)
 /** @} */
 
@@ -332,13 +309,6 @@ typedef zb_uint16_t zb_nvram_ver_t;
  * That means support of reading NVRAM datasets in older versions,
  * but write datasets only in newest format */
 #define ZB_NVRAM_VERSION ZB_NVRAM_MAX_VERSION
-
-/**
-   Return 1 if data set type is valid.
- */
-#define ZB_NVRAM_DATA_SET_HDR_IS_VALID(hdrp) (  \
-    (hdrp)->data_set_type < (zb_uint16_t)ZB_NVRAM_DATASET_NUMBER \
-    )
 
 typedef struct zb_nvram_migration_info_s
 {
@@ -423,7 +393,6 @@ typedef ZB_PACKED_PRE struct zb_nvram_dataset_common_ver_2_0_s
 } ZB_PACKED_STRUCT
 zb_nvram_dataset_common_ver_2_0_t;
 
-
 typedef ZB_PACKED_PRE struct zb_nvram_dataset_common_ver_4_0_s
 {
   zb_bitfield_t   aps_designated_coordinator : 1; /*!< This boolean flag indicates whether the
@@ -453,13 +422,13 @@ typedef ZB_PACKED_PRE struct zb_nvram_dataset_common_ver_4_0_s
 
   /* Custom fields*/
   /* In default configuration ZB_NWK_MAC_IFACE_TBL_SIZE is 1, so the dataset is compatible with previous stack versions.
-   * When multple interfaces are enabled, the dataset will become incompatible with default configuration and
+   * When multiple interfaces are enabled, the dataset will become incompatible with default configuration and
    * migrations between single-MAC and multi-MAC NVRAM are not supported now */
   zb_uint8_t channel[ZB_NWK_MAC_IFACE_TBL_SIZE]; /*!< Current channel. Custom field */
   zb_uint8_t page[ZB_NWK_MAC_IFACE_TBL_SIZE];    /*!< Current page. Custom field */
   zb_nwk_mac_iface_tbl_ent_t mac_iface_tbl[ZB_NWK_MAC_IFACE_TBL_SIZE]; /*!< nwkMacInterfaceTable from NWK NIB()*/
   /* There was 1 reserved byte */
-  zb_bitfield_t   hub_connectivity:1; /*!< gub connectivity for WWAH and r23 all hubs  */
+  zb_bitfield_t   hub_connectivity:1; /*!< hub connectivity for WWAH and r23 all hubs  */
   zb_bitfield_t   rx_on:1;            /*!< rx-on-when-idle for ZED  */
   zb_bitfield_t   tc_swapped:1;     /*!< TC swapout is in progress for ZC (not
                                      * all known devices came back) / Joiner
@@ -477,12 +446,77 @@ typedef ZB_PACKED_PRE struct zb_nvram_dataset_common_ver_4_0_s
 } ZB_PACKED_STRUCT
 zb_nvram_dataset_common_ver_4_0_t;
 
+typedef ZB_PACKED_PRE struct zb_nvram_dataset_common_ver_5_0_s
+{
+  zb_bitfield_t   aps_designated_coordinator : 1; /*!< This boolean flag indicates whether the
+                                              device should assume on startup that it must
+                                              become a Zigbee coordinator.  */
+  zb_bitfield_t   aps_insecure_join : 1; /*!< A boolean flag, which defaults to TRUE and
+                                           indicates whether it is OK to use insecure
+                                           join on startup.  */
+  zb_bitfield_t   stack_profile:4;            /*!< Stack profile identifier  */
+  /*zb_bitfield_t   reserved:2;*/
+  zb_bitfield_t   device_type:2;    /*!< NIB device type and rx-on attr */
+  zb_uint8_t      depth;                     /*!< current node depth */
+  zb_uint16_t     nwk_manager_addr;          /*!< NWK manager address */
+  zb_uint16_t     panId;                     /*!< Pan ID */
+  zb_uint16_t     network_address;           /*!< Current network address */
+
+  zb_channel_list_t aps_channel_mask_list; /*!< This is the masks list containing allowable
+                                            * channels on which the device may attempt
+                                            * to form or join a network at startup time. */
+  zb_ext_pan_id_t aps_use_extended_pan_id;
+  zb_ext_pan_id_t nwk_extended_pan_id;  /*!< The extended PAN identifier for the PAN of which the device is a member */
+  zb_ieee_addr_t parent_address;            /*!< Parent address */
+  zb_ieee_addr_t trust_center_address;      /*!< Trust Center IEEE address */
+  zb_uint8_t nwk_key[ZB_CCM_KEY_SIZE];      /*!< Network Key */
+  zb_uint8_t nwk_key_seq;
+  zb_uint8_t tc_standard_key[ZB_CCM_KEY_SIZE];      /*!< Trust Center Standard Key */
+
+  /* Custom fields */
+  /* In default configuration ZB_NWK_MAC_IFACE_TBL_SIZE is 1, so the dataset is compatible with previous stack versions.
+   * When multiple interfaces are enabled, the dataset will become incompatible with default configuration and
+   * migrations between single-MAC and multi-MAC NVRAM are not supported now */
+  zb_uint8_t channel[ZB_NWK_MAC_IFACE_TBL_SIZE];  /*!< Current channel. Custom field */
+  zb_uint8_t page[ZB_NWK_MAC_IFACE_TBL_SIZE];     /*!< Current page. Custom field */
+  zb_nwk_mac_iface_tbl_ent_t mac_iface_tbl[ZB_NWK_MAC_IFACE_TBL_SIZE]; /*!<
+                                                                        * nwkMacInterfaceTable
+                                                                        * from
+                                                                        * NWK NIB()*/
+  /* There was 1 reserved byte */
+
+  zb_bitfield_t   hub_connectivity:1; /*!< hub connectivity for WWAH and r23 all hubs  */
+  zb_bitfield_t   rx_on:1;            /*!< rx-on-when-idle for ZED  */
+  zb_bitfield_t   tc_swapped:1;     /*!< TC swapout is in progress for ZC (not
+                                     * all known devices came back) / Joiner
+                                     * detected TC swapout, not all precessing
+                                     * completed. */
+  zb_bitfield_t   configuration_mode:1; /*!< If 1, device is in configuration mode (== !restricted mode */
+  zb_bitfield_t   reserved:4;
+
+  /* New fields from r23 - start of ver 4.0 */
+  zb_uint32_t    nwk_next_channel_change;
+  zb_uint16_t    nwk_next_pan_id;
+
+  zb_uint8_t    nwk_update_id;             /*!< Node's network settings snapshot index */
+  zb_uint8_t    reserved1;
+#if ZB_NWK_MAC_IFACE_TBL_SIZE == 1
+#elif ZB_NWK_MAC_IFACE_TBL_SIZE == 2
+  /* sizeof(zb_nvram_dataset_common_ver_4_0_t) == 114 (without additional reserved bytes) */
+  zb_uint8_t mm_reserved[2];
+#else
+  #error Current Multi-MAC configuration is not supported
+#endif
+} ZB_PACKED_STRUCT
+zb_nvram_dataset_common_ver_5_0_t;
+
 /* The new dataset does not introduce new fields, but renames the previously reserved fields,
  * so we can use the new dataset definition while loading legacy structure.
  */
 typedef zb_nvram_dataset_common_ver_4_0_t zb_nvram_dataset_common_ver_3_0_t;
 
-typedef zb_nvram_dataset_common_ver_4_0_t zb_nvram_dataset_common_t;
+typedef zb_nvram_dataset_common_ver_5_0_t zb_nvram_dataset_common_t;
+
 
 /**
  * @name NVRAM dataset common versions
@@ -496,15 +530,14 @@ typedef zb_nvram_dataset_common_ver_4_0_t zb_nvram_dataset_common_t;
 #define ZB_NVRAM_COMMON_DATA_DS_VER_2 1U
 #define ZB_NVRAM_COMMON_DATA_DS_VER_3 2U
 #define ZB_NVRAM_COMMON_DATA_DS_VER_4 3U
+#define ZB_NVRAM_COMMON_DATA_DS_VER_5 4U
 /** @} */
 
-#define ZB_NVRAM_COMMON_DATA_DS_VER ZB_NVRAM_COMMON_DATA_DS_VER_4
+#define ZB_NVRAM_COMMON_DATA_DS_VER ZB_NVRAM_COMMON_DATA_DS_VER_5
 
 
-/* Check dataset alignment for IAR compiler and ARM Cortex target platfrom */
+/* Check dataset alignment for IAR compiler and ARM Cortex target platform */
 ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_dataset_common_t);
-
-#ifdef ZB_STORE_COUNTERS
 
 typedef ZB_PACKED_PRE struct zb_nvram_dataset_counters_ver_1_0_s
 {
@@ -519,22 +552,35 @@ typedef ZB_PACKED_PRE struct zb_nvram_dataset_counters_ver_2_0_s
 } ZB_PACKED_STRUCT
 zb_nvram_dataset_counters_ver_2_0_t;
 
+typedef ZB_PACKED_PRE struct zb_nvram_dataset_counters_ver_3_0_s
+{
+  zb_uint32_t nib_outgoing_frame_counter;
+} ZB_PACKED_STRUCT
+zb_nvram_dataset_counters_ver_3_0_t;
+
+typedef ZB_PACKED_PRE struct zb_nvram_dataset_counters_ver_3_0_aps_s
+{
+  zb_uint32_t outgoing_frame_counter;
+} ZB_PACKED_STRUCT
+zb_nvram_dataset_counters_ver_3_0_aps_t;
+
 /**
  * @name NVRAM dataset counters versions
  * @anchor nvram_dataset_binding_versions
  */
 /** @{ */
-#define ZB_IB_COUNTERS_DS_VER_1 0U
-#define ZB_IB_COUNTERS_DS_VER_2 1U
+#define ZB_NVRAM_IB_COUNTERS_DS_VER_1 0U
+#define ZB_NVRAM_IB_COUNTERS_DS_VER_2 1U
+#define ZB_NVRAM_IB_COUNTERS_DS_VER_3 2U
 /** @} */
 
-typedef zb_nvram_dataset_counters_ver_2_0_t zb_nvram_dataset_counters_t;
-#define ZB_IB_COUNTERS_DS_VER ZB_IB_COUNTERS_DS_VER_2
+typedef zb_nvram_dataset_counters_ver_3_0_t zb_nvram_dataset_counters_t;
+typedef zb_nvram_dataset_counters_ver_3_0_aps_t zb_nvram_dataset_counters_aps_t;
 
-/* Check dataset alignment for IAR compiler and ARM Cortex target platfrom */
+#define ZB_NVRAM_IB_COUNTERS_DS_VER ZB_NVRAM_IB_COUNTERS_DS_VER_3
+
+/* Check dataset alignment for IAR compiler and ARM Cortex target platform */
 ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_dataset_counters_t);
-
-#endif
 
 #if defined ZB_ENABLE_HA
 
@@ -567,15 +613,12 @@ typedef ZB_PACKED_PRE struct zb_nvram_dataset_ha_s
 } ZB_PACKED_STRUCT
 zb_nvram_dataset_ha_t;
 
-typedef enum zb_nvram_dataset_ha_versions_e
-{
-  ZB_NVRAM_HA_DATA_DS_VER_1 = 0,
-}
-zb_nvram_dataset_ha_versions_t;
+#define ZB_NVRAM_HA_DATA_DS_VER_1 0U
+typedef zb_uint16_t zb_nvram_dataset_ha_versions_t;
 
 #define ZB_NVRAM_HA_DATA_DS_VER ZB_NVRAM_HA_DATA_DS_VER_1
 
-/* Check dataset alignment for IAR compiler and ARM Cortex target platfrom */
+/* Check dataset alignment for IAR compiler and ARM Cortex target platform */
 ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_dataset_ha_t);
 
 #endif /*defined ZB_ENABLE_HA*/
@@ -629,7 +672,7 @@ zb_nvram_dataset_diagnostics_v1_t;
 
 #define ZB_NVRAM_DIAGNOSTICS_DATA_DS_VER ZB_NVRAM_DIAGNOSTICS_DATA_DS_VER_1
 
-/* Check dataset alignment for IAR compiler and ARM Cortex target platfrom */
+/* Check dataset alignment for IAR compiler and ARM Cortex target platform */
 ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_dataset_diagnostics_v1_t);
 
 #endif /* ZDO_DIAGNOSTICS */
@@ -760,7 +803,7 @@ typedef zb_nvram_dataset_binding_v3_t zb_nvram_dataset_binding_t;
 
 #define ZB_NVRAM_APS_BINDING_DATA_DS_VER ZB_NVRAM_APS_BINDING_DATA_DS_VER_3
 
-/* Check dataset alignment for IAR compiler and ARM Cortex target platfrom */
+/* Check dataset alignment for IAR compiler and ARM Cortex target platform */
 ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_dataset_binding_v3_t);
 
 typedef ZB_PACKED_PRE struct zb_nvram_dataset_groups_hdr_s
@@ -804,7 +847,7 @@ typedef ZB_PACKED_PRE struct zb_nvram_dataset_poll_control_s
 } ZB_PACKED_STRUCT
 zb_nvram_dataset_poll_control_t;
 
-/* Check dataset alignment for IAR compiler and ARM Cortex target platfrom */
+/* Check dataset alignment for IAR compiler and ARM Cortex target platform */
 ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_dataset_poll_control_t);
 
 typedef enum zb_nvram_dataset_poll_control_versions_e
@@ -881,46 +924,6 @@ zb_nvram_dataset_wwah_versions_t;
 
 #ifdef ZB_ENABLE_ZGP
 
-typedef ZB_PACKED_PRE struct zb_nvram_zgp_transl_tbl_entry_ver_1_0_s
-{
-  zb_ieee_addr_t         zgpd_id;
-  zb_uint16_t            Zigbee_profile_id;
-  zb_uint16_t            cluster_id;
-
-  zb_uint8_t             Zigbee_cmd_id;
-  zb_uint8_t             options;
-  zb_uint8_t             zgpd_cmd_id;
-  zb_uint8_t             endpoint;
-
-  zb_uint8_t             payload_len;
-  zb_uint8_t             payload_data[ZB_ZGP_TRANSL_CMD_PLD_MAX_SIZE];
-  zb_uint8_t             aligned[2];
-}
-ZB_PACKED_STRUCT
-zb_nvram_zgp_transl_tbl_entry_ver_1_0_t;
-
-typedef zb_nvram_zgp_transl_tbl_entry_ver_1_0_t zb_nvram_zgp_transl_tbl_t;
-
-typedef ZB_PACKED_PRE struct zb_nvram_zgp_sink_tbl_entry_ver_1_0_s
-{
-  zb_ieee_addr_t   zgpd_id;
-
-  zb_uint16_t      options;
-  zb_uint16_t      zgpd_assigned_alias;
-  zb_uint32_t      zgpd_sec_frame_counter;
-
-  zb_uint8_t       device_id;
-  zb_uint8_t       groupcast_radius;
-  zb_uint8_t       sec_options;
-  zb_uint8_t       zgpd_key[ZB_CCM_KEY_SIZE];
-  zb_uint8_t       dup_counter_expired;
-}
-ZB_PACKED_STRUCT
-zb_nvram_zgp_sink_tbl_entry_ver_1_0_t;
-
-/* Check dataset alignment for IAR compiler and ARM Cortex target platfrom */
-ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_zgp_sink_tbl_entry_ver_1_0_t);
-
 typedef ZB_PACKED_PRE struct zb_nvram_zgp_sink_tbl_entry_ver_6_0_s
 {
   zb_uint32_t      src_id;
@@ -949,31 +952,10 @@ typedef ZB_PACKED_PRE struct zb_nvram_zgp_sink_tbl_entry_ver_6_0_s
 ZB_PACKED_STRUCT
 zb_nvram_zgp_sink_tbl_entry_ver_6_0_t;
 
-/* Check dataset alignment for IAR compiler and ARM Cortex target platfrom */
+/* Check dataset alignment for IAR compiler and ARM Cortex target platform */
 ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_zgp_sink_tbl_entry_ver_6_0_t);
 
 typedef zb_nvram_zgp_sink_tbl_entry_ver_6_0_t zb_nvram_zgp_sink_tbl_t;
-
-/* Format of old ZGP dataset used before ZB_NVRAM_VER_2_0 */
-#define ZB_NVRAM_ZGP_TRANSL_TBL_SIZE_1_0  64U
-#define ZB_NVRAM_ZGP_SINK_TBL_SIZE_1_0    32U
-typedef ZB_PACKED_PRE struct zb_nvram_zgp_dataset_ver_1_0_s
-{
-  zb_nvram_zgp_transl_tbl_t zgp_translate_tbl[ZB_NVRAM_ZGP_TRANSL_TBL_SIZE_1_0];
-  zb_nvram_zgp_sink_tbl_t   zgp_sink_tbl[ZB_NVRAM_ZGP_SINK_TBL_SIZE_1_0];
-  zb_uint32_t               zgp_sink_tbl_used_entries;
-}
-ZB_PACKED_STRUCT
-zb_nvram_zgp_dataset_ver_1_0_t;
-
-typedef ZB_PACKED_PRE struct zb_nvram_zgp_dataset_info_ver_2_0_s
-{
-  zb_uint16_t               zgp_sink_tbl_size;
-  zb_uint32_t               zgp_sink_tbl_used_entries;
-  zb_uint16_t               zgp_transl_tbl_size;
-}
-ZB_PACKED_STRUCT
-zb_nvram_zgp_dataset_info_ver_2_0_t;
 
 typedef ZB_PACKED_PRE struct zb_nvram_zgp_dataset_info_ver_6_0_s
 {
@@ -1063,7 +1045,7 @@ zb_nvram_dataset_gp_app_tbl_versions_t;
  * converted to a set of macros due to MISRA violations.
  */
 /** @{ */
-/* First(0) version should be 0.
+  /* First(0) version should be 0.
  * New versions should be added to the end, before ZB_NVRAM_ADDR_MAP_DS_VER.
  * After, ZB_NVRAM_ADDR_MAP_DS_VER should be updated. */
 #define ZB_NVRAM_ADDR_MAP_DS_VER_0     0U
@@ -1146,7 +1128,7 @@ ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_addr_map_rec_v2_t);
  * converted to a set of macros due to MISRA violations.
  */
 /** @{ */
-/* First(0) version should be 0.
+  /* First(0) version should be 0.
  * New versions should be added to the end, before ZB_NVRAM_NEIGHBOUR_TBL_DS_VER.
  * After, ZB_NVRAM_NEIGHBOUR_TBL_DS_VER should be updated. */
 #define ZB_NVRAM_NEIGHBOR_TBL_DS_VER_0 0U
@@ -1159,7 +1141,7 @@ ZB_ASSERT_IF_NOT_ALIGNED_TO_4(zb_nvram_addr_map_rec_v2_t);
 
 typedef ZB_PACKED_PRE struct zb_nvram_neighbour_hdr_v0_s
 {
-  zb_uint8_t nbr_rec_num; /*!< Strores number of stored neighbour devices */
+  zb_uint8_t nbr_rec_num; /*!< Stores number of stored neighbour devices */
   zb_uint8_t version;     /*!< Stores version of the dataset */
 }
 ZB_PACKED_STRUCT
@@ -1167,7 +1149,7 @@ zb_nvram_neighbour_hdr_v0_t;
 
 typedef ZB_PACKED_PRE struct zb_nvram_neighbour_hdr_v1_s
 {
-  zb_uint8_t nbr_rec_num; /*!< Strores number of stored neighbour devices */
+  zb_uint8_t nbr_rec_num; /*!< Stores number of stored neighbour devices */
   zb_uint8_t version;     /*!< Stores version of the dataset */
   zb_uint8_t aligned[2];
 }
@@ -1255,9 +1237,10 @@ zb_nvram_zcl_reporting_data_ds_versions_t;
  */
 /** @{ */
 #define ZB_NVRAM_APS_SECURE_DATA_DS_VER_1 0U
+#define ZB_NVRAM_APS_SECURE_DATA_DS_VER_2 1U
 /** @} */
 
-#define ZB_NVRAM_APS_SECURE_DATA_DS_VER ZB_NVRAM_APS_SECURE_DATA_DS_VER_1
+#define ZB_NVRAM_APS_SECURE_DATA_DS_VER ZB_NVRAM_APS_SECURE_DATA_DS_VER_2
 
 typedef enum zb_nvram_installcodes_ds_versions_e
 {
@@ -1431,6 +1414,8 @@ zb_ret_t zb_nvram_custom_ds_try_get_length(zb_uint16_t ds_type,
                                            zb_size_t *len);
 
 zb_bool_t zb_nvram_custom_ds_is_supported(zb_uint16_t ds_type);
+
+zb_uint16_t zb_nvram_custom_ds_try_get_version(zb_uint16_t ds_type);
 
 
 zb_ret_t zb_nvram_custom_ds_register(zb_nvram_ds_filter_cb_t filter,

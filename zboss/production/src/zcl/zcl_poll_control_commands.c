@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -304,11 +304,9 @@ zb_uint8_t zb_zcl_poll_control_stop(void)
  * send Check-in if change Check-in interval & Check-in remain time > new check-in interval */
 void write_attr_check_in_interval_hook(zb_uint8_t endpoint, zb_uint8_t *new_value_ptr)
 {
-  zb_time_t time_alarm;
   zb_time_t new_interval;
   zb_uint32_t new_val;
   zb_uint8_t canceled_param = 0;
-  zb_ret_t ret;
 
   ZVUNUSED(endpoint);
 
@@ -319,10 +317,6 @@ void write_attr_check_in_interval_hook(zb_uint8_t endpoint, zb_uint8_t *new_valu
   new_interval = ZB_QUARTERECONDS_TO_BEACON_INTERVAL(new_val);
   ZVUNUSED(new_interval);
 
-  ret = ZB_SCHEDULE_GET_ALARM_TIME(zb_zcl_poll_control_start_check_in, ZB_ALARM_ANY_PARAM, &time_alarm);
-
-  if (ret == RET_OK)
-  {
     /* HA specification changed: re-start check-in unconditionally */
 
     canceled_param = zb_zcl_poll_control_stop();
@@ -344,11 +338,6 @@ void write_attr_check_in_interval_hook(zb_uint8_t endpoint, zb_uint8_t *new_valu
         zb_buf_free(canceled_param);
       }
     }
-  }
-  else
-  {
-    TRACE_MSG(TRACE_ZCL2, "cant find alarm, skip", (FMT__0));
-  }
 
   TRACE_MSG(TRACE_ZCL1, "< write_attr_check_in_interval_hook", (FMT__0));
 }
@@ -393,7 +382,7 @@ static void check_in_res_handler_pack_params(zb_bufid_t param,
   zb_size_t params_size = payload_size_aligned + sizeof(*cmd_info);
   zb_uint8_t *ptr = NULL;
 
-  ptr = zb_buf_initial_alloc(param, params_size);
+  ptr = zb_buf_initial_alloc(param, (zb_uint_t)params_size);
 
   ZB_MEMCPY(ptr, payload, sizeof(*payload));
   ptr += payload_size_aligned;
@@ -813,7 +802,7 @@ zb_bool_t zb_zcl_process_poll_control_specific_commands_srv(zb_uint8_t param)
 }
 
 
-/** @brief Run Check-in command if Check in Responce not receive
+/** @brief Run Check-in command if Check in Response not receive
  * */
 void zb_zcl_poll_control_check_in_non_response(zb_uint8_t endpoint)
 {
@@ -1218,45 +1207,5 @@ zb_ret_t zb_zcl_poll_control_set_client_addr(zb_uint8_t local_ep, zb_uint16_t ad
 /**
  *  @} internal
 */
-
-#if defined ZB_ENABLE_HA
-/*
-static zb_uint8_t gs_poll_control_cmd_list_srv[] =
-{
-    ZB_ZCL_CMD_POLL_CONTROL_CHECK_IN_ID
-};
-
-static zb_uint8_t gs_poll_control_cmd_list_cli[] =
-{
-    ZB_ZCL_CMD_POLL_CONTROL_CHECK_IN_RESPONSE_ID,
-    ZB_ZCL_CMD_POLL_CONTROL_FAST_POLL_STOP_ID,
-    ZB_ZCL_CMD_POLL_CONTROL_SET_LONG_POLL_INTERVAL_ID,
-    ZB_ZCL_CMD_POLL_CONTROL_SET_SHORT_POLL_INTERVAL_ID
-};
-*/
-/* Returns supported commands list for receiving or generating */
-/*
-zb_uint8_t zb_zcl_get_cmd_list_poll_control(zb_bool_t is_client_generated, zb_uint8_t **cmd_list)
-{
-  zb_uint8_t ret = 0;
-
-  TRACE_MSG(TRACE_ZCL1, "> zb_zcl_get_cmd_list_poll_control is_client_generated %hd", (FMT__H, is_client_generated));
-
-  if (is_client_generated)
-  {
-    *cmd_list = gs_poll_control_cmd_list_cli;
-    ret = sizeof(gs_poll_control_cmd_list_cli);
-  }
-  else
-  {
-    *cmd_list = gs_poll_control_cmd_list_srv;
-    ret = sizeof(gs_poll_control_cmd_list_srv);
-  }
-
-  TRACE_MSG(TRACE_ZCL1, "< zb_zcl_get_cmd_list_poll_control ret %hd", (FMT__H, ret));
-  return ret;
-}
-*/
-#endif /* defined ZB_ENABLE_HA */
 
 #endif /* ZB_ZCL_SUPPORT_CLUSTER_POLL_CONTROL */

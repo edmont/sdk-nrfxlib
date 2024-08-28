@@ -186,17 +186,18 @@ static inline const zb_uint8_t *zb_zcl_price_ack_get_payload_from_data(
   return data;
 }
 
-void zb_zcl_price_send_cmd_price_ack(
+void zb_zcl_price_send_cmd_price_ack_tsn(
   zb_uint8_t param,
   const zb_addr_u *dst_addr,
   zb_aps_addr_mode_t dst_addr_mode,
   zb_uint8_t dst_ep,
   zb_uint8_t src_ep,
   const zb_zcl_price_ack_payload_t *payload,
+  zb_uint8_t tsn,
   zb_callback_t cb
 )
 {
-  zb_zcl_send_cmd(param,
+  zb_zcl_send_cmd_tsn(param,
     dst_addr,
     dst_addr_mode,
     dst_ep,
@@ -208,6 +209,24 @@ void zb_zcl_price_send_cmd_price_ack(
     ZB_ZCL_CLUSTER_ID_PRICE,
     ZB_ZCL_ENABLE_DEFAULT_RESPONSE,
     ZB_ZCL_PRICE_CLI_CMD_PRICE_ACK,
+    tsn,
+    cb
+  );
+}
+
+void zb_zcl_price_send_cmd_price_ack(
+  zb_uint8_t param,
+  const zb_addr_u *dst_addr,
+  zb_aps_addr_mode_t dst_addr_mode,
+  zb_uint8_t dst_ep,
+  zb_uint8_t src_ep,
+  const zb_zcl_price_ack_payload_t *payload,
+  zb_callback_t cb
+)
+{
+  zb_zcl_price_send_cmd_price_ack_tsn(
+    param, dst_addr, dst_addr_mode, dst_ep,
+    src_ep, payload, ZB_ZCL_GET_SEQ_NUM(),
     cb
   );
 }

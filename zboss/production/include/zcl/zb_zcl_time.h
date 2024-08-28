@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -76,7 +76,12 @@ typedef zb_bool_t (*zb_zcl_time_set_real_time_clock_t)(zb_uint32_t time);
  */
 void zb_zcl_set_real_time_clock_callback(zb_zcl_time_set_real_time_clock_t cb);
 
-/* typedef struct */
+/**
+ * @brief Call user's callback.
+ * @param[in] time - UTC time at which real time clock has been set
+ * @return ZB_TRUE if real time clock was set to new value and ZB_FALSE otherwise
+ */
+zb_bool_t zb_zcl_call_real_time_clock_callback(zb_uint32_t time);
 
 /** This enum defines possible authoritative levels of time server */
 enum time_server_authoritative_level_e
@@ -134,7 +139,7 @@ typedef void (*zb_zcl_time_sync_time_server_found_cb_t)(zb_ret_t status, zb_uint
 /**
  * @brief Start time synchronization.
  * @param endpoint endpoint for each time server synchronization shall be started.
- * @param cb callback that will be called on each successfull time server discovery.
+ * @param cb callback that will be called on each successful time server discovery.
  * @details Start time synchronization process. If device doesn't have master bit set in Time Status attribute of Time Cluster
  *          then starts to search available time server in Zigbee network and tries to read status and time attributes.
  *          After time server successfully found and gathered attributes their values will be passed to application

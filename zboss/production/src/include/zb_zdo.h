@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -38,13 +38,15 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* PURPOSE: ZDO API
+/* PURPOSE: Internal API of ZDO subsystem
 */
 
 #ifndef ZB_ZDO_H
 #define ZB_ZDO_H 1
 
 #include "zboss_api_zdo.h"
+#include "zdo_wwah_survey_beacons.h"
+#include "zb_tlv.h"
 #include "zboss_api_zcl.h"
 
 
@@ -56,34 +58,45 @@
 /**
   Cluster ids for ZDO commands
  */
-#define  ZDO_NWK_ADDR_REQ_CLID                   0x0000U
-#define  ZDO_IEEE_ADDR_REQ_CLID                  0x0001U
-#define  ZDO_NODE_DESC_REQ_CLID                  0x0002U
-#define  ZDO_POWER_DESC_REQ_CLID                 0x0003U
-#define  ZDO_SIMPLE_DESC_REQ_CLID                0x0004U
-#define  ZDO_ACTIVE_EP_REQ_CLID                  0x0005U
-#define  ZDO_MATCH_DESC_REQ_CLID                 0x0006U
-#define  ZDO_COMPLEX_DESC_REQ_CLID               0x0010U
-#define  ZDO_USER_DESC_REQ_CLID                  0x0011U
-#define  ZDO_DEVICE_ANNCE_CLID                   0x0013U
-#define  ZDO_SYSTEM_SERVER_DISCOVERY_REQ_CLID    0x0015U
-#define  ZDO_PARENT_ANNCE_CLID                   0x001FU
-#define  ZDO_BIND_REQ_CLID                       0x0021U
-#define  ZDO_UNBIND_REQ_CLID                     0x0022U
-#define  ZDO_MGMT_LQI_REQ_CLID                   0x0031U
-#define  ZDO_MGMT_BIND_REQ_CLID                  0x0033U
-#define  ZDO_MGMT_LEAVE_REQ_CLID                 0x0034U
-#define  ZDO_MGMT_PERMIT_JOINING_CLID            0x0036U
-#define  ZDO_MGMT_NWK_UPDATE_REQ_CLID            0x0038U
-#define  ZDO_MGMT_NWK_ENHANCED_UPDATE_REQ_CLID   0x0039U
-#define  ZDO_MGMT_NWK_IEEE_JOINING_LIST_REQ_CLID 0x003AU
+#define  ZDO_NWK_ADDR_REQ_CLID                       0x0000U
+#define  ZDO_IEEE_ADDR_REQ_CLID                      0x0001U
+#define  ZDO_NODE_DESC_REQ_CLID                      0x0002U
+#define  ZDO_POWER_DESC_REQ_CLID                     0x0003U
+#define  ZDO_SIMPLE_DESC_REQ_CLID                    0x0004U
+#define  ZDO_ACTIVE_EP_REQ_CLID                      0x0005U
+#define  ZDO_MATCH_DESC_REQ_CLID                     0x0006U
+#define  ZDO_COMPLEX_DESC_REQ_CLID                   0x0010U
+#define  ZDO_USER_DESC_REQ_CLID                      0x0011U
+#define  ZDO_DEVICE_ANNCE_CLID                       0x0013U
+#define  ZDO_SYSTEM_SERVER_DISCOVERY_REQ_CLID        0x0015U
+#define  ZDO_PARENT_ANNCE_CLID                       0x001FU
+#define  ZDO_BIND_REQ_CLID                           0x0021U
+#define  ZDO_UNBIND_REQ_CLID                         0x0022U
+#define  ZDO_CLEAR_ALL_BIND_REQ_CLID                 0x002BU
+#define  ZDO_MGMT_LQI_REQ_CLID                       0x0031U
+#define  ZDO_MGMT_RTG_REQ_CLID                       0x0032U
+#define  ZDO_MGMT_BIND_REQ_CLID                      0x0033U
+#define  ZDO_MGMT_LEAVE_REQ_CLID                     0x0034U
+#define  ZDO_MGMT_DIRECT_JOIN_REQ_CLID               0x0035U
+#define  ZDO_MGMT_PERMIT_JOINING_CLID                0x0036U
+#define  ZDO_MGMT_NWK_UPDATE_REQ_CLID                0x0038U
+#define  ZDO_MGMT_NWK_ENHANCED_UPDATE_REQ_CLID       0x0039U
+#define  ZDO_MGMT_NWK_IEEE_JOINING_LIST_REQ_CLID     0x003AU
+#define  ZDO_MGMT_NWK_BEACON_SURVEY_REQ_CLID         0x003CU
+#define  ZDO_SECURITY_START_KEY_NEGOTIATION_REQ_CLID 0x0040U
+#define  ZDO_SECURITY_GET_AUTH_TOKEN_REQ_CLID        0x0041U
+#define  ZDO_SECURITY_GET_AUTH_LEVEL_REQ_CLID        0x0042U
+#define  ZDO_SECURITY_SET_CONFIGURATION_REQ_CLID     0x0043U
+#define  ZDO_SECURITY_GET_CONFIGURATION_REQ_CLID     0x0044U
+#define  ZDO_SECURITY_START_KEY_UPDATE_REQ_CLID      0x0045U
+#define  ZDO_SECURITY_DECOMMISSION_REQ_CLID          0x0046U
+#define  ZDO_SECURITY_FRAME_CNT_CHALLENGE_REQ_CLID   0x0047U
 
 #ifndef R23_DISABLE_DEPRECATED_ZDO_CMDS
 #define  ZDO_USER_DESC_SET_CLID                  0x0014U
 #define  ZDO_EXTENDED_SIMPLE_DESC_REQ_CLID       0x001DU
 #define  ZDO_EXTENDED_ACTIVE_EP_REQ_CLID         0x001EU
 #define  ZDO_END_DEVICE_BIND_REQ_CLID            0x0020U
-#define  ZDO_MGMT_RTG_REQ_CLID                   0x0032U
 #endif  /* R23_DISABLE_DEPRECATED_ZDO_CMDS */
 
 #define  ZDO_NWK_ADDR_RESP_CLID                               0x8000U
@@ -100,7 +113,9 @@
 #define  ZDO_PARENT_ANNCE_RESP_CLID                           0x801FU
 #define  ZDO_BIND_RESP_CLID                                   0x8021U
 #define  ZDO_UNBIND_RESP_CLID                                 0x8022U
+#define  ZDO_CLEAR_ALL_BIND_RESP_CLID                         0x802BU
 #define  ZDO_MGMT_LQI_RESP_CLID                               0x8031U
+#define  ZDO_MGMT_RTG_RESP_CLID                               0x8032U
 #define  ZDO_MGMT_BIND_RESP_CLID                              0x8033U
 #define  ZDO_MGMT_LEAVE_RESP_CLID                             0x8034U
 #define  ZDO_MGMT_PERMIT_JOINING_RESP_CLID                    0x8036U
@@ -108,10 +123,18 @@
 #define  ZDO_MGMT_NWK_ENHANCED_UPDATE_NOTIFY_CLID             0x8039U
 #define  ZDO_MGMT_NWK_IEEE_JOINING_LIST_RESP_CLID             0x803AU
 #define  ZDO_MGMT_NWK_UNSOLICITED_ENHANCED_UPDATE_NOTIFY_CLID 0x803BU
+#define  ZDO_MGMT_NWK_BEACON_SURVEY_RESP_CLID                 0x803CU
+#define  ZDO_SECURITY_START_KEY_NEGOTIATION_RESP_CLID         0x8040U
+#define  ZDO_SECURITY_GET_AUTHENTICATION_TOKEN_RESP_CLID      0x8041U
+#define  ZDO_SECURITY_GET_AUTH_LEVEL_RESP_CLID                0x8042U
+#define  ZDO_SECURITY_SET_CONFIGURATION_RESP_CLID             0x8043U
+#define  ZDO_SECURITY_GET_CONFIGURATION_RESP_CLID             0x8044U
+#define  ZDO_SECURITY_START_KEY_UPDATE_RESP_CLID              0x8045U
+#define  ZDO_SECURITY_DECOMMISSION_RESP_CLID                  0x8046U
+#define  ZDO_SECURITY_FRAME_CNT_CHALLENGE_RESP_CLID           0x8047U
 
 #ifndef R23_DISABLE_DEPRECATED_ZDO_CMDS
 #define  ZDO_END_DEVICE_BIND_RESP_CLID                        0x8020U
-#define  ZDO_MGMT_RTG_RESP_CLID                               0x8032U
 #endif  /* R23_DISABLE_DEPRECATED_ZDO_CMDS */
 
 /*! @} */
@@ -180,7 +203,6 @@ typedef void (*zb_zdo_duty_cycle_mode_ind_cb_t) (zb_uint8_t mode);
   *   ZB_AIB().aps_designated_coordinator = 1;
   *   ZB_IEEE_ADDR_COPY(ZB_PIBCACHE_EXTENDED_ADDRESS(), &g_zc_addr);
   *   ZB_PIBCACHE_PAN_ID() = 0x1aaa;
-  *   ZB_NIB().max_children = 1;
   *   if (zdo_dev_start() != RET_OK)
   *   {
   *     TRACE_MSG(TRACE_ERROR, "zdo_dev_start failed", (FMT__0));
@@ -209,7 +231,6 @@ zb_ret_t zdo_dev_start(void);
   ZB_AIB().aps_designated_coordinator = 1;
   ZB_IEEE_ADDR_COPY(ZB_PIB_EXTENDED_ADDRESS(), &g_zc_addr);
   ZB_PIBCACHE_PAN_ID() = 0x1aaa;
-  ZB_NIB().max_children = 1;
   if (zdo_dev_start() != RET_OK)
   {
     TRACE_MSG(TRACE_ERROR, "zdo_dev_start failed", (FMT__0));
@@ -224,6 +245,12 @@ zb_ret_t zdo_dev_start(void);
 void zdo_main_loop(void);
 
 /**
+   Initializes internal contexts specific for
+   selected device type
+ */
+void zb_init_contexts_by_dev_type(void);
+
+/**
    ZDO device init
 
    May be called as alter zdo_dev_start().
@@ -235,10 +262,9 @@ void zdo_main_loop(void);
   ZB_AIB().aps_designated_coordinator = 1;
   ZB_IEEE_ADDR_COPY(ZB_PIB_EXTENDED_ADDRESS(), &g_zc_addr);
   ZB_PIBCACHE_PAN_ID() = 0x1aaa;
-  ZB_NIB().max_children = 1;
   zdo_dev_init();
-  ZB_SCHEDULE_CALLBACK(zb_zdo_dev_start_cont, 0);
-  zdo_main_loop();
+    ZB_SCHEDULE_CALLBACK(zb_zdo_dev_start_cont, 0);
+    zdo_main_loop();
 @endcode
 
  */
@@ -256,6 +282,8 @@ zb_ret_t zb_zdo_start_no_autostart(void);
  */
 void zb_zdo_dev_start_cont(zb_uint8_t param);
 
+#ifdef ZB_USE_INTERNAL_HEADERS
+
 /**
    Callback which will be called after device startup complete or other event happen
 
@@ -267,7 +295,9 @@ void zb_zdo_dev_start_cont(zb_uint8_t param);
 @snippet tp_pro_bv_20_zc.c zb_af_set_data_indication
 
  */
-void zb_zdo_startup_complete(zb_uint8_t param);
+void zboss_signal_handler(zb_uint8_t param);
+
+#endif /* ZB_USE_INTERNAL_HEADERS */
 
 /*! @} */
 
@@ -456,13 +486,15 @@ zb_bool_t zb_zdo_is_rejoin_active(void);
  *  @param channels_list [IN] - scanned channels
  *  @param secure [IN] - if set to ZB_TRUE, device will perform secured rejoin;
  *  if ZB_FALSE - device will do unsecure rejoin
+ *  @param scan_duration [IN] - A value used to calculate the length of time to
+ *  spend scanning each channel.
  *  @return NLME-JOIN.request schedule result.
  * TODO: write comments
  */
 zb_ret_t zdo_initiate_rejoin(zb_bufid_t buf, zb_uint8_t *ext_pan_id,
-                             zb_channel_page_t *channels_list, zb_bool_t secure_rejoin);
+                             zb_channel_page_t *channels_list, zb_bool_t secure_rejoin, zb_uint8_t scan_duration);
 #else
-#define zdo_initiate_rejoin(buf, ext_pan_id, channels_list, secure_rejoin)
+#define zdo_initiate_rejoin(buf, ext_pan_id, channels_list, secure_rejoin, scan_duration)
 #endif
 
 /**
@@ -481,7 +513,6 @@ void zb_zdo_addr_resp_handle(zb_uint8_t param);
 void zb_zdo_mgmt_nwk_update_handler(zb_uint8_t param);
 
 
-#ifdef ZB_MGMT_NWK_ENHANCED_UPDATE_ENABLED
 /**
    Handles Mgmt_NWK_Enhanced_Update_req request
 
@@ -496,7 +527,6 @@ void zb_zdo_mgmt_nwk_enhanced_update_handler(zb_uint8_t param);
    @param param - index of buffer with request
  */
 void zb_zdo_mgmt_unsol_enh_nwk_update_notify_handler(zb_uint8_t param);
-#endif /* ZB_MGMT_NWK_ENHANCED_UPDATE_ENABLED */
 
 
 /**
@@ -513,6 +543,8 @@ void zb_zdo_mgmt_handle_unsol_nwk_update_notify(zb_uint8_t param);
    @param bind - true for bind, false for unbind
  */
 void zb_zdo_bind_unbind_res(zb_uint8_t param, zb_bool_t bind);
+
+void zb_zdo_clear_all_bind_res(zb_uint8_t param);
 
 /**
    Sends 2.4.4.3.2 Mgmt_Lqi_rsp
@@ -580,7 +612,7 @@ void zdo_mgmt_leave_srv(zb_uint8_t param);
    Try to send mgmt_leave_rsp if somebody waiting for it.
 
    mgmt_leave operation is registered in the leave pending list: after LEAVE
-   command send confirm must send responce.
+   command send confirm must send response.
    Search is done using buffer ref: it always same.
    If nothing found in the pending list, can proceed with leave.confirm
    operations (clear addresses), else need to wait until response sent.
@@ -598,10 +630,12 @@ void zb_zdo_register_addr_resp_cb(zb_callback_t addr_resp_cb);
 void zb_zdo_register_leave_cb(zb_callback_t leave_cb);
 #endif
 
+#ifndef ZB_DISABLE_ASSERT_INDICATION
 /**
   Register a callback which should be called when application falls into assert
  */
 void zb_zdo_register_assert_indication_cb(zb_assert_indication_cb_t assert_cb);
+#endif
 
 /**
  Register a callback which will be called when TC received device update
@@ -645,7 +679,16 @@ void zb_zdo_do_set_channel(zb_uint8_t channel);
 
 void zb_zdo_mgmt_permit_joining_confirm_handle(zb_uint8_t param);
 
-#endif
+#ifdef ZB_CERTIFICATION_HACKS
+/* ZB_UINT8_MAX used as a special value
+  (this value forces stack to not consider this value at all)
+*/
+void zb_set_max_joins(zb_uint8_t max_joins);
+
+zb_uint8_t zb_get_max_joins(void);
+
+#endif /* ZB_CERTIFICATION_HACKS */
+#endif /* ZB_ROUTER_ROLE */
 
 #ifndef ZB_LITE_NO_ZDO_RESPONSE_VALIDATION
 zb_bool_t zb_zdo_validate_reponse(zb_bufid_t buf, zb_uint16_t cluster_id);
@@ -693,13 +736,6 @@ zb_bool_t register_zdo_cb(
   zb_uint8_t resp_counter, zb_uint8_t cb_type,
   zb_bool_t rx_on_when_idle);
 
-/** @brief Call confirm callback by index from buffer list.
-  *
-  * This routine called from functions to pass confirm to the upper layer. Use @ref register_zdo_cb
-  * with callback search type @brief CB_TYPE_INDEX to register user callback.
-  */
-zb_ret_t zdo_run_cb_by_index(zb_uint8_t param);
-
 /** @addtogroup zdo_disc
   * @{
   */
@@ -715,7 +751,7 @@ void zdo_cb_reset(void);
 /** @} */ /* group zdo_disc */
 
 /* If forget device param is true - then remove all information related to device;
- * otherwise - remove device from neighbors, childs and unlock its address entry,
+ * otherwise - remove device from neighbors, children and unlock its address entry,
  * save application data (bindings e.t.c) */
 void zdo_device_removed(zb_uint8_t param, zb_uint16_t forget_device);
 void zb_send_leave_signal(zb_uint8_t param, zb_uint16_t user_param);
@@ -786,7 +822,7 @@ void zb_send_device_authorized_signal(zb_uint8_t param,
  * @brief Prepare parameters and send the
  *        @ZB_ZDO_SIGNAL_DEVICE_AUTHORIZED signal with delay
  *
- * @param long_addr - lond address of the authorized device
+ * @param long_addr - long address of the authorized device
  *                    (need to getting the @zb_address_ieee_ref_t)
  * @param authorization_type - authorization type (legacy, r21 TCLK, )
  * @param authorization_status - authorization status (depends on authorization_type)
@@ -794,6 +830,24 @@ void zb_send_device_authorized_signal(zb_uint8_t param,
 void zb_prepare_and_send_device_authorized_signal(zb_ieee_addr_t long_addr,
                                                   zb_uint8_t authorization_type,
                                                   zb_uint8_t authorization_status);
+
+#ifdef DEBUG
+/**
+ * @brief Send @ZB_DEBUG_SIGNAL_TCLK_READY signal
+ *
+ * @param param - reference to the buffer
+ * @param long_addr - long address of the partner device
+ */
+void zb_send_tclk_ready_debug_signal(zb_uint8_t param, zb_ieee_addr_t long_addr);
+
+/**
+ * @brief Prepare parameters and send the
+ *        @ZB_DEBUG_SIGNAL_TCLK_READY signal with delay
+ *
+ * @param long_addr - long address of the partner device
+ */
+void zb_prepare_and_send_tclk_ready_debug_signal(zb_ieee_addr_t long_addr);
+#endif
 
 /**
  * @brief Alarm to send @ZB_ZDO_SIGNAL_DEVICE_AUTHORIZED signal
@@ -810,6 +864,7 @@ void zb_legacy_device_auth_signal_alarm(zb_uint8_t param);
  */
 void zb_legacy_device_auth_signal_cancel(zb_ieee_addr_t long_addr);
 
+
 /* MM: For unicast, counter should be set to 1 and callback can be freed in two
  * ways: timeout or ZDO response recept
  * For broadcast, counter should be set to 0xFF(?) and callback can be
@@ -819,6 +874,14 @@ void zb_legacy_device_auth_signal_cancel(zb_ieee_addr_t long_addr);
  * I still keep DEFAULT_COUNTER (but changed const): seems, in some cases we can
  * send broadcast ZDO packets and receive more than 1 answer.
  */
+
+/**
+ * @brief Send @ref ZB_ZDO_DEVICE_UNAVAILABLE signal
+ *
+ * @param param - a buf ID, @see zb_bufid_t
+ * @param param2 - an address reference, @see zb_address_ieee_ref_t
+ */
+void zb_zdo_send_device_unavailable_signal(zb_uint8_t param, zb_uint16_t param2);
 
 void zb_send_no_active_links_left_signal(zb_uint8_t param);
 
@@ -908,6 +971,7 @@ zb_zdo_pim_stop_fast_poll_extended_resp_t;
 /**
    Initialize Poll Interval Management default settings
  */
+void zb_zdo_pim_init(void);
 void zb_zdo_pim_init_defaults(void);
 void zb_zdo_pim_start_fast_poll(zb_uint8_t param);
 void zb_zdo_fast_poll_leave(zb_uint8_t param);
@@ -933,6 +997,9 @@ void zb_zdo_update_long_poll_int(zb_uint8_t param);
 void zb_zdo_pim_continue_turbo_poll(void);
 zb_time_t zb_zdo_pim_get_long_poll_ms_interval(void);
 void zb_zdo_pim_turbo_poll_cancel_packet(void);
+void zb_zdo_pim_set_mac_poll_retry_count(zb_uint8_t cnt);
+void zb_zdo_pim_set_mac_poll_failure_wait_time(zb_uint8_t t);
+void zb_zdo_pim_repeat_poll(void);
 
 #ifdef ZB_USE_INTERNAL_HEADERS
 void zb_zdo_pim_set_long_poll_interval(zb_time_t ms);
@@ -959,6 +1026,7 @@ void zb_zdo_pim_stop_fast_poll_extended_req(zb_uint8_t param, zb_callback_t cb);
 
 #else
 /* No any polling if not ZED-only or ZR switched to ZED */
+#define zb_zdo_pim_init()
 #define zb_zdo_pim_init_defaults()
 #define zb_zdo_pim_start_fast_poll(param)
 #define zb_zdo_fast_poll_leave(param)
@@ -986,6 +1054,9 @@ void zb_zdo_pim_stop_fast_poll_extended_req(zb_uint8_t param, zb_callback_t cb);
 #define zb_zdo_pim_get_long_poll_ms_interval() 0U
 #define zb_zdo_pim_get_in_fast_poll_flag_req(param, cb)
 #define zb_zdo_pim_stop_fast_poll_extended_req(param, cb)
+#define zb_zdo_pim_set_mac_poll_retry_count(cnt)
+#define zb_zdo_pim_set_mac_poll_failure_wait_time(t)
+#define zb_zdo_pim_repeat_poll()
 #define zb_zdo_pim_turbo_poll_cancel_packet()
 
 #endif  /* ZB_ED_FUNC */
@@ -1025,7 +1096,7 @@ typedef enum zb_zdo_tsn_policy_e
 /**
    set the policy to update ZDO TSN value
  */
-void zdo_tsn_policy_set(zb_zdo_tsn_policy_t policy);
+void zdo_tsn_policy_set(zb_zdo_tsn_policy_t policy, zb_callback_t lock_cb);
 
 /**
    predict (not really increment) ZDO TSN value according to the policy
@@ -1204,10 +1275,6 @@ void zb_set_network_ed_role_legacy(zb_uint32_t channel_mask);
   @param app_input_cluster_count - Application input cluster count
   @param app_output_cluster_count - Application output cluster count
 
-  @par Example
-  @snippet doxygen_snippets.dox zb_set_simple_descriptor_certification_TP_ZDO_BV-09_tp_zdo_bv_09_zc_c
-  @par
-
 */
 void zb_set_simple_descriptor(zb_af_simple_desc_1_1_t *simple_desc,
                               zb_uint8_t  endpoint, zb_uint16_t app_profile_id,
@@ -1220,10 +1287,6 @@ void zb_set_simple_descriptor(zb_af_simple_desc_1_1_t *simple_desc,
   @param cluster_number - cluster item number
   @param cluster_id - cluster ID
 
-  @par Example
-  @snippet doxygen_snippets.dox zb_set_simple_descriptor_certification_TP_ZDO_BV-09_tp_zdo_bv_09_zc_c
-  @par
-
 */
 void zb_set_input_cluster_id(zb_af_simple_desc_1_1_t *simple_desc, zb_uint8_t cluster_number, zb_uint16_t cluster_id);
 
@@ -1231,10 +1294,6 @@ void zb_set_input_cluster_id(zb_af_simple_desc_1_1_t *simple_desc, zb_uint8_t cl
     @param simple_desc - pointer to simple descriptor
     @param cluster_number - cluster item number
     @param cluster_id - cluster ID
-
-  @par Example
-  @snippet doxygen_snippets.dox zb_set_simple_descriptor_certification_TP_ZDO_BV-09_tp_zdo_bv_09_zc_c
-  @par
 
 */
 void zb_set_output_cluster_id(zb_af_simple_desc_1_1_t *simple_desc, zb_uint8_t cluster_number, zb_uint16_t cluster_id);
@@ -1285,8 +1344,11 @@ void zb_set_ed_node_descriptor(zb_bool_t power_src, zb_bool_t rx_on_when_idle, z
 #define ZB_NODE_DESC_LOGICAL_TYPE_MASK 0x7U       /* 0000.0000 0000.0111 */
 #define ZB_NODE_DESC_COMPLEX_DESC_AVAIL_MASK 0x8U /* 0000.0000 0000.1000 */
 #define ZB_NODE_DESC_USER_DESC_AVAIL_MASK 0x10U   /* 0000.0000 0001.0000 */
+#define ZB_NODE_DESC_USER_DESC_FRAG_MASK 0x20U    /* 0000.0000 0010.0000 */
 #define ZB_NODE_DESC_APS_FLAGS_MASK    0x700U     /* 0000.0111 0000.0000 */
 #define ZB_NODE_DESC_FREQ_BAND_MASK    0xF800U    /* 1111.1000 0000.0000 */
+
+#define ZB_NODE_DESC_SERVER_FLAGS_STACK_REV_MASK 0xFE00U /* 1111.1110 0000.0000 */
 
 #define ZB_SET_NODE_DESC_LOGICAL_TYPE(desc, value)              \
   ( (desc)->node_desc_flags &= (zb_uint16_t)~ZB_NODE_DESC_LOGICAL_TYPE_MASK, \
@@ -1309,6 +1371,13 @@ void zb_set_ed_node_descriptor(zb_bool_t power_src, zb_bool_t rx_on_when_idle, z
 #define ZB_GET_NODE_DESC_USER_DESC_AVAIL(desc)                    \
   ( ((desc)->node_desc_flags & ZB_NODE_DESC_USER_DESC_AVAIL_MASK) >> 4U )
 
+#define ZB_SET_NODE_DESC_FRAGMENTATION_SUPPORTED(desc, value)                 \
+  ( (desc)->node_desc_flags &= (zb_uint16_t)~ZB_NODE_DESC_USER_DESC_FRAG_MASK,    \
+    (desc)->node_desc_flags |= (zb_uint16_t)((value) << 5U) )
+
+#define ZB_GET_NODE_DESC_FRAGMENTATION_SUPPORTED(desc)                    \
+  ( ((desc)->node_desc_flags & ZB_NODE_DESC_USER_DESC_FRAG_MASK) >> 5U )
+
 #define ZB_SET_NODE_DESC_APS_FLAGS(desc, value)                    \
   ( (desc)->node_desc_flags &= (zb_uint16_t)~ZB_NODE_DESC_APS_FLAGS_MASK,       \
     (desc)->node_desc_flags |= (zb_uint16_t)((value) << 8U) )
@@ -1322,6 +1391,12 @@ void zb_set_ed_node_descriptor(zb_bool_t power_src, zb_bool_t rx_on_when_idle, z
 
 #define ZB_GET_NODE_DESC_FREQ_BAND(desc)                      \
   ( ((desc)->node_desc_flags & ZB_NODE_DESC_FREQ_BAND_MASK) >> 11U )
+
+#define ZB_GET_NODE_DESC_STACK_VERSION(desc)                  \
+  ( ((desc)->server_mask) >> 9U )
+
+#define ZB_GET_NODE_DESC_SERVER_FLAGS_STACK_REV(desc)         \
+  ( ((desc)->server_mask & ZB_NODE_DESC_SERVER_FLAGS_STACK_REV_MASK) >> 9 )
 /** @endcond */ /*internals_doc */
 
 /**
@@ -1342,7 +1417,8 @@ void zb_set_node_descriptor(zb_logical_type_t device_type, zb_bool_t power_src, 
 
 /** @cond internals_doc */
 /* Macro to set node descriptor, 2.3.2.3 Node Descriptor  */
-#define ZB_SET_NODE_DESCRIPTOR(logical_type_p, frequence_band_p, mac_capability_flags_p, manufacturer_code_p, \
+
+#define ZB_SET_NODE_DESCRIPTOR(logical_type_p, fragmentation_support, frequency_band_p, mac_capability_flags_p, manufacturer_code_p, \
                                 max_buf_size_p, max_incoming_transfer_size_p, server_mask_p, \
                                 max_outgoing_transfer_size_p, desc_capability_field_p) \
   do \
@@ -1350,8 +1426,9 @@ void zb_set_node_descriptor(zb_logical_type_t device_type, zb_bool_t power_src, 
     ZB_SET_NODE_DESC_LOGICAL_TYPE(ZB_ZDO_NODE_DESC(), (logical_type_p)); \
     ZB_SET_NODE_DESC_COMPLEX_DESC_AVAIL(ZB_ZDO_NODE_DESC(), 0U);  /* complex desc is not supported */ \
     ZB_SET_NODE_DESC_USER_DESC_AVAIL(ZB_ZDO_NODE_DESC(), 0U);     /* usr desc is not supported */ \
+    ZB_SET_NODE_DESC_FRAGMENTATION_SUPPORTED(ZB_ZDO_NODE_DESC(), fragmentation_support); \
     ZB_SET_NODE_DESC_APS_FLAGS(ZB_ZDO_NODE_DESC(), 0U); /* not supported by spec */ \
-    ZB_SET_NODE_DESC_FREQ_BAND(ZB_ZDO_NODE_DESC(), ((zb_uint16_t)frequence_band_p)); \
+    ZB_SET_NODE_DESC_FREQ_BAND(ZB_ZDO_NODE_DESC(), ((zb_uint16_t)frequency_band_p)); \
     ZB_ZDO_NODE_DESC()->mac_capability_flags = (mac_capability_flags_p);          \
     ZB_ZDO_NODE_DESC()->manufacturer_code = (zb_uint16_t)(manufacturer_code_p); \
     ZB_ZDO_NODE_DESC()->max_buf_size = (zb_uint8_t)(max_buf_size_p);              \
@@ -1361,6 +1438,14 @@ void zb_set_node_descriptor(zb_logical_type_t device_type, zb_bool_t power_src, 
     ZB_ZDO_NODE_DESC()->desc_capability_field = (zb_uint8_t)(desc_capability_field_p); \
   } while (ZB_FALSE)
 /** @endcond */ /* internals_doc */
+
+#define ZB_NODE_DESCRIPTOR_SERVER_MASK_SET_STACK_REVISION(server_mask, revision)  \
+  (((server_mask) & 0x1FFU) | ((revision) << 9U))
+
+#define ZB_NODE_DESCRIPTOR_SET_STACK_REVISION(revision) \
+  (ZB_ZDO_NODE_DESC()->server_mask =                    \
+    ZB_NODE_DESCRIPTOR_SERVER_MASK_SET_STACK_REVISION(  \
+      ZB_ZDO_NODE_DESC()->server_mask, revision))       \
 
 /** @cond internals_doc */
 #define ZB_POWER_DESC_CUR_POWER_MODE_MASK     0x000FU /* 0000.0000 0000.1111 */
@@ -1403,10 +1488,6 @@ void zb_set_node_descriptor(zb_logical_type_t device_type, zb_bool_t power_src, 
   @param available_power_sources - available power sources
   @param current_power_source - current power source
   @param current_power_source_level - current power source level
-
-  @par Example
-  @snippet tp_zdo_bv_09_zc.c zb_set_node_power_descriptor
-  @par
 
   NOTE: zboss_start() overwrites this descriptor with default values
         if ZB_SET_DEFAULT_POWER_DESCRIPTOR is defined
@@ -1466,9 +1547,156 @@ zb_bool_t zb_tc_is_distributed(void);
 void zb_sync_distributed(void);
 #endif
 
+/**
+   TLV management
+ */
+
+#if defined ZB_JOIN_CLIENT
+
+/* [VK]: to avoid a MISRA warning for the Rule-5.1:
+ * The external identifier 'xxx' clashes with other identifier(s) in the first 31 characters 1 time(s).
+ */
+void zb_zdo_st_key_neg_req_put_tlv(zb_uint8_t param);
+#define zb_zdo_start_key_negotiation_req_put_tlv zb_zdo_st_key_neg_req_put_tlv
+
+void zb_zdo_get_auth_tok_req_put_tlv(zb_uint8_t param);
+#define zb_zdo_get_authentication_token_req_put_tlv zb_zdo_get_auth_tok_req_put_tlv
+
+zb_ret_t zb_zdo_start_k_neg_r_proc_tlv(zb_uint8_t *tlv_ptr,
+                                       zb_uint8_t tlv_data_len,
+                                       zb_ieee_addr_t tc_ieee);
+
+#define zb_zdo_start_key_negotiation_rsp_process_tlv zb_zdo_start_k_neg_r_proc_tlv
+
+zb_ret_t zb_zdo_get_auth_tkn_rsp_proc_tlv(zb_uint8_t *tlv_ptr,
+                                          zb_uint8_t tlv_data_len,
+                                          zb_uint8_t *passphrase);
+
+#define zb_zdo_get_authentication_token_rsp_process_tlv zb_zdo_get_auth_tkn_rsp_proc_tlv
+
+#endif /* ZB_JOIN_CLIENT */
+
+#if defined ZB_COORDINATOR_ROLE || defined ZB_ROUTER_ROLE
+
+void zb_zdo_st_key_neg_rsp_put_tlv(zb_uint8_t param,
+                                   zb_uint8_t *public_point);
+#define zb_zdo_start_key_negotiation_rsp_put_tlv zb_zdo_st_key_neg_rsp_put_tlv
+
+
+void zb_zdo_get_auth_tok_rsp_put_tlv(zb_uint8_t param, zb_uint8_t *passphrase);
+#define zb_zdo_get_authentication_token_rsp_put_tlv zb_zdo_get_auth_tok_rsp_put_tlv
+
+/**
+ * Parse and validate incoming key negotiation request TLV
+ * Places ref, public_keypoint_i (and for zigbee direct selected key neg method) in context
+ *
+ * @param tlv_ptr       pointer to the body of the TLV
+ *                      (should not include the outer TLV header, describing the whole TLV's length)
+ * @param tlv_data_len  actual length of the TLV body
+ * @param is_dlk        if true, uses dlk
+ *
+ * @return If TLV appeared to be valid, returns (allocates) key negotiation context, filling following fields:
+ *         ref, selected_key_neg_method, public_key_point_i
+ *         If TLV is not valid, returns NULL
+ *
+ * @note it is guaranteed, that resp_param->status is ZB_APS_STATUS_SUCCESS if return value is not NULL
+ */
+zb_secur_ecdhe_common_ctx_t* zb_zdo_start_key_negotiation_req_process_parse_tlv(const zb_uint8_t* tlv_ptr,
+                                                                                zb_uint8_t tlv_data_len,
+                                                                                zb_uint8_t* resp_param,
+                                                                                zb_bool_t is_dlk);
+
+/**
+    @return RET_OK, RET_ERROR, RET_NO_MATCH
+ */
+zb_ret_t zb_zdo_get_authentication_token_req_process_tlv(zb_uint8_t *tlv_ptr,
+                                                         zb_uint8_t tlv_data_len);
+
+#endif /* ZB_COORDINATOR_ROLE || ZB_ROUTER_ROLE */
+
+void zb_zdo_key_neg_methods_put_tlv(zb_uint8_t param);
+
+void zb_zdo_upd_key_req_put_tlvs(zb_uint8_t param, zb_uint8_t selected_method, zb_uint8_t selected_secret);
+
+zb_ret_t zb_zdo_upd_key_req_process_tlv(zb_uint8_t *tlv_ptr,
+                                        zb_uint8_t tlv_data_len,
+                                        zb_uint16_t src_short_addr);
+
+#if defined ZB_COORDINATOR_ROLE || defined ZB_ROUTER_ROLE
+zb_ret_t zb_zdo_select_key_neg_method(zb_ieee_addr_t partner_ieee_addr,
+                                      zb_uint16_t partner_methods,
+                                      zb_uint8_t  partner_secrets,
+                                      zb_uint8_t *selected_method,
+                                      zb_uint8_t *selected_secret);
+
+zb_ret_t zb_zdo_select_key_neg_method_in_ecdhe_ctx(zb_secur_ecdhe_common_ctx_t *ecdhe_ctx);
+#endif /* ZB_COORDINATOR_ROLE || ZB_ROUTER_ROLE */
+
+zb_ret_t zb_secur_get_auth_token_key_by_ieee(zb_ieee_addr_t ieee_addr, zb_uint8_t *key);
+
+#ifdef ZB_COORDINATOR_ROLE
+zb_secur_ecdhe_common_ctx_t *zb_zdo_alloc_ecdhe_ctx_with_support_kn_tlv(zb_ieee_addr_t ieee_addr,
+                                                                        zb_uint8_t supported_kn_methods,
+                                                                        zb_uint8_t  supported_secrets);
+#endif /* ZB_COORDINATOR_ROLE */
+
+zb_ret_t zb_zdo_key_neg_methods_and_frag_param_process_tlv(zb_uint8_t *tlv_ptr,
+                                                           zb_uint8_t tlv_data_len,
+                                                           zb_uint8_t src_short_addr);
+void zb_zdo_encapsulation_put_tlv(zb_uint8_t param,
+                                  zb_secur_ecdhe_common_ctx_t *ecdhe_ctx);
+
+void zb_zdo_encapsulation_process_tlv(zb_uint8_t *tlv_ptr,
+                                      zb_uint8_t tlv_data_len,
+                                      zb_secur_ecdhe_common_ctx_t *ecdhe_ctx);
+
+zb_ret_t zb_zdo_clear_all_bind_put_tlv(zb_uint8_t param);
+zb_ret_t zb_zdo_clear_all_bind_process_tlv(zb_uint8_t *tlv_ptr,
+                                           zb_uint8_t tlv_data_len,
+                                           zb_tlv_clear_all_bind_req_eui64_t *tlv_param);
+
+/* Decommission TLV is the same as the Clear_all_bind TLV */
+#define zb_zdo_decommission_put_tlv zb_zdo_clear_all_bind_put_tlv
+zb_ret_t zb_zdo_decommission_process_tlv(zb_uint8_t *tlv_ptr,
+                                         zb_uint8_t tlv_data_len,
+                                         zb_tlv_decommission_req_eui64_t *tlv_param);
+
+void zb_zdo_get_auth_level_req_put_target_ieee_tlv(zb_uint8_t param, zb_uint8_t *target_ieee);
+zb_ret_t zb_zdo_get_auth_level_req_process_target_ieee_tlv(zb_uint8_t *tlv_ptr, zb_uint8_t tlv_data_len, zb_uint8_t *target_ieee);
+
+void zb_zdo_get_auth_level_rsp_put_dev_auth_lvl_tlv(zb_uint8_t param, zb_uint8_t *target_ieee, zb_uint8_t initial_join_auth, zb_uint8_t active_lk_type);
+zb_ret_t zb_zdo_get_auth_level_rsp_process_dev_auth_lvl_tlv(zb_uint8_t *tlv_ptr, zb_uint8_t tlv_data_len,
+                                                            zb_uint8_t *target_ieee, zb_uint8_t *initial_join_auth, zb_uint8_t *active_lk_type);
+
+typedef struct zb_zdo_processing_status_tlv_ctx_s
+{
+  zb_uint8_t conf_mode_param_tlv_status;
+  zb_uint8_t next_channel_change_tlv_status;
+  zb_uint8_t next_pan_id_tlv_status;
+}zb_zdo_processing_status_tlv_ctx_t;
+
+void zb_zdo_set_configuration_req_process_tlv(zb_uint8_t *tlv_ptr,
+                                              zb_uint8_t tlv_data_len,
+                                              zb_zdo_processing_status_tlv_ctx_t *tlv_statuses);
+
+void zb_zdo_put_processing_status_tlv(zb_uint8_t param, zb_zdo_processing_status_tlv_ctx_t *tlv_statuses);
+
+
+void zb_zdo_construct_relay_tlv(zb_uint8_t param, zb_uint8_t *joiner_ieee);
+
+void zb_zdo_cut_all_except_relay_msg_tlv(zb_uint8_t param);
+void zb_zdo_get_tunneled_frame_from_relay(zb_uint8_t param);
+
+zb_ret_t zb_zdo_link_key_capabilities_process_tlv(zb_uint8_t *tlv_ptr, zb_uint8_t tlv_data_len, zb_uint8_t *capabilities);
+void zb_zdo_link_key_cap_put_tlv(zb_uint8_t param, zb_uint8_t capabilities);
+
+void zb_zdo_beacon_survey_resp_put_tlv(zb_uint8_t param, zb_zdo_beacon_survey_resp_params_t *resp_params);
+
+zb_ret_t zb_zdo_put_tlv_by_id(zb_uint8_t param, zb_uint8_t id);
+
 void zdo_load_production_config(void);
 void zb_send_no_autostart_signal(zb_uint8_t param);
-void zb_nlme_leave_indication_cont(zb_uint8_t param_buf, zb_uint16_t param_req);
+void zb_nlme_leave_indication_cont(zb_uint8_t param_buf);
 
 /**
  * Returns if the device is authenticated in the network.
@@ -1508,9 +1736,44 @@ void zb_af_handle_zcl_frame_data_confirm(zb_uint8_t param);
 zb_bool_t zb_af_handle_zcl_frame(zb_uint8_t param);
 #endif /* ZB_ENABLE_ZCL */
 
-void zb_send_leave_indication_signal(zb_uint8_t param, zb_ieee_addr_t device_addr, zb_uint8_t rejoin);
+void zb_zdo_send_status_res(zb_uint8_t param, zb_uint8_t status);
+
+void zb_send_leave_indication_signal(zb_uint8_t param);
 
 void zdo_send_signal_no_args(zb_uint8_t param, zb_uint16_t signal);
+
+void zdo_mgmt_beacon_survey_req_handler(zb_uint8_t param);
+
+void zdo_beacon_survey_hook(zb_uint8_t param);
+
+void zb_zdo_beacon_survey_resp_handler(zb_uint8_t param);
+
+void zdo_secur_get_config_rsp_hook(zb_uint8_t param);
+
+void zdo_aps_challenge_timeout(zb_uint8_t param);
+
+void zb_zdo_secur_get_auth_level_req_handle(zb_uint8_t param);
+
+
+/* Challenge req/rsp functions */
+#define ZB_ZDO_CHALLENGE_RSP_MIC_SIZE (8U)
+
+void zb_zdo_secur_send_challenge_req(zb_uint8_t param);
+
+void zb_zdo_secur_challenge_req_handle(zb_uint8_t param);
+
+void zb_zdo_secur_challenge_resp_handle(zb_uint8_t param);
+
+void zb_zdo_challenge_req_put_tlv (zb_uint8_t param, zb_uint8_t *rand);
+
+zb_uint8_t *zb_zdo_challenge_rsp_put_tlv (zb_uint8_t param, zb_uint8_t *rand, zb_uint32_t out_cnt, zb_uint32_t challenge_cnt);
+
+zb_ret_t zb_zdo_challenge_req_process_tlv(zb_uint8_t *tlv_ptr, zb_uint8_t tlv_data_len,
+                                              zb_uint8_t *sender_ieee, zb_uint8_t *rand_value);
+zb_ret_t zb_zdo_challenge_resp_process_tlv(zb_uint8_t *tlv_ptr, zb_uint8_t tlv_data_len,
+                                              zb_uint8_t *sender_ieee, zb_uint8_t *rand_value,
+                                              zb_uint32_t *out_counter, zb_uint32_t *challenge_counter, zb_uint8_t *mic);
+
 
 #if defined NCP_MODE && !defined NCP_MODE_HOST
 void zdo_send_ncp_join_signal(zb_uint8_t param);
@@ -1546,5 +1809,106 @@ zb_ret_t zb_production_cfg_read_header(zb_uint8_t *prod_cfg_hdr, zb_uint16_t hdr
 zb_ret_t zb_production_cfg_read(zb_uint8_t *buffer, zb_uint16_t len, zb_uint16_t offset);
 
 #endif
+
+#ifdef ZB_CERTIFICATION_HACKS
+/**
+   Sent network report command after panid conflict detect on ZR
+
+   This is legacy pre-r23 Network report.
+   It is present in r23 Test Specification at GU side - see  Test Case 8.2 (PAN ID Conflict)
+ */
+void zb_panid_conflict_send_legacy_network_report(zb_uint8_t param);
+#endif
+
+void zb_send_device_interview_signal_common(zb_bufid_t param, zb_address_ieee_ref_t addr_ref, zb_uint32_t signal_code, zb_uint16_t status);
+
+/**
+ * @brief Prepare parameters and send
+ *        @ZB_ZDO_SIGNAL_DEVICE_READY_FOR_INTERVIEW signal with delay
+ *
+ * @param param - buffer that will be reused for storing the signal parameters
+ * @addr_ref - ieee address reference to device which is going to be interviewed
+ */
+void zb_send_device_ready_for_interview_signal_delayed(zb_bufid_t param, zb_uint16_t addr_ref);
+
+/**
+ * @brief Prepare parameters and send
+ *        @ZB_ZDO_SIGNAL_DEVICE_INTERVIEW_FINISHED signal with RET_ERROR status
+ *
+ * @param param - buffer for signal
+ */
+void zb_send_device_interview_failed_signal_delayed(zb_bufid_t param, zb_uint16_t addr_ref);
+
+/**
+ * @brief Prepare parameters and send
+ *        @ZB_ZDO_SIGNAL_DEVICE_INTERVIEW_FINISHED signal with RET_OK status
+ *
+ * @param param - buffer for signal
+ */
+void zb_send_device_interview_done_signal_delayed(zb_bufid_t param, zb_uint16_t addr_ref);
+
+#ifdef ZB_COORDINATOR_ROLE
+/**
+ * @brief Starts Device Interview stage on Trust Center
+ *
+ * @param param buffer for signal
+ * @param joiner_ref reference to joiner's ieee address
+ * @return zb_ret_t result of Device Interview starting
+ */
+zb_ret_t zb_start_device_interview_on_tc(zb_bufid_t param, zb_address_ieee_ref_t ieee_ref);
+#endif /* ZB_COORDINATOR_ROLE */
+
+#ifdef ZB_JOIN_CLIENT
+/**
+ * @brief Check device interview requirements
+ * @return zb_bool_t TRUE if device interview should be started on joiner
+ */
+zb_bool_t zb_need_start_device_interview_on_joiner(zb_bool_t relayed, zb_bool_t verified);
+
+/**
+ * @brief Starts Device Interview stage on joiner
+ * @return zb_ret_t result of Device Interview starting
+ */
+zb_ret_t zb_start_device_interview_on_joiner(void);
+
+/**
+ * @brief Stops Device Interview stage on joiner
+ */
+void zb_stop_device_interview_on_joiner(void);
+
+/**
+  @brief Checks whether Device Interview is started on the joiner's side
+  @return Device Interview status flag
+ */
+zb_bool_t zb_is_device_interview_started_on_joiner(void);
+#endif /* ZB_JOIN_CLIENT */
+
+#ifdef ZB_COORDINATOR_ROLE
+void send_transport_key_after_dlk(zb_uint8_t param, zb_secur_ecdhe_common_ctx_t *dlk_ctx_p);
+#endif /* ZB_COORDINATOR_ROLE */
+
+zb_uint8_t zdo_send_req_by_short(zb_uint16_t command_id, zb_uint8_t param, zb_callback_t cb,
+                                 zb_uint16_t addr, zb_uint8_t resp_counter);
+zb_uint8_t zdo_send_req_by_long(zb_uint16_t command_id, zb_uint8_t param, zb_callback_t cb,
+                                zb_ieee_addr_t addr);
+void zdo_send_resp_by_short(zb_uint16_t command_id, zb_uint8_t param, zb_uint16_t addr, zb_bool_t aps_secur);
+
+
+/**
+   @brief Enable broadcasting TX failure diagnostic at ZC
+
+   If TX failure debug is switched on and 1/4 or more packets are failed to
+   transmit due to CSMA/CA failed, ZC broadcasts
+   Mgmt_NWK_Unsolicited_Enhanced_Update_notify with MAC TX statistics.
+
+   That function is debug only.
+
+   @param enable - if ZB_TRUE, enable that debug feature
+ */
+void zb_zdo_enable_tx_fail_debug(zb_bool_t enable);
+
+zb_ret_t zb_check_next_panid(zb_uint16_t panid);
+
+zb_ret_t zb_check_next_channel(zb_channel_page_t channel_page);
 
 #endif /* ZB_ZDO_H */

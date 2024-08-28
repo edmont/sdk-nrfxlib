@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -1631,7 +1631,7 @@ typedef ZB_PACKED_PRE struct zb_zcl_scenes_view_scene_res_fixed_size_s
     @param seq_num - ZCL sequence number
     @param status of the command execution. Appropriate values (defined in @ref
     zcl_status enumeration) are:
-    @li ZB_ZCL_STATUS_SUCCESS for successfull result
+    @li ZB_ZCL_STATUS_SUCCESS for successful result
     @li ZB_ZCL_STATUS_INSUFF_SPACE if fieldsets don't fit into packet
     @li ZB_ZCL_STATUS_INVALID_FIELD if the group is not present in the
     @param group_id - group identifier for the scene to store
@@ -1669,7 +1669,7 @@ typedef ZB_PACKED_PRE struct zb_zcl_scenes_view_scene_res_fixed_size_s
     @param seq_num - ZCL sequence number
     @param status of the command execution. Appropriate values (defined in @ref
     zcl_status enumeration) are:
-    @li ZB_ZCL_STATUS_SUCCESS for successfull result
+    @li ZB_ZCL_STATUS_SUCCESS for successful result
     @li ZB_ZCL_STATUS_INSUFF_SPACE if fieldsets don't fit into packet
     @li ZB_ZCL_STATUS_INVALID_FIELD if the group is not present in the
     @param group_id - group identifier for the scene to store
@@ -1704,7 +1704,7 @@ typedef ZB_PACKED_PRE struct zb_zcl_scenes_view_scene_res_fixed_size_s
     @param seq_num - ZCL sequence number
     @param status of the command execution. Appropriate values (defined in @ref
     zcl_status enumeration) are:
-    @li ZB_ZCL_STATUS_SUCCESS for successfull result
+    @li ZB_ZCL_STATUS_SUCCESS for successful result
     @li ZB_ZCL_STATUS_INSUFF_SPACE if fieldsets don't fit into packet
     @li ZB_ZCL_STATUS_INVALID_FIELD if the group is not present in the
     @param group_id - group identifier for the scene to store
@@ -1835,7 +1835,7 @@ typedef ZB_PACKED_PRE struct zb_zcl_scenes_remove_scene_res_s
     @param callback for getting command send status
     @param status of the corresponding Add scene command execution. Appropriate
     values (defined in @ref zcl_status enumeration)are:
-    @li @ref ZB_ZCL_STATUS_SUCCESS for successfull result
+    @li @ref ZB_ZCL_STATUS_SUCCESS for successful result
     @li @ref ZB_ZCL_STATUS_NOT_FOUND if the scene is not present in the scene table
     @li @ref ZB_ZCL_STATUS_INVALID_FIELD if the group is not present in the
     Group Table
@@ -1914,7 +1914,7 @@ typedef ZB_PACKED_PRE struct zb_zcl_scenes_remove_all_scenes_res_s
     @param callback for getting command send status
     @param status of the corresponding Add scene command execution. Appropriate
     values (defined in @ref zcl_status enumeration)are:
-    @li @ref ZB_ZCL_STATUS_SUCCESS for successfull result
+    @li @ref ZB_ZCL_STATUS_SUCCESS for successful result
     @li @ref ZB_ZCL_STATUS_INVALID_FIELD if the group is not present in the
     Group Table
     @param group_id - group identifier for the scene to store
@@ -1991,7 +1991,7 @@ typedef ZB_PACKED_PRE struct zb_zcl_scenes_store_scene_res_s
     @param callback for getting command send status
     @param status of the corresponding Add scene command execution. Appropriate
     values (defined in @ref zcl_status enumeration)are:
-    @li @ref ZB_ZCL_STATUS_SUCCESS for successfull result
+    @li @ref ZB_ZCL_STATUS_SUCCESS for successful result
     @li ZB_ZCL_STATUS_INSUFF_SPACE if fieldsets don't fit into packet
     @li @ref ZB_ZCL_STATUS_INVALID_FIELD if the group is not present in the
     Group Table
@@ -2120,7 +2120,7 @@ typedef ZB_PACKED_PRE struct zb_zcl_scenes_get_scene_membership_res_s
     @param cap_ptr - pointer to the capacity fields of the response
     @param status of the command execution. Appropriate values (defined in @ref
     zcl_status enumeration) are:
-    @li ZB_ZCL_STATUS_SUCCESS for successfull result
+    @li ZB_ZCL_STATUS_SUCCESS for successful result
     @li ZB_ZCL_STATUS_INVALID_FIELD if the group is not present in the
     @param capacity of the scene table
     @param group_id - group identifier for the scene to store

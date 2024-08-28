@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -249,9 +249,9 @@ zb_ret_t check_value_thermostat_server(zb_uint16_t attr_id, zb_uint8_t endpoint,
       /* First check MinHeatSetpointLimit/MaxHeatSetpointLimit, than
        * AbsMinHeatSetpointLimit/AbsMaxHeatSetpointLimit, than predefined constants. */
       zb_zcl_attr_t *attr_desc_min = zb_zcl_get_attr_desc_a(endpoint,
-          ZB_ZCL_CLUSTER_ID_THERMOSTAT, ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ZCL_ATTR_THERMOSTAT_ABS_MIN_HEAT_SETPOINT_LIMIT_ID);
+          ZB_ZCL_CLUSTER_ID_THERMOSTAT, ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ZCL_ATTR_THERMOSTAT_MIN_HEAT_SETPOINT_LIMIT_ID);
       zb_zcl_attr_t *attr_desc_max = zb_zcl_get_attr_desc_a(endpoint,
-          ZB_ZCL_CLUSTER_ID_THERMOSTAT, ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ZCL_ATTR_THERMOSTAT_ABS_MAX_HEAT_SETPOINT_LIMIT_ID);
+          ZB_ZCL_CLUSTER_ID_THERMOSTAT, ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ZCL_ATTR_THERMOSTAT_MAX_HEAT_SETPOINT_LIMIT_ID);
       if (attr_desc_min && attr_desc_max)
       {
         min_val = (zb_int16_t)ZB_ZCL_GET_ATTRIBUTE_VAL_S16(attr_desc_min);
@@ -487,7 +487,10 @@ zb_ret_t check_value_thermostat_server(zb_uint16_t attr_id, zb_uint8_t endpoint,
       break;
 
     case ZB_ZCL_ATTR_THERMOSTAT_SETPOINT_CHANGE_SOURCE_TIMESTAMP_ID:
-      ret = (*(zb_uint32_t *)value != (zb_uint32_t)-1) ? RET_OK : RET_ERROR;
+    {
+      zb_uint32_t timestamp = ZB_ZCL_ATTR_GET32(value);
+      ret = (timestamp != (zb_uint32_t)-1) ? RET_OK : RET_ERROR;
+    }
       break;
 
     case ZB_ZCL_ATTR_THERMOSTAT_OCCUPIED_SETBACK_MIN_ID:

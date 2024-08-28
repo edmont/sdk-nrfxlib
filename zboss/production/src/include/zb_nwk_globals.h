@@ -65,7 +65,7 @@ zb_uint_t zb_calc_non_zero_bits_in_bit_vector(zb_uint8_t *vector, zb_uint_t size
  *
  * Note: These values were members of `enum zb_nlme_state_t` type but were converted to a
  * set of macros due to MISRA violations.
- */
+*/
 /** @{ */
 #define ZB_NLME_STATE_IDLE                      0U
 #define ZB_NLME_STATE_DISC                      1U
@@ -95,10 +95,17 @@ zb_uint_t zb_calc_non_zero_bits_in_bit_vector(zb_uint8_t *vector, zb_uint_t size
 #define ZB_NLME_STATE_PIB_LOAD8                 20U
 #define ZB_NLME_STATE_PIB_LOAD9                 21U
 #define ZB_NLME_STATE_PIB_LOAD10                22U
-#define ZB_NLME_STATE_PIB_LOAD_SRC_MATCH_TBL    23U
+#define ZB_NLME_STATE_PIB_LOAD11                23U
+#define ZB_NLME_STATE_PIB_LOAD_SRC_MATCH_TBL    24U
+#define ZB_NLME_STATE_PIB_LOAD_BEACON_JITTER    25U
+
 
 /*!< State to execute the 'Survey Beacon' procedure */
-#define ZB_NLME_STATE_SURVEY_BEACON             24U
+#define ZB_NLME_STATE_SURVEY_BEACON             25U
+/* Specific case after NLME-LEAVE.request cmd has been received,
+    but NWK hasn't sent leave yet.
+   Device doesn't handle any pkt on NWK layer if this state is set. */
+#define ZB_NLME_STATE_LEAVE_IN_PROCESS          26U
 /** @} */
 
 /* Broadcast transaction record */
@@ -126,7 +133,7 @@ zb_nwk_btr_t;
 #define ZB_NWK_BRCST_PASSIVE_ACK_ARRAY_SIZE ((ZB_NEIGHBOR_TABLE_SIZE + 7U) / 8U)
 
 /**
-   Broadcast retransmition info
+   Broadcast retransmission info
    Important! This struct must ZB_PACKED_STRUCT for ZB_NEED_ALIGN
  */
 typedef ZB_PACKED_PRE struct zb_nwk_broadcast_retransmit_s
@@ -175,12 +182,6 @@ typedef struct zb_in_mgmt_leave_pending_list_s /* do not pack for IAR */
 } ZB_PACKED_STRUCT zb_in_mgmt_leave_pending_list_t;
 
 
-typedef struct zb_leave_ind_notify_s
-{
-  zb_address_ieee_ref_t addr_ref;       /*!< Address of device for leave */
-  zb_uint8_t rejoin;                    /*!< Is rejoin after leave */
-} zb_leave_ind_notify_t;
-
 /**
   leave context
 */
@@ -188,12 +189,9 @@ typedef struct zb_leave_context_s
 {
   /*!< * Pending incoming mgmt leave req, or self mgmt leave req */
   zb_in_mgmt_leave_pending_list_t pending_list[ZB_ZDO_PENDING_LEAVE_SIZE];
-  zb_leave_ind_notify_t leave_ind_prnt;                             /*!< */
-  zb_leave_ind_notify_t leave_ind_zed;                              /*!< */
   zb_uint8_t pending_list_bm;                                       /*!< */
   zb_bitfield_t rejoin_after_leave:1;                               /*!< */
-  zb_bitfield_t remove_children:1;                                  /*!< */
-  zb_bitfield_t reserved:6;
+  zb_bitfield_t reserved:7;
 } zb_leave_context_t;
 
 #define ZB_SET_LEAVE_PENDING(i) ZG->nwk.leave_context.pending_list_bm |= (1U<<(i))
@@ -206,14 +204,16 @@ typedef struct zb_leave_context_s
  */
 typedef struct zb_rejoin_context_s /* do not pack for IAR */
 {
-  zb_uint16_t addr;                     /*!< */
-  zb_address_ieee_ref_t addr_ref;
-  zb_uint8_t secure_rejoin;
-  zb_uint8_t rx_on;
+  zb_uint16_t addr;                     /*!< "Old" network address */
+  zb_address_ieee_ref_t addr_ref;       /*!< Address ref of "new" address */
+  zb_bitfield_t is_used:1;
+  zb_bitfield_t rx_on:1;
+  zb_bitfield_t zvd_capability:1;
+  zb_bitfield_t reserved:5;
 #ifdef ZB_MAC_PENDING_BIT_SOURCE_MATCHING
   zb_bufid_t rejoin_rsp_param;          /*!< Buf with nwk header. */
   zb_bufid_t mlme_set_conf_param;       /*!< This param is needed to determine ent in rejoin table
-                                               for which confirm has arrived. */
+                                             for which confirm has arrived. */
 #endif /* ZB_MAC_PENDING_BIT_SOURCE_MATCHING */
 } ZB_PACKED_STRUCT zb_rejoin_context_t;
 
@@ -283,7 +283,7 @@ typedef struct zb_nwk_handle_s  /* do not pac for IAR */
 #if defined ZB_MAC_POWER_CONTROL
   zb_uint8_t send_power_delta_index; /* Current index of short_sorted address
                                       * table for NWK Power Delta command (notification */
-  zb_uint16_t lpd_resp_addr;         /* Address of recepient, LPD frame
+  zb_uint16_t lpd_resp_addr;         /* Address of recipient, LPD frame
                                       * response to be sent to */
   zb_ieee_addr_t lpd_leave_ieee; /* IEEE to delete from MAC power table */
 #endif
@@ -300,12 +300,11 @@ typedef struct zb_nwk_handle_s  /* do not pac for IAR */
 
 #ifdef ZB_ROUTER_ROLE
   zb_nwk_broadcast_retransmit_t brrt[ZB_NWK_BRR_TABLE_SIZE]; /* Broadcast
-                                                              * retransmition
+                                                              * retransmission
                                                               table */
   zb_uint8_t brrt_cnt;
   zb_uint8_t brrt_in_progress;                               /* Broadcast retransmission is in progress */
   zb_rejoin_context_t rejoin_req_table[ZB_NWK_REJOIN_REQUEST_TABLE_SIZE];
-  zb_uint8_t  rejoin_req_table_cnt;
 #endif
 
 #if defined ZB_NWK_STOCHASTIC_ADDRESS_ASSIGN && defined ZB_ROUTER_ROLE
@@ -333,37 +332,34 @@ typedef struct zb_nwk_handle_s  /* do not pac for IAR */
 
   zb_uint8_t     input_blocked_by; /*!< buffer which blocked nwk input processing  */
 
-#ifndef ZB_LITE_NO_PANID_CONFLICT_DETECTION
-  zb_uint16_t new_panid;                                     /*!< */
-
-  zb_bitbool_t panid_conflict:1;                             /*!< Flag 'Has Pan ID conflict' */
-#endif                                                       /* panid conflict enabled */
+  zb_uint16_t new_panid;                            /*!< */
 
   zb_bitbool_t permit_join:1; /*!< True if permit join is in progress */
-  zb_bitbool_t reserved:1;
+  zb_bitfield_t reserved:2;
   /*zb_bitfield_t joined:1; moved to AIB.tcpolicy and defined ZB_JOINED() macro      Non-zero if the device is joined into the network */
 
   zb_bitbool_t router_started:1;                             /*!< True if the device is a router and it is started */
 
   zb_bitbool_t poll_in_progress:1;                           /*!< */
   zb_bitbool_t joined_restart:1;                             /*!< True if the device started
-                                                              * with NWK parameters from NVRAM */
+                                    * with NWK parameters from NVRAM */
   zb_bitbool_t rejoin_capability_alloc_address:1;            /*!< True if address is selected by the
-                                                              * parent; False if self-assigned */
+                                                         * parent; False if self-assigned */
   zb_bitbool_t addr_conflict_ctx_send_nwk_status:1;          /*!< True if nwk status command must be
-                                                              * broadcast during address conflict
-                                                              * resolution */
+                                                         * broadcast during address conflict
+                                                         * resolution */
   zb_bitbool_t nwk_broadcast_delivery_time_passed:1;         /*<! Flag indicating that
-                                                              * nwkNetworkBroadcastDeliveryTime
-                                                              * have passed since device start.
-                                                              * Needed for CCB 2033. */
+                                                         * nwkNetworkBroadcastDeliveryTime
+                                                         * have passed since device start.
+                                                         * Needed for CCB 2033. */
 #if defined ZB_MAC_PENDING_BIT_SOURCE_MATCHING && defined ZB_ROUTER_ROLE
-  zb_uint8_t src_match_nbr_idx;                              /*!< External loop index for SRC Match restoring */
+  zb_uint8_t src_match_nbr_idx;     /*!< External loop index for SRC Match restoring */
 #endif
   zb_channel_list_t scan_channels_list;                      /*!< Channels to be scanned. */
   zb_uint8_t        scan_iface_idx;                          /*!< Index of current MAC iface in nwkMacInterfaceTable used for scan. */
   zb_uint8_t        scan_duration;                           /*!< Time to spend scanning each channel. */
   zb_uint8_t        ed_list_param;                           /*!< Index of buffer for ED scan results. */
+  zb_uint8_t        scan_cancel_state;                       /*!< Network subsystem state @ref nlme_state when zb_mac_cancel_scan was requested */
 } zb_nwk_handle_t;
 
 #ifdef ZB_ROUTER_ROLE
@@ -432,7 +428,7 @@ nwkMaxBroadcastRetries
  */
 #if 0
 #if defined ZB_NWK_STOCHASTIC_ADDRESS_ASSIGN
-#define ZB_NWK_BROADCAST_DELIVERY_TIME()                                  \
+#define ZB_NWK_BROADCAST_DELIVERY_TIME()                                \
   (2U * ZB_NWK_STOCH_DEPTH * ((ZB_NWK_MAX_BROADCAST_JITTER_INTERVAL/2U) + \
                              (ZB_NWK_PASSIVE_ACK_TIMEOUT * ZB_NWK_MAX_BROADCAST_RETRIES)/1000U))
 
@@ -483,6 +479,7 @@ typedef struct zb_nwk_globals_s
   zb_bitfield_t reserved:4;
 #endif  /* ZB_CHECK_OOM_STATUS */
   zb_bitbool_t panid_conflict_auto_resolution:1;   /* CCB2713 */
+  zb_bitbool_t reset_panid_before_formation:1;           /* to reset a PAN ID before formation */
 #ifdef ZB_NWK_BLACKLIST
   zb_nwk_blacklist_t blacklist;
 #endif
@@ -492,9 +489,6 @@ typedef struct zb_nwk_globals_s
     zb_callback_t formation_ed_scan_confirm;
     zb_callback_t formation_select_channel;
     zb_callback_t formation_mlme_start_conf;
-    zb_callback_t panid_conflict_in_beacon;
-    zb_callback_t panid_conflict_got_network_report;
-    zb_callback_t panid_conflict_network_update_recv;
     zb_callback_t no_active_links_left_cb;
     zb_bool_t (*should_accept_frame_before_join)(zb_bufid_t);
     zb_callback_t nwk_cancel_nwk_disc_resp;
@@ -502,10 +496,13 @@ typedef struct zb_nwk_globals_s
   } selector;
 
 #ifndef ZB_MAC_INTERFACE_SINGLE
-    zb_uindex_t        mac_interfaces_count;
+    zb_uint8_t         mac_interfaces_count;
     zb_mac_interface_t mac_interfaces[ZB_NWK_MAC_IFACE_TBL_SIZE];
 #endif /* ZB_MAC_INTERFACE_SINGLE */
 
+  zb_bitbool_t is_nwk_started:1;        /*!< nwk started flag           */
+  zb_bitbool_t pta_state_at_start:1;    /*!< set pta state at nwk start */
+  zb_bitbool_t postpone_data_processing:1; /*!< postpone data processing until joining finish */
 } zb_nwk_globals_t;
 
 
@@ -531,6 +528,7 @@ typedef struct zb_nwk_globals_s
 
 #define ZB_NWK_MAC_IFACE_TBL() ZB_NIB().mac_iface_tbl
 #define ZB_NWK_MAC_IFACE_TBL_ENTRY(iface_id) (&ZB_NIB().mac_iface_tbl[iface_id])
+#define ZB_NWK_MAC_IFACE_IS_TRUSTED_LINK(iface_id) ZB_U2B(ZB_NIB().mac_iface_tbl[iface_id].trusted_link)
 
 #ifdef ZB_NWK_USE_SEND_JITTER
 #define ZB_NWK_JITTER(interval) ((interval) + ZB_RANDOM_JTR(ZB_NWK_OCTETS_TO_BI(ZB_NWKC_MAX_BROADCAST_JITTER_OCTETS)))
@@ -578,6 +576,24 @@ void zb_nwk_lpd_joined_parent(zb_uint8_t param, zb_uint16_t short_addr);
 #endif /* ZB_MAC_POWER_CONTROL */
 
 void zb_nlme_rejoin_request_pre_handler(zb_uint8_t param);
+
+zb_ret_t zb_prepare_network_for_channel_pan_id_change(zb_uint8_t param, zb_callback_t cb, zb_bool_t is_panid_change);
+
+zb_rejoin_context_t* zb_nwk_find_free_rejoin_ctx(void);
+
+zb_rejoin_context_t*zb_nwk_find_rejoin_ctx_by_addr_ref(zb_address_ieee_ref_t addr_ref);
+
+zb_rejoin_context_t*zb_nwk_find_rejoin_ctx_by_addr(zb_uint16_t addr);
+
+void zb_nwk_free_rejoin_ctx_by_addr_ref(zb_address_ieee_ref_t addr_ref);
+
+void zb_nwk_free_rejoin_ctx(zb_rejoin_context_t *ctx);
+
+zb_bool_t zb_nwk_is_under_rejoin(zb_address_ieee_ref_t addr_ref);
+
+zb_bool_t zb_nwk_is_rejoin_ctx_full(void);
+
+void zb_nwk_clear_rejoin_ctx(void);
 
 /*! @} */
 /*! @endcond */

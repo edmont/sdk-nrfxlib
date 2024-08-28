@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -153,14 +153,13 @@ static void zb_zcl_ota_upgrade_block_req_cb(zb_uint8_t param)
     ZB_N_APS_ACK_WAIT_DURATION_FROM_NON_SLEEPY * (ZB_N_APS_MAX_FRAME_RETRIES - 1) / ZB_APS_DUPS_TABLE_SIZE )
 #define OTA_BLOCK_REQ_DELAY(_delay) (((_delay > OTA_MIN_BLOCK_REQ_DELAY)) ? (_delay) : OTA_MIN_BLOCK_REQ_DELAY)
 
-static void zb_zcl_ota_upgrade_send_block_request(zb_uint8_t param, zb_uint64_t current_delay)
+static void zb_zcl_ota_upgrade_send_block_request(zb_uint8_t param, zb_time_t current_delay)
 {
   zb_zcl_parsed_hdr_t cmd_info;
   zb_ieee_addr_t our_long_address;
   zb_uint8_t endpoint;
   zb_uint16_t manufacturer;
   zb_uint16_t image_type;
-  zb_uint32_t file_version;
   zb_uint32_t current_offset;
   zb_zcl_ota_upgrade_client_variable_t *client_data;
 
@@ -171,7 +170,6 @@ static void zb_zcl_ota_upgrade_send_block_request(zb_uint8_t param, zb_uint64_t 
 
   manufacturer = zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID);
   image_type = zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID);
-  file_version = zb_zcl_ota_upgrade_get32(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID);
   current_offset = zb_zcl_ota_upgrade_get32(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_FILE_OFFSET_ID);
   client_data = get_upgrade_client_variables(endpoint);
 
@@ -193,7 +191,7 @@ static void zb_zcl_ota_upgrade_send_block_request(zb_uint8_t param, zb_uint64_t 
                                           ZB_ZCL_OTA_UPGRADE_QUERY_IMAGE_BLOCK_DELAY_PRESENT,
                                           manufacturer,
                                           image_type,
-                                          file_version,
+                                          ZCL_CTX().ota_cli.ota_dfv,
                                           current_offset,
                                           client_data->max_data_size,
                                           our_long_address,
@@ -479,8 +477,11 @@ void zb_zcl_ota_upgrade_file_upgraded(zb_uint8_t endpoint)
 
   attr_desc = zb_zcl_get_attr_desc_a(endpoint,
     ZB_ZCL_CLUSTER_ID_OTA_UPGRADE, ZB_ZCL_CLUSTER_CLIENT_ROLE, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID);
-  ZB_ASSERT(attr_desc);
-  ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, ZB_ZCL_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_DEF_VALUE);
+  // update attribute in case it was declared by user
+  if (NULL != attr_desc) {
+    ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, ZB_ZCL_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_DEF_VALUE);
+  }
+  ZCL_CTX().ota_cli.ota_dfv = ZB_ZCL_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_DEF_VALUE;
 
   /* Restore attribute of request period from backup:
    * 11.10.10  MinimumBlockPeriod Attribute
@@ -531,10 +532,10 @@ static zb_ret_t image_notify_handler(zb_uint8_t param)
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_WWAH
     if (zb_zcl_wwah_check_if_forced_to_use_tc(ZB_ZCL_CLUSTER_ID_OTA_UPGRADE))
     {
-      is_agree_file = (cmd_info.addr_data.common_data.source.u.short_addr == 
+      is_agree_file = (cmd_info.addr_data.common_data.source.u.short_addr ==
                        zb_aib_get_trust_center_short_address());
     }
-#endif 
+#endif
     TRACE_MSG(TRACE_ZCL2, "dst_addr 0x%x", (FMT__D, cmd_info.addr_data.common_data.dst_addr));
     if( ZB_NWK_IS_ADDRESS_BROADCAST(cmd_info.addr_data.common_data.dst_addr) )
     {
@@ -543,7 +544,7 @@ static zb_ret_t image_notify_handler(zb_uint8_t param)
       switch(payload.payload_type)
       {
       case ZB_ZCL_OTA_UPGRADE_IMAGE_NOTIFY_PAYLOAD_JITTER_CODE_IMAGE_VER:
-        is_agree_file = is_agree_file && 
+        is_agree_file = is_agree_file &&
                         ZB_ZCL_OTA_UPGRADE_VERSION_CMP(payload.file_version,
                         zb_zcl_ota_upgrade_get32(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_FILE_VERSION_ID));
         /* FALLTHROUGH */
@@ -616,9 +617,16 @@ static zb_ret_t image_notify_handler(zb_uint8_t param)
     TRACE_MSG(TRACE_ZCL2, "is_agree_file %d", (FMT__H, is_agree_file));
     if(is_agree_file)
     {
-      zb_uint16_t hw_ver = get_upgrade_client_variables(endpoint)->hw_version;
+      zb_zcl_ota_upgrade_client_variable_t* client_variables;
+      zb_uint16_t hw_ver;
 
-     /* For the case we didn't got it from the notify command */
+      client_variables = get_upgrade_client_variables(endpoint);
+      hw_ver = client_variables->hw_version;
+
+      /* Reschedule regular Query Next Image Request, because the most recent call is going to happen now */
+      client_variables->timer_counter = client_variables->timer_query;
+
+      /* For the case we didn't got it from the notify command */
       payload.image_type=zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID);
       payload.manufacturer=zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID);
       ZB_ZCL_OTA_UPGRADE_SEND_QUERY_NEXT_IMAGE_REQ(param,
@@ -646,7 +654,7 @@ static zb_ret_t image_notify_handler(zb_uint8_t param)
 static zb_ret_t query_next_image_resp_handler(zb_uint8_t param)
 {
   zb_ret_t ret = RET_OK;
-  zb_zcl_ota_upgrade_query_next_image_res_t payload;
+  zb_zcl_ota_upgrade_query_next_image_res_t payload = {0};
   zb_zcl_parse_status_t status;
   zb_zcl_parsed_hdr_t cmd_info;
 
@@ -708,10 +716,14 @@ static zb_ret_t query_next_image_resp_handler(zb_uint8_t param)
         ZB_ASSERT(attr_desc);
         ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, 0);
 
-        attr_desc = zb_zcl_get_attr_desc_a(endpoint,
-          ZB_ZCL_CLUSTER_ID_OTA_UPGRADE, ZB_ZCL_CLUSTER_CLIENT_ROLE, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID);
-        ZB_ASSERT(attr_desc);
-        ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, payload.file_version);
+        ZCL_CTX().ota_cli.ota_dfv = payload.file_version;
+
+#ifdef ZB_STACK_REGRESSION_TESTING_API
+        if (ZB_REGRESSION_TESTS_API().zcl_ota_custom_file_version != 0)
+        {
+          ZCL_CTX().ota_cli.ota_dfv = ZB_REGRESSION_TESTS_API().zcl_ota_custom_file_version;
+        }
+#endif /* ZB_STACK_REGRESSION_TESTING_API */
 
         client_data->download_file_size = payload.image_size;
 
@@ -763,7 +775,7 @@ static void schedule_resend_buffer(zb_uint8_t endpoint)
 
   ZCL_CTX().ota_cli.resend_retries = 0;
   ZB_SCHEDULE_ALARM_CANCEL(resend_buffer, 0);
-  /* Extend resend inteval to exclude situation when we request new block and retransmit APS packet
+  /* Extend resend interval to exclude situation when we request new block and retransmit APS packet
    * with old request. */
   ZB_SCHEDULE_ALARM(resend_buffer, 0, ZB_ZCL_OTA_UPGRADE_RESEND_BUFFER_DELAY + ZB_MILLISECONDS_TO_BEACON_INTERVAL(delay));
 }
@@ -795,8 +807,12 @@ void zcl_ota_abort(zb_uint8_t endpoint, zb_uint8_t param)
   // reset downloaded file version attribute
   attr_desc = zb_zcl_get_attr_desc_a(endpoint,
     ZB_ZCL_CLUSTER_ID_OTA_UPGRADE, ZB_ZCL_CLUSTER_CLIENT_ROLE, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID);
-  ZB_ASSERT(attr_desc);
-  ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, ZB_ZCL_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_DEF_VALUE);
+  // update attribute in case it was declared by user
+  if (NULL != attr_desc)
+  {
+    ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, ZB_ZCL_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_DEF_VALUE);
+  }
+  ZCL_CTX().ota_cli.ota_dfv = ZB_ZCL_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_DEF_VALUE;
 
   /* Restore attribute of request period from backup*/
   attr_desc = zb_zcl_get_attr_desc_a(endpoint,
@@ -972,7 +988,7 @@ static void resend_buffer(zb_uint8_t param)
                                                 delay, OTA_BLOCK_REQ_DELAY(delay));
         client_data->img_block_req_sent = 1;
         ZB_SCHEDULE_ALARM_CANCEL(resend_buffer, 0);
-        /* Extend resend inteval to exclude situation when we request new block and retransmit APS packet
+        /* Extend resend interval to exclude situation when we request new block and retransmit APS packet
          * with old request. */
         ZB_SCHEDULE_ALARM(resend_buffer, 0, ZB_ZCL_OTA_UPGRADE_RESEND_BUFFER_DELAY + ZB_MILLISECONDS_TO_BEACON_INTERVAL(delay));
       }
@@ -1028,6 +1044,7 @@ static void zb_zcl_ota_upgrade_process_downloaded_image(zb_uint8_t param,
 {
   zb_uint8_t endpoint;
   zb_uint8_t upgrade_status;
+  zb_zcl_attr_t *attr_desc;
 
   TRACE_MSG(TRACE_OTA2, "OTA: process downloaded image", (FMT__0));
 
@@ -1039,6 +1056,14 @@ static void zb_zcl_ota_upgrade_process_downloaded_image(zb_uint8_t param,
   endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint;
 
   cancel_resend_buffer();
+
+  attr_desc = zb_zcl_get_attr_desc_a(endpoint,
+    ZB_ZCL_CLUSTER_ID_OTA_UPGRADE, ZB_ZCL_CLUSTER_CLIENT_ROLE, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID);
+  // update attribute in case it was declared by user
+  if (NULL != attr_desc) {
+    ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, ZCL_CTX().ota_cli.ota_dfv);
+  }
+
   zb_zcl_ota_upgrade_set_ota_status(endpoint, ZB_ZCL_OTA_UPGRADE_IMAGE_STATUS_DOWNLOADED);
 
   ZB_ZCL_OTA_UPGRADE_CHECK_USER_APP(param, upgrade_status);
@@ -1151,7 +1176,7 @@ void zb_zcl_ota_restart_after_rejoin(zb_uint8_t endpoint)
     ZB_ZCL_PARSED_HDR_SHORT_DATA(&ZCL_CTX().ota_cli.cmd_info_2).src_endpoint = zb_zcl_ota_upgrade_get8(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID); /*    dst ep (yes, dst) */
     ZCL_CTX().ota_cli.payload_2.response.success.manufacturer = zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID);
     ZCL_CTX().ota_cli.payload_2.response.success.image_type = zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID);;
-    ZCL_CTX().ota_cli.payload_2.response.success.file_version = zb_zcl_ota_upgrade_get32(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID);
+    ZCL_CTX().ota_cli.payload_2.response.success.file_version = ZCL_CTX().ota_cli.ota_dfv;
 
     schedule_resend_buffer(endpoint);
   }
@@ -1256,7 +1281,7 @@ static zb_ret_t image_block_resp_handler(zb_uint8_t param)
 
           if(payload.response.success.manufacturer==zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID) &&
              payload.response.success.image_type==zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID) &&
-             payload.response.success.file_version==zb_zcl_ota_upgrade_get32(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID) )
+             payload.response.success.file_version==ZCL_CTX().ota_cli.ota_dfv)
           {
             zb_uint32_t file_size = client_data->download_file_size;
             zb_uint32_t current_offset;
@@ -1363,7 +1388,7 @@ static zb_ret_t image_block_resp_handler(zb_uint8_t param)
                       (FMT__D_D_D_D_L_L,
                        payload.response.success.manufacturer, zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID),
                        payload.response.success.image_type, zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID),
-                       payload.response.success.file_version, zb_zcl_ota_upgrade_get32(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID)));
+                       payload.response.success.file_version, ZCL_CTX().ota_cli.ota_dfv));
             ret = RET_INVALID_PARAMETER_1;
           }
           break;
@@ -1377,7 +1402,6 @@ static zb_ret_t image_block_resp_handler(zb_uint8_t param)
             zb_zcl_ota_upgrade_client_variable_t *client_data = get_upgrade_client_variables(endpoint);
           */
           zb_uint32_t delay32;
-          zb_uint64_t delay64;
 
           TRACE_MSG(TRACE_ZCL2, "set delay attr %d",
                     (FMT__D, payload.response.wait_for_data.delay));
@@ -1409,21 +1433,21 @@ static zb_ret_t image_block_resp_handler(zb_uint8_t param)
                                          payload.response.wait_for_data.current_time);
 
             /* request/current time is sent in UTC (seconds), translate it to ms */
-            delay64 = 1000ull * (delay32);
+            delay32 = ZB_SECONDS_TO_MILLISECONDS(delay32);
 
-            if (delay64 == 0)
+            if (delay32 == 0)
             {
               /* if time delta is zero, use BlockRequestDelay value */
-              delay64 = payload.response.wait_for_data.delay;
+              delay32 = payload.response.wait_for_data.delay;
             }
 
-            TRACE_MSG(TRACE_ZCL2, "OTA: delay32 %ds", (FMT__D, (zb_uint16_t)delay32));
+            TRACE_MSG(TRACE_ZCL2, "OTA: delay32 %d", (FMT__D, (zb_uint16_t)delay32));
 
             /* re-send query next block */
             /* TODO: ImageBlockResp may also be received as a response
              * to ImagePageReq, in this case ImagePageReq should be resent */
             ZB_MEMCPY(ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), &cmd_info, sizeof(zb_zcl_parsed_hdr_t));
-            zb_zcl_ota_upgrade_send_block_request(param, delay64);
+            zb_zcl_ota_upgrade_send_block_request(param, delay32);
 
             ret = RET_BUSY;
             /* cancel resend */
@@ -1503,8 +1527,9 @@ static zb_ret_t upgrade_end_resp_handler(zb_uint8_t param)
     TRACE_MSG(TRACE_ZCL2, "payload parameter %ld %d %d", (FMT__L_D_D,
         payload.file_version, payload.manufacturer, payload.image_type));
     TRACE_MSG(TRACE_ZCL2, "saved parameter %ld %d %d", (FMT__L_D_D,
-        zb_zcl_ota_upgrade_get32(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID),
-        zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID)));
+        ZCL_CTX().ota_cli.ota_dfv,
+        zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID),
+        zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID)));
     TRACE_MSG(TRACE_ZCL2, "time parameter %ld %ld", (FMT__L_L,
         payload.current_time, payload.upgrade_time));
 
@@ -1518,7 +1543,7 @@ static zb_ret_t upgrade_end_resp_handler(zb_uint8_t param)
        */
     if(payload.manufacturer==zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_MANUFACTURE_ID) &&
        payload.image_type==zb_zcl_ota_upgrade_get16(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_IMAGE_TYPE_ID) &&
-       payload.file_version==zb_zcl_ota_upgrade_get32(endpoint, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID) &&
+       payload.file_version==ZCL_CTX().ota_cli.ota_dfv &&
        (payload.current_time <= payload.upgrade_time || ZB_ZCL_OTA_UPGRADE_UPGRADE_TIME_DEF_VALUE==payload.upgrade_time))
     {
       if(payload.upgrade_time == ZB_ZCL_OTA_UPGRADE_UPGRADE_TIME_DEF_VALUE)
@@ -1624,10 +1649,7 @@ static zb_ret_t query_specific_file_resp_handler(zb_uint8_t param)
         ZB_ASSERT(attr_desc);
         ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, 0);
 
-        attr_desc = zb_zcl_get_attr_desc_a(endpoint,
-          ZB_ZCL_CLUSTER_ID_OTA_UPGRADE, ZB_ZCL_CLUSTER_CLIENT_ROLE, ZB_ZCL_ATTR_OTA_UPGRADE_DOWNLOADED_FILE_VERSION_ID);
-        ZB_ASSERT(attr_desc);
-        ZB_ZCL_SET_DIRECTLY_ATTR_VAL32(attr_desc, payload.file_version);
+        ZCL_CTX().ota_cli.ota_dfv = payload.file_version;
 
         client_data->download_file_size = payload.image_size;
 
@@ -1723,12 +1745,28 @@ static zb_bool_t zb_zcl_process_ota_cli_upgrade_specific_commands(zb_uint8_t par
 #endif /* defined ZB_ZCL_SUPPORT_CLUSTER_WWAH && !defined ZB_COORDINATOR_ONLY */
 
     case ZB_ZCL_CMD_DEFAULT_RESP:
-      /* This is not a normall call to specific commands processing.
-         This is a replacement of direct call from zb_zcl_handle_default_response_commands().
-         It made to exclude OTA code linking if OTA cluster is not declared by the app.
-       */
-      return (zb_bool_t)zb_zcl_process_ota_upgrade_default_response_commands(param);
+    {
+      zb_zcl_default_resp_payload_t* default_res;
+
+      ZB_ASSERT(ZB_ZCL_FRAME_DIRECTION_TO_CLI == cmd_info.cmd_direction);
+
+      default_res = ZB_ZCL_READ_DEFAULT_RESP(param);
+      TRACE_MSG(TRACE_ZCL1, "default response received by OTA client, ep %hd, status %hd", 
+        (FMT__H_H, ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, default_res->status));
+
+      switch (default_res->status)
+      {
+        case ZB_ZCL_STATUS_ABORT:
+          /* This behaviour is implied by OTA-TC-14C */
+          zcl_ota_abort(ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint, param);
+          break;
+        
+        default:
+          /* No action needs to be performed */
+          break;
+      }
       break;
+    }
 
     default:
       processed = ZB_FALSE;

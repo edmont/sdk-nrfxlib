@@ -381,7 +381,7 @@ typedef struct zb_zcl_basic_disable_local_conf_s
     @param device_enabled - pointer to variable to store device enabled attribute value
 */
 #define ZB_ZCL_DECLARE_BASIC_WITH_DEVICE_ENABLED_ATTRIB_LIST(attr_list, zcl_version, power_source, device_enabled) \
-    ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_BASIC)     \
+    ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                    \
     ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_BASIC_ZCL_VERSION_ID, (zcl_version))          \
     ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_BASIC_POWER_SOURCE_ID, (power_source))        \
     ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_BASIC_DEVICE_ENABLED_ID, (device_enabled))    \
@@ -462,7 +462,7 @@ typedef struct zb_zcl_basic_disable_local_conf_s
   ph_env,                                                                           \
   sw_build_id,                                                                      \
   device_enabled)                                                                   \
-    ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_BASIC)      \
+    ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                     \
     ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_BASIC_ZCL_VERSION_ID, (zcl_version))           \
     ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_BASIC_APPLICATION_VERSION_ID, (app_version))   \
     ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_BASIC_STACK_VERSION_ID, (stack_version))       \
@@ -567,13 +567,13 @@ enum zb_zcl_basic_cmd_e
       ZB_BUF_GET_PARAM(buffer, zb_zcl_device_callback_param_t);     \
     user_app_data->device_cb_id = ZB_ZCL_BASIC_RESET_CB_ID;         \
     user_app_data->endpoint = (ep);                                   \
-    user_app_data->status = RET_OK;                                 \
+    user_app_data->status = result;                                 \
     (ZCL_CTX().device_cb)(param);                                   \
     result = user_app_data->status;                                 \
   }                                                                 \
 }
 
-/*! @brief Check Device Enabled atribute value and should the stack process command or not.
+/*! @brief Check Device Enabled attribute value and should the stack process command or not.
     @see ZCL spec, subclause 3.2.2.2.18 DeviceEnabled Attribute
     @param ep_id Endpoint ID
     @param cmd_id Command ID

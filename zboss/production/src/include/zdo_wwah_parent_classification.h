@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -46,8 +46,8 @@
 
 #include "zb_config.h"
 #include "zb_common.h"
+#include "zcl/zb_zcl_wwah.h"
 
-#ifdef ZB_PARENT_CLASSIFICATION
 
 /** @cond DOXYGEN_ZCL_SECTION */
 
@@ -72,7 +72,7 @@
 /*
  * TODO: ZDO_WWAH_MIN_RSSI_FOR_RECEIVING_PACKETS is platform dependent!!!
  *
- * Now ZDO_WWAH_MIN_RSSI_FOR_RECEIVING_PACKETS and 
+ * Now ZDO_WWAH_MIN_RSSI_FOR_RECEIVING_PACKETS and
  * ZDO_WWAH_RSSI_FOR_RECEIVING_PACKETS_ADDING are zero to put all
  * beacons in the Good Link Quality group and check only TC Connectivity
  * and Long Uptime flags.
@@ -110,8 +110,6 @@
 #define ZDO_WWAH_GET_LINK_QUALITY_GROUP_BY_RSSI(rssi) \
   (zb_bool_t)((rssi) >= ZDO_WWAH_RSSI_FOR_GOOD_LINK_QUALITY_GROUP)
 
-#endif  /* #ifdef ZB_PARENT_CLASSIFICATION */
-
 /* Let's compile that macro always */
 
 /* low bit for TC Connectivity; high bit for Long Uptime */
@@ -138,8 +136,6 @@
     ZB_CLR_BIT_IN_BIT_VECTOR((mask), ZB_ZDO_LONG_UPTIME_BIT_POS);     \
   }
 
-#ifdef ZB_PARENT_CLASSIFICATION
-
 
 /* 0b00 */
 #define ZB_ZCL_WWAH_NO_TC_CONNECTIVITY_AND_SHORT_UPTIME_MASK \
@@ -155,10 +151,46 @@
 
 /* 0b11 */
 #define ZB_ZCL_WWAH_TC_CONNECTIVITY_AND_LONG_UPTIME_MASK \
-  (zb_uint8_t)(1 << ZB_ZDO_TC_CONNECTIVITY_BIT_POS | 1 << ZB_ZDO_LONG_UPTIME_BIT_POS)
+  ((zb_uint8_t)(1U << ZB_ZDO_TC_CONNECTIVITY_BIT_POS | 1U << ZB_ZDO_LONG_UPTIME_BIT_POS))
+
+
+/** @internal Structure for beaconSurvey data type
+ */
+
+/**
+ *  @brief Determine a parent choose priority (WWAH-Requirements C-20)
+ *
+ *  End Devices examine all beacons in the Good Link Quality group
+ *  (if received beacon with an RSSI above @see minRssiForReceivingPackets
+ *  +30 dbm) and choose the parent with highest parent priority, as shown below.
+ *  If no suitable parents exist in the Good Link Quality group, then the End
+ *  Device shall examine all beacons in the Marginal Link Quality group.
+ */
+
+/*! Invalid value for parent priority */
+#define ZB_ZCL_WWAH_PARENT_PRIORITY_INVALID   0U
+/*! 0b00 - no TC connectivity and Short Uptime or no WWAH parent */
+#define ZB_ZCL_WWAH_PARENT_PRIORITY_VERY_LOW  1U
+/*! 0b01 - no TC connectivity and Long Uptime */
+#define ZB_ZCL_WWAH_PARENT_PRIORITY_LOW       2U
+/*! 0b10 - TC connectivity and Short Uptime */
+#define ZB_ZCL_WWAH_PARENT_PRIORITY_HIGH      3U
+/*! 0b11 - TC connectivity and Long Uptime */
+#define ZB_ZCL_WWAH_PARENT_PRIORITY_VERY_HIGH 4U
+
+typedef zb_uint8_t zb_zcl_wwah_parent_priority_t;
+
+/**
+ *  @brief Returns parent priority by parent classification mask
+ *
+ *  @param mask Classification mask
+ *  @return zb_zcl_wwah_parent_priority_t Parent priority
+ */
+zb_zcl_wwah_parent_priority_t zdo_wwah_get_parent_priority_by_classification_mask(zb_uint16_t mask);
+
 
 /** After this interval ZB_NIB().nwk_long_uptime bit will be set to 1 */
-#define ZDO_WWAH_LONG_UPTIME_INTERVAL (24*60*60*ZB_TIME_ONE_SECOND)
+#define ZDO_WWAH_LONG_UPTIME_INTERVAL ZB_MILLISECONDS_TO_BEACON_INTERVAL(24u*60u*60u)
 
 /**
  *  @param Set 'WWAH Parent Classification is enabled' in ZDO ctx
@@ -166,17 +198,6 @@
  *  @param enable ZB_TRUE if WWAH Parent Classification is enabled; ZB_FALSE otherwise
  */
 void zdo_wwah_parent_classification_set(zb_bool_t enable);
-
-/**
- *  @brief Get @zb_zcl_wwah_parent_priority_t by @zb_zcl_wwah_classification_mask_t
- *
- *  @param mask - one byte which contain TC Connectivity and Long Uptime bits values
- *
- *  @return @ZB_ZCL_WWAH_PARENT_PRIORITY_INVALID if invalid parameter uses;
- *          @zb_zcl_wwah_parent_priority_t value otherwise
- */
-zb_zcl_wwah_parent_priority_t zdo_wwah_get_parent_priority_by_classification_mask(
-  zb_uint8_t mask);
 
 
 /**
@@ -190,12 +211,22 @@ zb_zcl_wwah_parent_priority_t zdo_wwah_get_parent_priority_by_classification_mas
 zb_bool_t zdo_wwah_compare_neighbors(
   zb_ext_neighbor_tbl_ent_t *nbte_first, zb_ext_neighbor_tbl_ent_t *nbte_second);
 
+/**
+ *  @brief Compare neighbors by R23 metrics
+ *         (see 3.6.1.5.2 Parent Selection)
+ *
+ *  @param nbte_first - pointer to the first neighbor table entry
+ *  @param nbte_second - pointer to the second neighbor table entry
+ *  @param parent_preference - bitmask with preference
+ */
+zb_bool_t zdo_nwk_compare_neighbors(zb_ext_neighbor_tbl_ent_t *nbte_first,
+    zb_ext_neighbor_tbl_ent_t *nbte_second, zb_uint8_t parent_preference);
+
 /** @} */ /* @addtogroup ZDO_WWAH_PARENT_CLASSIFICATION */
 
 /** @} */ /* @addtogroup ZB_ZCL_WWAH */
 
 /** @endcond */ /* DOXYGEN_ZCL_SECTION */
 
-#endif /* ZB_PARENT_CLASSIFICATION */
 
 #endif /* ZDO_WWAH_PARENT_CLASSIFICATION_H */

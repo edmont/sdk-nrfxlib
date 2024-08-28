@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -65,7 +65,7 @@
 
 #define ZB_BUF_IS_OOM_STATE() (ZB_BUF_IS_OOM_STATE_IN() || ZB_BUF_IS_OOM_STATE_OUT())
 
-#if !defined ZB_MACSPLIT_DEVICE && !defined ZB_MINIMAL_CONTEXT
+#if !defined ZB_MACSPLIT_DEVICE && !defined ZB_MINIMAL_CONTEXT && !defined ZB_ZGPD_ROLE
 #define ZB_NWK_UNLOCK_IN(bufid) zb_nwk_unlock_in((bufid))
 #else
 #define ZB_NWK_UNLOCK_IN(bufid)
@@ -185,21 +185,33 @@ zb_uint8_t *zb_buf_data0_func(TRACE_PROTO zb_bufid_t buf);
 zb_bufid_t zb_buf_from_data0_func(TRACE_PROTO void *ptr);
 #define zb_buf_from_data0(a) zb_buf_from_data0_func(TRACE_CALL (a));
 
+/**
+ * Copy payload if a pointer points to a buffer and the buffer has enough space for it
+ *
+ * @param ptr - a pointer to check
+ * @param payload - payload pointer
+ * @param payload_len - payload length
+ *
+ * @return ZB_TRUE if a pointer is valid and payload was copied; ZB_FALSE otherwise
+ */
+zb_bool_t zb_buf_safecopy_func(TRACE_PROTO zb_uint8_t *ptr, const zb_uint8_t *payload, zb_uint16_t payload_len);
+#define zb_buf_safecopy(ptr, payload, payload_len) zb_buf_safecopy_func(TRACE_CALL (ptr), (payload), (payload_len))
+
 #ifdef ZB_MACSPLIT
 /**
-   Serialize internal buffer structure into linear array.
+   Serialize ZBOSS buffer structure into the data buffer.
    Output structure is: | header | body | parameter w/o leading zeros |
 
    @param buf - buffer id
    @param ptr - pointer for data output
+   @param len - total size in bytes of data output
    @return serialized data size
  */
-zb_uint8_t zb_buf_serialize_func(TRACE_PROTO zb_bufid_t buf, zb_uint8_t *ptr);
-#define zb_buf_serialize(a, b) zb_buf_serialize_func(TRACE_CALL (a), (b))
+zb_uint_t zb_buf_serialize_func(TRACE_PROTO zb_bufid_t buf, zb_uint8_t *ptr, zb_uint16_t len);
+#define zb_buf_serialize(a, b, c) zb_buf_serialize_func(TRACE_CALL (a), (b), (c))
 
 /**
-   Deserialize linear array into ZBOSS buffer.
-   Array structure must be the same as in @see zb_buf_serialize_func.
+   Deserialize data buffer into ZBOSS buffer.
 
    @param buf - buffer id
    @param ptr - pointer to array
@@ -207,6 +219,18 @@ zb_uint8_t zb_buf_serialize_func(TRACE_PROTO zb_bufid_t buf, zb_uint8_t *ptr);
  */
 void zb_buf_deserialize_func(TRACE_PROTO zb_bufid_t buf, zb_uint8_t *ptr, zb_uint8_t payload_size);
 #define zb_buf_deserialize(a, b, c) zb_buf_deserialize_func(TRACE_CALL (a),(b),(c))
+
+/**
+   Deserialize ZBOSS buffer parameters from the buffer ignoring data section.
+   Array structure must be the same as in @see zb_buf_serialize_func.
+
+   @param ptr - pointer to array
+   @param payload_size - array size
+   @param status - status got from the header
+   @param out_buf - buffer to store deserialized parameters. Should be at least param_size bytes in length
+   @param param_size - size of the parameter's structure
+ */
+void zb_buf_deserialize_param(zb_uint8_t *ptr, zb_uint8_t payload_size, zb_uint8_t *status, zb_uint8_t *out_buf, zb_uint8_t param_size);
 
 /**
    Partial deserialize linear array.
@@ -275,5 +299,23 @@ zb_ret_t zb_buf_requalify_in_to_out_func(TRACE_PROTO zb_bufid_t buf);
    Note: internal call.
  */
 void zb_init_buffers(void);
+
+
+/**
+   Allocation optimized for using in ISR receiving packet.
+
+   The idea is to be faster in MAC LL ISR.
+   Start packet from the buffer begin. Do not fill buffer by zeroes: it is done earlier in mac.c.
+   No need to unlock NWK here.
+ */
+void *zb_buf_initial_alloc_in(zb_bufid_t buf, zb_uint_t size);
+
+/**
+   Cut single byte from the buffer beginning
+
+   To be used in MAC LL ISR to cut length byte.
+ */
+void zb_buf_cut_left_byte(zb_bufid_t buf);
+
 
 #endif /* ZB_BUFPOOL_H */

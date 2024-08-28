@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -183,9 +183,7 @@ enum zb_zcl_diagnostics_attr_e
   ZB_ZCL_ATTR_DIAGNOSTICS_LAST_RSSI_ID                       = 0x011d,
   /*! @brief A counter that is incremented on the NWK layer
    *         each time tries number of a packet resending are gone.
-   *
-   * @note It's a non-standard counter that depends on ZB_ENABLE_NWK_RETRANSMIT and
-   *       will be zero always when the macro isn't set. */
+   */
   ZB_ZCL_ATTR_DIAGNOSTICS_CUSTOM_ATTR_NWK_RETRY_OVERFLOW_ID  = 0xff00,
   /** A non-standard counter that is incremented each time an the PHY layer was unable
    *  to transmit due to a failed CCA */
@@ -653,7 +651,7 @@ enum zb_zcl_diagnostics_attr_e
  * We have asynchronous reading the Diagnostics attributes:
  * in the zb_zcl_read_attr_handler() we call zdo_diagnostics_get_stats()
  * that will copy all counters to the same buffer from the first byte.
- * What the problem? We have the following buffer stucture:
+ * What the problem? We have the following buffer structure:
  *   a) buffer begin (from zero byte! not from zb_buf_begin()) - will contain all counters;
  *   b) buffer middle (from zb_buf_begin()) - contains one or more zb_zcl_read_attr_req_t;
  *   c) buffer end (can be get with ZB_BUF_GET_PARAM()) - contains zb_zcl_parsed_hdr_t.
@@ -676,7 +674,7 @@ void zb_zcl_diagnostics_init_client(void);
  * @brief Synchronize MAC and ZDO counters with ZCL attributes.
  *
  * Call this function each time when you want to get an attribute value
- * and proccess statistic using @zb_zcl_get_attr_desc_a
+ * and process statistic using @zb_zcl_get_attr_desc_a
  *
  * When synchronization will be finished, users callback
  * with a specified parameter will be called.

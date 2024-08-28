@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -87,17 +87,29 @@
 #if defined ZB_CONFIGURABLE_MEM || defined DOXYGEN
 
 /*
-  some data structures use 7 bits to address a buffer, so can have up to 127 buffers.
-  Actually it is big enough because more than 48 are rarely used..
+    Multimac proxy layer uses ZB_NWK_MAC_IFACE_TBL_SIZE value
+    to call multiple interfaces.
+    There is a need to call some requests (such as MCPS-DATA) with buffer ID
+    instead of interface ID.
+    Such cases occur if transaction is needed for all interfaces.
+    So, bufpool size is limited by:
+    - Max value of zb_bufid_t (1 byte)
+    - Used MAC interface indexes (ZB_NWK_MAC_IFACE_TBL_SIZE) [0, ZB_NWK_MAC_IFACE_TBL_SIZE - 1]
+    - Reserved value for MAC iface indexes: ZB_NWK_MULTIMAC_ALL_INTERFACES
+
+    So, depending on ZB_NWK_MAC_IFACE_TBL_SIZE, maximal bufpool size will vary.
+    For more info, see comment in nwk_multimac_proxy.c.
  */
-#if ZB_CONFIG_IOBUF_POOL_SIZE > 127U
-#error ZB_CONFIG_IOBUF_POOL_SIZE must be <= 127
+#if ZB_CONFIG_IOBUF_POOL_SIZE >= ZB_UINT8_MAX - ZB_NWK_MAC_IFACE_TBL_SIZE
+#error ZB_CONFIG_IOBUF_POOL_SIZE must be < ("zb_bufid_t max_value"  - ZB_NWK_MAC_IFACE_TBL_SIZE)
 #endif
 
 /**@brief Maximum buffer index.
  *        This macro is just an abbreviation for a corresponding macro in ZBOSS sources and its value must not be changed.
  */
 #define ZB_CONFIG_N_BUF_IDS (ZB_CONFIG_IOBUF_POOL_SIZE + 1U)
+
+#define ZB_CONFIG_RECV_CFM_NBYTES ((ZB_CONFIG_IOBUF_POOL_SIZE + 7U) / 8U)
 
 /**
    @par
@@ -123,7 +135,7 @@
 
 
 /**
-   If user did not owerwrite default memory configuration, that variable value is 1, else 0.
+   If user did not overwrite default memory configuration, that variable value is 1, else 0.
 
    Currently used in trace only, but, maybe, implement user API for it if customer require it?
  */
@@ -157,6 +169,7 @@ zb_bufpool_globals.h
 zb_buf_pool_t.pool
 zb_buf_pool_t.bufs_busy_bitmap
 zb_buf_pool_t.buf_in_use
+zb_macsplit_transport_tx_queue
  */
 ZB_CONFIG_PRE zb_buf_ent_t gc_iobuf_pool[ZB_CONFIG_IOBUF_POOL_SIZE] ZB_CONFIG_POST = { 0 };
 ZB_CONFIG_PRE zb_uint8_t gc_bufs_busy_bitmap[ZB_CONFIG_BUF_POOL_BITMAP_SIZE] ZB_CONFIG_POST = { 0 };
@@ -164,6 +177,26 @@ ZB_CONFIG_PRE zb_uint8_t gc_buf_pool_bitmap_size ZB_CONFIG_POST = ZB_CONFIG_BUF_
 #ifdef ZB_BUF_SHIELD
 ZB_CONFIG_PRE zb_uint8_t gc_iobuf_buf_in_use[(ZB_CONFIG_IOBUF_POOL_SIZE + 7)/8] ZB_CONFIG_POST = { 0 };
 #endif
+
+#ifdef ZB_MACSPLIT
+
+ZB_CONFIG_PRE zb_uint8_t gc_tx_calls_table[ZB_CONFIG_N_BUF_IDS] ZB_CONFIG_POST = { 0 };
+ZB_RING_BUFFER_DECLARE(zb_macsplit_transport_tx_queue, zb_uint8_t, ZB_CONFIG_IOBUF_POOL_SIZE);
+ZB_CONFIG_PRE zb_macsplit_transport_tx_queue_t gc_macsplit_queue ZB_CONFIG_POST = { 0 };
+
+#if defined ZB_MACSPLIT_DEVICE
+
+ZB_CONFIG_PRE zb_uint8_t gc_msdu_handles[ZB_CONFIG_N_BUF_IDS] ZB_CONFIG_POST = { 0 };
+
+#else /* ZB_MACSPLIT_DEVICE */
+
+ZB_CONFIG_PRE zb_callback_t gc_confirm_cb[ZB_CONFIG_N_BUF_IDS] ZB_CONFIG_POST = { 0 };
+ZB_CONFIG_PRE zb_uint8_t    gc_recv_cfm[ZB_CONFIG_RECV_CFM_NBYTES] ZB_CONFIG_POST = { 0 };
+
+#endif /* ZB_MACSPLIT_DEVICE */
+
+
+#endif /* ZB_MACSPLIT */
 
 /**
 Input packets queue
@@ -200,8 +233,10 @@ zb_mac_globals.h
 ZB_MAC_PENDING_QUEUE_SIZE (ZB_IOBUF_POOL_SIZE / 4)
 
  */
+#ifdef ZB_COMPILE_MAC_MONOLITHIC
 #ifdef ZB_ROUTER_ROLE
 ZB_CONFIG_PRE zb_mac_pending_data_t gc_mac_pending_data_queue[ZB_CONFIG_MAC_PENDING_QUEUE_SIZE] ZB_CONFIG_POST = { 0 };
+#endif
 #endif
 
 #ifdef ZB_MAC_SOFTWARE_PB_MATCHING
@@ -212,7 +247,6 @@ ZB_CONFIG_PRE zb_uint32_t gc_pending_bitmap[ZB_CONFIG_PENDING_BITMAP_SIZE] ZB_CO
 
 #ifdef ZB_MAC_POLL_INDICATION_CALLS_REDUCED
 ZB_CONFIG_PRE zb_time_t gc_poll_timestamp_table[ZB_CONFIG_CHILD_HASH_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
-ZB_CONFIG_PRE zb_uint16_t gc_poll_timeout_table[ZB_CONFIG_CHILD_HASH_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
 #endif /* ZB_MAC_POLL_INDICATION_CALLS_REDUCED */
 
 #endif  /* ZB_MAC_SOFTWARE_PB_MATCHING */
@@ -232,7 +266,7 @@ ZB_CONFIG_PRE zb_uint8_t gc_trans_table[ZB_CONFIG_APS_BIND_TRANS_TABLE_SIZE] ZB_
 
 /**
   APS bind tables
-  
+
   zb_aps_globals.h
 
   ZG->aps.binding.zb_aps_bind_src_table_t
@@ -289,17 +323,18 @@ ZB_CONFIG_PRE zb_uint_t gc_addr_table_size ZB_CONFIG_POST = ZB_CONFIG_IEEE_ADDR_
 ZB_CONFIG_PRE zb_uint8_t gc_passive_ack[ZB_NWK_BRR_TABLE_SIZE][((ZB_CONFIG_NEIGHBOR_TABLE_SIZE + 7) / 8)] ZB_CONFIG_POST = { 0 };
 #endif
 
-#ifdef ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
-ZB_CONFIG_PRE zb_address_ieee_ref_t gc_subghz_dev[ZB_CONFIG_NEIGHBOR_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
-#endif
-
 ZB_CONFIG_PRE zb_neighbor_tbl_ent_t gc_neighbor[ZB_CONFIG_NEIGHBOR_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
 ZB_CONFIG_PRE zb_uint_t gc_neighbor_table_size ZB_CONFIG_POST = ZB_CONFIG_NEIGHBOR_TABLE_SIZE;
+
+ZB_CONFIG_PRE zb_nwk_disc_tbl_ent_t gc_ext_neighbor[ZB_CONFIG_NWK_DISC_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
+ZB_CONFIG_PRE zb_uint_t gc_nwk_disc_table_size ZB_CONFIG_POST = ZB_CONFIG_NWK_DISC_TABLE_SIZE;
 
 /* ZB_NWK_ROUTING_TABLE_SIZE */
 #ifdef ZB_ROUTER_ROLE
 ZB_CONFIG_PRE zb_nwk_routing_t gc_routing_table[ZB_CONFIG_NWK_ROUTING_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
 ZB_CONFIG_PRE zb_uint_t gc_routing_table_size ZB_CONFIG_POST = ZB_CONFIG_NWK_ROUTING_TABLE_SIZE;
+ZB_CONFIG_PRE zb_nwk_route_discovery_t gc_nwk_route_disc_table[ZB_CONFIG_NWK_ROUTE_DISC_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
+ZB_CONFIG_PRE zb_uint8_t gc_nwk_route_disc_table_size ZB_CONFIG_POST = ZB_CONFIG_NWK_ROUTE_DISC_TABLE_SIZE;
 /* ZB_NWK_SOURCE_ROUTING_TABLE_SIZE */
 #if defined ZB_PRO_STACK && !defined ZB_LITE_NO_SOURCE_ROUTING
 /* 10/21/2019 EE CR:MAJOR ZC only! Not ZB_ROUTER_ROLE but ZB_COORDINATOR_ROLE */
@@ -312,6 +347,9 @@ ZB_CONFIG_PRE zb_uint8_t gc_nwk_max_source_routes ZB_CONFIG_POST = ZB_CONFIG_NWK
 ZB_CONFIG_PRE zb_aps_dup_tbl_ent_t gc_dups_table[ZB_CONFIG_APS_DUPS_TABLE_SIZE] ZB_CONFIG_POST = { 0 };
 ZB_CONFIG_PRE zb_uint_t gc_aps_dups_table_size ZB_CONFIG_POST = ZB_CONFIG_APS_DUPS_TABLE_SIZE;
 
+/* ZB_ZDO_KEY_NEGOTIATIONS_NUM */
+ZB_CONFIG_PRE zb_secur_ecdhe_common_ctx_t gc_key_negotiation_ctx[ZB_CONFIG_ZDO_KEY_NEGOTIATIONS_NUM] ZB_CONFIG_POST = { 0 };
+ZB_CONFIG_PRE zb_uint8_t gc_zdo_key_negotiations_num ZB_CONFIG_POST = ZB_CONFIG_ZDO_KEY_NEGOTIATIONS_NUM;
 #if defined NCP_MODE && !defined NCP_MODE_HOST
 ZB_CONFIG_PRE zb_ncp_pending_calls_t gc_ncp_pending_calls[ZB_CONFIG_N_BUF_IDS] ZB_CONFIG_POST = { 0 };
 #endif

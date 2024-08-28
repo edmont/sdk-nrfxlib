@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -38,10 +38,10 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/*  PURPOSE: BDD specific commissioning
+/*  PURPOSE: BDB specific commissioning
 */
 
-#define ZB_TRACE_FILE_ID 62
+#define ZB_TRACE_FILE_ID 1402
 
 #include "zb_common.h"
 #include "zb_scheduler.h"
@@ -55,6 +55,7 @@
 #include "zb_nvram.h"
 #include "zb_bdb_internal.h"
 #include "zdo_wwah_stubs.h"
+#include "zb_direct_common.h"
 
 #define BDB_COMMISSIONING_DEBUG
 
@@ -75,7 +76,12 @@ static void bdb_precomm_rejoin_over_all_channels(zb_uint8_t param, zb_uint16_t s
 void bdb_network_steering_on_network(zb_uint8_t param);
 #ifdef ZB_JOIN_CLIENT
 void bdb_network_steering_not_on_network(zb_uint8_t param);
-#endif
+static void bdb_force_rejoin_if_not_in_progress(zb_bufid_t param);
+#ifndef NCP_MODE_HOST
+static void bdb_handle_leave_with_rejoin_signal(zb_bufid_t param);
+static void bdb_initiate_key_exchange_if_needed(void);
+#endif /* NCP_MODE_HOST */
+#endif /* ZB_JOIN_CLIENT */
 void bdb_after_mgmt_permit_joining_cb(zb_uint8_t param);
 #ifdef ZB_ZCL_ENABLE_WWAH_SERVER
 static void bdb_rejoin_machine(zb_uint8_t param);
@@ -84,15 +90,25 @@ static void schedule_wwah_rejoin_backoff_attempt(zb_uint8_t param);
 #ifndef NCP_MODE_HOST
 static void nwk_cancel_network_discovery_response(zb_bufid_t buf);
 #endif /* NCP_MODE_HOST */
+static void bdb_handle_leave_done_signal(zb_bufid_t param);
+static zb_ret_t bdb_try_initiate_rejoin(zb_uint8_t param);
+static void bdb_initialization_procedure_for_nfn_devices(zb_uint8_t param);
 
 zb_bool_t bdb_not_ever_joined()
 {
   zb_ext_pan_id_t curr_ext_pan_id = {0};
+  zb_bool_t ret;
   zb_get_extended_pan_id(curr_ext_pan_id);
 
-  return (zb_bool_t)(ZB_EXTPANID_IS_ZERO(curr_ext_pan_id)
-                     && !zb_zdo_authenticated()
-                     && !zb_zdo_tclk_valid());
+  ret = ZB_EXTPANID_IS_ZERO(curr_ext_pan_id)
+                && !zb_zdo_authenticated();
+
+  if (!ZB_IS_DEVICE_ZC() && zb_aib_get_coordinator_version() >= 21)
+  {
+    ret = ret && !zb_zdo_tclk_valid();
+  }
+
+  return ret;
 }
 
 
@@ -198,8 +214,7 @@ void bdb_check_fn()
   }
   else
   {
-    /* TODO: recheck this condition */
-    if (bdb_not_ever_joined())
+    if (zb_bdb_is_factory_new())
     {
       TRACE_MSG(TRACE_ZDO1, "Factory new", (FMT__0));
       ZB_ZLL_SET_FACTORY_NEW();
@@ -248,13 +263,9 @@ zb_bool_t bdb_joined(void)
   zb_ext_pan_id_t ext_pan_id = {0};
 
   zb_get_extended_pan_id(ext_pan_id);
-  joined = (zb_bool_t)(!ZB_EXTPANID_IS_ZERO(ext_pan_id) &&
-                       zb_zdo_authenticated());
-
-  if (zb_aib_get_coordinator_version() >= 21)
-  {
-    joined = (zb_bool_t)(joined && zb_zdo_tclk_valid());
-  }
+  joined = (zb_bool_t)(!ZB_EXTPANID_IS_ZERO(ext_pan_id)
+                       && zb_zdo_authenticated()
+                       && zb_zdo_tclk_valid());
 
   return joined;
 }
@@ -309,6 +320,24 @@ void bdb_preinit(void)
   bdb_check_fn();
 #endif
 
+#ifndef NCP_MODE_HOST
+  if(zb_get_device_type() == ZB_NWK_DEVICE_TYPE_NONE)
+  {
+    TRACE_MSG(TRACE_ZDO1, "bdb_preinit: fetching previous device type %hd", (FMT__H, ZB_NIB().device_type_last));
+    ZB_NIB().device_type = ZB_NIB().device_type_last;
+  }
+#endif /* NCP_MODE_HOST */
+
+  /**
+   * Originally that assertion was checking, that programmer specified device type before the first commissioning.
+   *
+   * device_type_last is NONE initially, and not NONE after the first LEAVE.
+   * So, for factory-new device the assertion meaning is not changed.
+   * For ever-commissioned device assertion will never fail, as device type will be fetched from device_type_last,
+   * just as it would never fail originally, as device_type was never erased.
+   *
+   * Thus, assertion meaning is not changed at all.
+   */
   ZB_ASSERT(zb_get_device_type() != ZB_NWK_DEVICE_TYPE_NONE);
 
   zb_get_extended_pan_id(ext_pan_id);
@@ -342,99 +371,167 @@ void bdb_preinit(void)
 
   bdb_init_channel_sets();
 
-  TRACE_MSG(TRACE_INFO1, "dev type %hd, joined %hd, ext_pan_id %hd, authenticated %hd, tclk_valid %hd",
+  if (ZB_IS_DEVICE_ZC())
+  {
+    TRACE_MSG(TRACE_INFO1, "dev type %hd, joined %hd, ext_pan_id %hd, authenticated %hd",
+            (FMT__H_H_H_H_H,
+             zb_get_device_type(),
+             joined,
+             !ZB_EXTPANID_IS_ZERO(ext_pan_id),
+             zb_zdo_authenticated()));
+  }
+  else
+  {
+    TRACE_MSG(TRACE_INFO1, "dev type %hd, joined %hd, ext_pan_id %hd, authenticated %hd, tclk_valid %hd",
             (FMT__H_H_H_H_H,
              zb_get_device_type(),
              joined,
              !ZB_EXTPANID_IS_ZERO(ext_pan_id),
              zb_zdo_authenticated(),
              zb_zdo_tclk_valid()));
+  }
 }
 
+static zb_ret_t bdb_try_initiate_rejoin(zb_uint8_t param)
+{
+  zb_ret_t ret;
+  zb_ext_pan_id_t ext_pan_id = {0};
+
+  zb_get_extended_pan_id(ext_pan_id);
+
+  if (ZB_EXTPANID_IS_ZERO(ext_pan_id))
+  {
+    TRACE_MSG(TRACE_ERROR, "Failed to initiate rejoin, do not know extended PAN ID", (FMT__0));
+    ret = RET_INVALID_STATE;
+  }
+  else
+  {
+    if (zb_zdo_authenticated())
+    {
+      TRACE_MSG(TRACE_ZDO1, "Perform secure rejoin", (FMT__0));
+
+      bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_SECURE_REJOIN, param);
+      ret = RET_OK;
+    }
+    else if (zb_zdo_tclk_valid())
+    {
+      TRACE_MSG(TRACE_ZDO1, "Perform TC rejoin", (FMT__0));
+
+      bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_TC_REJOIN, param);
+      ret = RET_OK;
+    }
+    else
+    {
+      TRACE_MSG(TRACE_ERROR, "Failed to initiate rejoin", (FMT__0));
+      ret = RET_INVALID_STATE;
+    }
+  }
+
+  return ret;
+}
+
+/* not factory new device processing */
+static void bdb_initialization_procedure_for_nfn_devices(zb_uint8_t param)
+{
+  zb_ret_t ret;
+
+#if defined ZB_COORDINATOR_ROLE
+  if (ZB_IS_DEVICE_ZC())
+  {
+    TRACE_MSG(TRACE_ZDO2, "Start ZC without formation", (FMT__0));
+    ZB_SCHEDULE_CALLBACK(zb_nwk_cont_without_formation, param);
+    ret = RET_OK;
+  }
+  else
+#endif /* ZB_COORDINATOR_ROLE */
+
+#ifdef ZB_DIRECT_ENABLED
+  if (zb_aib_get_allow_secured_rejoin_without_tclk() && zb_zdo_authenticated() &&
+    ( zb_aib_get_coordinator_version() < 21 || (zb_aib_get_coordinator_version() >= 21 && !zb_zdo_tclk_valid() ) ))
+  {
+#if defined ZB_ROUTER_ROLE
+    if (ZB_IS_DEVICE_ZR())
+    {
+      /* Device will anyway need to request TCLK */
+      ZB_BDB().bdb_force_router_rejoin =  ZB_TRUE;
+    }
+#endif /* ZB_ROUTER_ROLE */
+
+    /* Perform secure rejoin */
+    ret = RET_OK;
+    TRACE_MSG(TRACE_ZDO2, "Perform secure rejoin without valid TCLK", (FMT__0));
+    bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_SECURE_REJOIN, param);
+    param = 0;
+  }
+  else
+#endif /* ZB_DIRECT_ENABLED */
+
+#if defined ZB_ROUTER_ROLE
+  /* by BDB specification ZR should continue without rejoin, only ZED can perform rejoin */
+  if (ZB_IS_DEVICE_ZR()
+      && !ZB_BDB().bdb_force_router_rejoin)
+  {
+    TRACE_MSG(TRACE_ZDO2, "Start ZR without rejoin", (FMT__0));
+      ZB_SCHEDULE_CALLBACK(zb_zdo_start_router, param);
+    ret = RET_OK;
+  }
+  else
+#endif /* ZB_ROUTER_ROLE */
+  {
+    /* Now we can try to initiate rejoin.
+     * Device ether ZED or ZR with `bdb_force_router_rejoin` set to `true` */
+    ret = bdb_try_initiate_rejoin(param);
+  }
+
+  if (ret == RET_OK)
+  {
+    /* Common routine for not factory new devices */
+
+    /* Reset steering to avoid network opening
+     * (permit join request command) */
+    ZB_BDB().bdb_commissioning_mode &= ~ZB_BDB_NETWORK_STEERING;
+
+    /* We are NFN - indicate ZB_BDB_SIGNAL_DEVICE_REBOOT */
+    ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_REBOOT;
+  }
+  else
+  {
+    /* Failure for ZC is impossible */
+    ZB_ASSERT(!ZB_IS_DEVICE_ZC());
+
+    TRACE_MSG(TRACE_ERROR, "Strange configuration, leave", (FMT__0));
+
+    zdo_commissioning_leave(param, ZB_FALSE, ZB_FALSE);
+  }
+}
 
 /**
    BDB Initialization procedure according to 7.1 Initialization procedure
  */
 void bdb_initialization_procedure(zb_uint8_t param)
-{
-  zb_ext_pan_id_t ext_pan_id = {0};
-  zb_get_extended_pan_id(ext_pan_id);
-
+  {
   bdb_preinit();
-/* Can do rejoin if ZED and if authenticated: only secured rejoin is
-   * allowed by BDB.
-   * Seems, ZR must continue its work without a rejoin (hmm?)
-   */
-  if (bdb_joined())
-  {
-#if defined ZB_COORDINATOR_ROLE
-    if (ZB_IS_DEVICE_ZC())
-    {
-      TRACE_MSG(TRACE_ZDO2, "Start ZC without formation", (FMT__0));
-      ZB_SCHEDULE_CALLBACK(zb_nwk_cont_without_formation, param);
-      param = 0;
-    }
-    else
-#endif
-#if defined ZB_ROUTER_ROLE
-    if (ZB_IS_DEVICE_ZR() && !ZB_BDB().bdb_force_router_rejoin)
-    {
-      TRACE_MSG(TRACE_ZDO2, "Initiate start router for ZR", (FMT__0));
-      ZB_SCHEDULE_CALLBACK(zb_zdo_start_router, param);
-      param = 0;
-    }
-    else
-#endif
-    {
-      /* Perform secure rejoin */
-      TRACE_MSG(TRACE_ZDO2, "Perform secure rejoin", (FMT__0));
-      bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_SECURE_REJOIN, param);
-      param = 0;
-    }
 
-    /* Reset steering to avoid network opening
-     * (permit join request command) */
-    ZB_BDB().bdb_commissioning_mode = ZB_BDB_NETWORK_FORMATION | ZB_BDB_FINDING_N_BINDING;
-
-    /* We are NFN - indicate ZB_BDB_SIGNAL_DEVICE_REBOOT */
-    ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_REBOOT;
-  }
-  else if (bdb_not_ever_joined())
+  if (bdb_not_ever_joined())
   {
-    /* Nothing to do, just continue */
-    TRACE_MSG(TRACE_ERROR, "Nothing to do, just continue", (FMT__0));
+    TRACE_MSG(TRACE_ZDO1, "Newer been on a network, perform cold start", (FMT__0));
+
     ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_FIRST_START;
-  }
-  else if (!ZB_EXTPANID_IS_ZERO(ext_pan_id)
-           && ((zb_aib_get_coordinator_version() < 21) ||
-               ((zb_aib_get_coordinator_version() >= 21) && zb_zdo_tclk_valid())))
-  {
-    /* Perform TC rejoin */
-    TRACE_MSG(TRACE_ERROR, "Perform TC rejoin", (FMT__0));
-    bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_TC_REJOIN, param);
-
-    ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_REBOOT;
-    param = 0;
-  }
-#ifndef ZB_COORDINATOR_ONLY
-  else
-  {
-    TRACE_MSG(TRACE_ERROR, "Strange configuration, leave", (FMT__0));
-    zdo_commissioning_leave(param, ZB_FALSE, ZB_FALSE);
-    param = 0;
-  }
-#endif  /* #ifndef ZB_COORDINATOR_ONLY */
-
-  if (param)
-  {
     /* No additional actions are needed, finish initialization */
     bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_FINISH, param);
+  }
+  else
+  {
+    TRACE_MSG(TRACE_ZDO1, "Not a factory new device, check if we can still be on the network", (FMT__0));
+
+    bdb_initialization_procedure_for_nfn_devices(param);
   }
 }
 
 static void bdb_post_commissioning_actions(void)
 {
 #if (defined ZB_ZCL_SUPPORT_CLUSTER_WWAH && defined ZB_ZCL_ENABLE_WWAH_SERVER)
+  /* ZCL-level actions */
   wwah_post_commissioning_actions();
 #endif
 }
@@ -493,7 +590,13 @@ void bdb_commissioning_machine(zb_uint8_t param)
 #endif /* ZB_ZCL_ENABLE_WWAH_SERVER */
 
     case ZB_BDB_COMMISSIONING_STOP:
-      if (BDB_COMM_CTX().signal == BDB_COMM_SIGNAL_FINISH)
+      if (BDB_COMM_CTX().signal == BDB_COMM_SIGNAL_FINISH
+#ifdef NCP_MODE_HOST
+        /* Need it only to send signal to app about rejoin.
+           Maybe need to implement it correctly.*/
+        || BDB_COMM_CTX().signal == BDB_COMM_SIGNAL_NWK_START_ROUTER_CONF
+#endif /* NCP_MODE_HOST */
+      )
       {
         /* commissioning done */
         if (ZB_BDB().bdb_commissioning_status == ZB_BDB_STATUS_IN_PROGRESS)
@@ -512,6 +615,13 @@ void bdb_commissioning_machine(zb_uint8_t param)
                                                   RET_INTERRUPTED,
                                                   0);
 
+        }
+        else if (ZB_BDB().bdb_commissioning_status == ZB_BDB_STATUS_FORMATION_FAILURE)
+        {
+          zb_app_signal_pack_with_detailed_status(param,
+                                                  ZB_BDB().bdb_application_signal,
+                                                  RET_OPERATION_FAILED,
+                                                  0);
         }
         else
         {
@@ -535,6 +645,15 @@ void bdb_commissioning_machine(zb_uint8_t param)
         {
           bdb_post_commissioning_actions();
         }
+
+#if defined ZB_JOIN_CLIENT
+        if (ZB_BDB().bdb_commissioning_status == ZB_BDB_STATUS_DEV_ANNCE_SEND_FAILURE &&
+            (ZB_BDB().bdb_application_signal == ZB_BDB_SIGNAL_DEVICE_FIRST_START ||
+             ZB_BDB().bdb_application_signal == ZB_BDB_SIGNAL_DEVICE_REBOOT))
+        {
+          ZB_SCHEDULE_CALLBACK(bdb_force_rejoin_if_not_in_progress, ZB_BUF_INVALID);
+        }
+#endif /* defined ZB_JOIN_CLIENT */
       }
       /* else ignore anything we can receive (for instance, LEAVE_DONE etc) */
       else
@@ -632,18 +751,17 @@ static void bdb_initialization_machine(zb_uint8_t param)
 #endif
       {
         TRACE_MSG(TRACE_ZDO1, "Can't find network", (FMT__0));
-        ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_NO_NETWORK;
+      ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_NO_NETWORK;
         ZB_BDB().bdb_tc_rejoin_active = ZB_FALSE_U;
 
-        bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_FINISH, param);
+      bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_FINISH, param);
       }
     }
-    break;
+      break;
 
     case BDB_COMM_SIGNAL_NWK_JOIN_DONE:
       TRACE_MSG(TRACE_ZDO1, "Device is joined", (FMT__0));
 #ifdef ZB_JOIN_CLIENT
-
 #ifdef ZB_ZCL_ENABLE_WWAH_SERVER
       if (!ZB_PIBCACHE_RX_ON_WHEN_IDLE()
           && zb_zcl_wwah_check_if_wwah_rejoin_enabled()
@@ -735,7 +853,8 @@ static void bdb_precomm_rejoin_over_all_channels(zb_uint8_t param, zb_uint16_t s
     zb_get_extended_pan_id(ext_pan_id);
     zdo_initiate_rejoin(param, ext_pan_id,
                         rejoin_ch_list,
-                        (zb_bool_t)secure);
+                        (zb_bool_t)secure,
+                        bdb_get_scan_duration());
   }
 }
 
@@ -745,6 +864,10 @@ static void bdb_touchlink_target_timeout(zb_uint8_t param)
   TRACE_MSG(TRACE_ZDO1, "bdb_touchlink_target_timeout: finish Touchlink Target", (FMT__0));
   ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_TOUCHLINK_TARGET_FINISHED;
   ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_SUCCESS;
+
+  /* Reset this callback. It will be set back to touchlink in case of new touchlink target start
+   but it should work in default case for any other bdb mode. */
+  ZDO_CTX().continue_start_after_nwk_cb = NULL;
   bdb_commissioning_signal(BDB_COMM_SIGNAL_TOUCHLINK_FINISH, param);
 }
 #endif
@@ -777,6 +900,7 @@ static void bdb_touchlink_machine(zb_uint8_t param)
       }
       else if (ZB_BDB().bdb_commissioning_mode & ZB_BDB_TOUCHLINK_COMMISSIONING)
       {
+#if defined ZB_ZLL_ENABLE_COMMISSIONING_CLIENT
         /* TODO: Fix this correctly after discussion about signals. */
         if (ZB_BDB().bdb_commissioning_mode == ZB_BDB_TOUCHLINK_COMMISSIONING)
         {
@@ -786,6 +910,9 @@ static void bdb_touchlink_machine(zb_uint8_t param)
         TRACE_MSG(TRACE_ZDO1, "Start Touchlink initiator", (FMT__0));
         TRACE_MSG(TRACE_ZDO1, "Running BDB Touchlink initiator v_do_primary_scan %hd", (FMT__H, ZB_BDB().v_do_primary_scan));
         ZB_SCHEDULE_CALLBACK(bdb_touchlink_initiator, param);
+#else
+        bdb_commissioning_signal(BDB_COMM_SIGNAL_TOUCHLINK_FINISH, param);
+#endif /* ZB_ZLL_ENABLE_COMMISSIONING_CLIENT */
       }
       else
 #endif
@@ -888,6 +1015,7 @@ static void bdb_touchlink_machine(zb_uint8_t param)
       }
       else /* Touchlink Initiator */
       {
+#if defined ZB_ZLL_ENABLE_COMMISSIONING_CLIENT
         if (status == ZB_ZLL_TASK_STATUS_FINISHED)
         {
           TRACE_MSG(TRACE_ZDO1, "Some device discovered: continue with touchlink_initiator", (FMT__0));
@@ -899,10 +1027,17 @@ static void bdb_touchlink_machine(zb_uint8_t param)
         {
           ZB_ASSERT(0);         /* debug */
         }
+#endif /* ZB_ZLL_ENABLE_COMMISSIONING_CLIENT */
       }
     }
     break;
 #endif /* ZB_BDB_TOUCHLINK */
+    case BDB_COMM_SIGNAL_LEAVE_DONE:
+      TRACE_MSG(TRACE_ZDO1, "BDB_COMM_SIGNAL_LEAVE_DONE, finishing", (FMT__0));
+      ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_CANCELLED;
+      bdb_commissioning_signal(BDB_COMM_SIGNAL_TOUCHLINK_FINISH, param);
+      break;
+
     case BDB_COMM_SIGNAL_TOUCHLINK_FINISH:
       if (ZB_BDB().bdb_commissioning_status != ZB_BDB_STATUS_IN_PROGRESS)
       {
@@ -1052,6 +1187,10 @@ void bdb_network_steering_start_scan(zb_uint8_t param)
 
 void bdb_network_steering_not_on_network(zb_uint8_t param)
 {
+#if !defined NCP_MODE_HOST
+  zb_uint8_t used_page;
+#endif /* !NCP_MODE_HOST */
+
   if (ZB_BDB().v_do_primary_scan == ZB_BDB_JOIN_MACHINE_PRIMARY_SCAN
       && ZB_BDB().bdb_primary_channel_set != 0
       && !ZB_IS_DEVICE_ZC())
@@ -1063,7 +1202,7 @@ void bdb_network_steering_not_on_network(zb_uint8_t param)
     if (zb_zdo_rejoin_backoff_is_running() && (ZDO_CTX().zdo_rejoin_backoff.rjb_cnt == 1) && !ZB_BDB().v_scan_channels)
     {
       /* the first attempt - do secure rejoin using the current channel */
-      ZB_BDB().v_scan_channels = (1l << ZB_PIBCACHE_CURRENT_CHANNEL());
+      ZB_BDB().v_scan_channels = (zb_uint32_t)(1l << ZB_PIBCACHE_CURRENT_CHANNEL());
       /* TRICKY: Set primary_scan again - we will do 2 PRIMARY_SCANs (first on current channel,
        * second on bdb_primary_channel_set), then SECONDARY_SCAN.  */
       ZB_BDB().v_do_primary_scan = ZB_BDB_JOIN_MACHINE_PRIMARY_SCAN;
@@ -1137,9 +1276,10 @@ void bdb_network_steering_not_on_network(zb_uint8_t param)
   }
 
 /* TODO (ZBS-429): sync the channel mask values in ZDO that will be used for retries */
-#ifndef NCP_MODE_HOST
-  zb_channel_page_list_set_mask(ZB_AIB().aps_channel_mask_list, 0, ZB_BDB().v_scan_channels);
-#endif /* NCP_MODE_HOST */
+#if !defined NCP_MODE_HOST
+  used_page = zb_aib_channel_page_list_get_first_filled_page();
+  zb_channel_page_list_set_mask(ZB_AIB().aps_channel_mask_list, used_page, ZB_BDB().v_scan_channels);
+#endif /* !NCP_MODE_HOST */
 
 }
 #endif  /* ZB_JOIN_CLIENT */
@@ -1151,27 +1291,22 @@ void bdb_network_steering_finish(zb_uint8_t param)
 
 void bdb_network_steering_on_network(zb_uint8_t param)
 {
-  TRACE_MSG(TRACE_ZDO3, "bdb_network_steering_on_network param %hd", (FMT__H, param));
   /*
-    Send Permit Joining.
+    Continues EZ-Mode Nwk steering after network has been formed or device has joined to the nwk:
+    invokes permit_joining routines for ZC & ZR, pushes the results of Nwk steering up
+    via user callback for ZED
+  */
 
-    If I am ZR or ZC, open myself for connects (permit joining).
-   */
-  {
-    /*
-  Continues EZ-Mode Nwk steering after network has been formed or device has joined to the nwk:
-  invokes permit_joining routines for ZC & ZR, pushes the results of Nwk steering up
-  via user callback for ZED
-*/
-    /* Send mgmt permit joining broadcast */
-    zb_zdo_mgmt_permit_joining_req_param_t *req_param = ZB_BUF_GET_PARAM(param, zb_zdo_mgmt_permit_joining_req_param_t);
+  /* Send mgmt permit joining broadcast */
+  zb_zdo_mgmt_permit_joining_req_param_t *req_param = ZB_BUF_GET_PARAM(param, zb_zdo_mgmt_permit_joining_req_param_t);
 
-    ZB_BZERO(req_param, sizeof(zb_zdo_mgmt_permit_joining_req_param_t));
-    req_param->dest_addr = ZB_NWK_BROADCAST_ROUTER_COORDINATOR;
-    req_param->permit_duration = ZB_BDBC_MIN_COMMISSIONING_TIME_S;
+  TRACE_MSG(TRACE_ZDO3, "bdb_network_steering_on_network param %hd", (FMT__H, param));
+
+  ZB_BZERO(req_param, sizeof(zb_zdo_mgmt_permit_joining_req_param_t));
+  req_param->dest_addr = ZB_NWK_BROADCAST_ROUTER_COORDINATOR;
+  req_param->permit_duration = ZB_BDBC_MIN_COMMISSIONING_TIME_S;
     req_param->tc_significance = ZB_TRUE;
-    zb_zdo_mgmt_permit_joining_req(param, bdb_after_mgmt_permit_joining_cb);
-  }
+  zb_zdo_mgmt_permit_joining_req(param, bdb_after_mgmt_permit_joining_cb);
 }
 
 /*
@@ -1181,10 +1316,19 @@ void bdb_network_steering_on_network(zb_uint8_t param)
 */
 void bdb_after_mgmt_permit_joining_cb(zb_uint8_t param)
 {
+  zb_uint8_t status = zb_buf_get_status(param);
 
-  TRACE_MSG(TRACE_ZDO2, "> bdb_after_mgmt_permit_joining_cb %hd", (FMT__H, param));
+  TRACE_MSG(TRACE_ZDO2, "> bdb_after_mgmt_permit_joining_cb %hd, status %hd", (FMT__H_H, param, status));
 
-  if (zb_buf_get_status(param) == RET_OK)
+  /* [VK]: There are the following cases to get a permit joining response:
+   * 1) when we send a permit joining request via broadcast after network formation;
+   * 2) when we send a permit joining request via broadcast after network joining;
+   * 3) when we get a ZDO Permit Joining Response packet.
+   *
+   * In case of 1 and 2 we use a buffer status field to store status.
+   * In case of 3 we put a status value from a packet to a buffer status field.
+   */
+  if (status == ZB_ZDP_STATUS_SUCCESS)
   {
 #ifdef ZB_ROUTER_ROLE
     if (ZB_IS_DEVICE_ZC_OR_ZR())
@@ -1211,7 +1355,14 @@ void bdb_after_mgmt_permit_joining_cb(zb_uint8_t param)
     bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_STEERING_FINISH, param);
   }
 
-  TRACE_MSG(TRACE_ZCL2, "< bdb_after_mgmt_permit_joining_cb", (FMT__0));
+  TRACE_MSG(TRACE_ZDO2, "< bdb_after_mgmt_permit_joining_cb", (FMT__0));
+}
+
+static void bdb_network_permit_joining(zb_uint8_t param)
+{
+  /* TRICKY: Run steering one more time - to broadcast Permit Joining. This time it will be
+    * steering for device on network. */
+  bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_STEERING_START, param);
 }
 
 static void bdb_network_steering_machine(zb_uint8_t param)
@@ -1230,8 +1381,17 @@ static void bdb_network_steering_machine(zb_uint8_t param)
           ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_STEERING;
         }
 
-        /* For ZC steering means "open net for join". Meaningful only after formation complete. */
-        if (!ZB_IS_DEVICE_ZC() || zb_zdo_joined())
+        /* For ZC  and ZR with enabled distributed formation steering means "open net for join". 
+           Meaningful only after formation complete. */
+        if (zb_zdo_joined() 
+            || ZB_IS_DEVICE_ZED()
+            || (ZB_IS_DEVICE_ZR() 
+#if defined ZB_DISTRIBUTED_SECURITY_ON && defined ZB_FORMATION
+                && ((FORMATION_SELECTOR().start_formation == NULL) 
+                     || !zb_tc_is_distributed())
+#endif /* ZB_DISTRIBUTED_SECURITY_ON && ZB_FORMATION*/
+               )
+           )
         {
           TRACE_MSG(TRACE_ZDO1, "Start Network Steering", (FMT__0));
           if (ZB_BDB().bdb_op_cancelled == ZB_TRUE)
@@ -1268,10 +1428,9 @@ static void bdb_network_steering_machine(zb_uint8_t param)
         bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_STEERING_FINISH, param);
         break;
       }
-
       if(ZB_BDB().bdb_commissioning_status == ZB_BDB_STATUS_IN_PROGRESS)
       {
-        /* If commisioning is in progress, steering state machine should handle NWK discovery failed signal,
+        /* If commissioning is in progress, steering state machine should handle NWK discovery failed signal,
         since a secondary channel scan is supposed to happen after a failed scan of primary channels */
         bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_STEERING_START, param);
         break;
@@ -1296,6 +1455,16 @@ static void bdb_network_steering_machine(zb_uint8_t param)
 #endif /* !ZB_COORDINATOR_ONLY */
 
     case BDB_COMM_SIGNAL_NWK_START_ROUTER_CONF:
+      // NOTE(NR): This signal is not triggered on router reboot. Checked with zc and zr joining to zc and rebooting.
+#if defined(ZB_JOIN_CLIENT) && defined(ZB_NWK_BLACKLIST)
+      if (!zdo_secur_waiting_for_tclk_update())
+      {
+        /* Join is finished - can reset the blacklist. */
+        zb_nwk_blacklist_reset();
+      }
+#endif /* ZB_JOIN_CLIENT && ZB_NWK_BLACKLIST */
+      bdb_network_permit_joining(param);
+      break;
     case BDB_COMM_SIGNAL_NWK_JOIN_DONE:
 #ifdef ZB_JOIN_CLIENT
       if (!zdo_secur_waiting_for_tclk_update())
@@ -1307,9 +1476,23 @@ static void bdb_network_steering_machine(zb_uint8_t param)
 #ifdef ZB_NWK_BLACKLIST
         zb_nwk_blacklist_reset();
 #endif
-        /* TRICKY: Run steering one more time - to broadcast Permit Joining. This time it will be
-         * steering for device on network. */
-        bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_STEERING_START, param);
+#if defined(ZB_ROUTER_ROLE) &&  !defined(SNCP_MODE)
+        if (ZB_IS_DEVICE_ZR())
+        {
+          if (param != ZB_BUF_INVALID)
+          {
+            ZB_SCHEDULE_CALLBACK(zb_zdo_start_router, param);
+          }
+          else
+          {
+            zb_buf_get_out_delayed(zb_zdo_start_router);
+          }
+        }
+        else
+#endif
+        {
+          bdb_network_permit_joining(param);
+        }
       }
       else
 #endif
@@ -1320,10 +1503,19 @@ static void bdb_network_steering_machine(zb_uint8_t param)
       break;
 
     case BDB_COMM_SIGNAL_LEAVE_DONE:
+      TRACE_MSG(TRACE_ZDO1, "BDB_COMM_SIGNAL_LEAVE_DONE, status %hd", (FMT__H, ZB_BDB().bdb_commissioning_status));
       if (ZB_BDB().bdb_commissioning_status != ZB_BDB_STATUS_NO_NETWORK)
       {
         /* Probably bdb device failed to update tclk exchange */
         bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_STEERING_FINISH, param);
+
+        /* We can be here with status ZB_BDB_STATUS_IN_PROGRESS after calling the function 
+         * zb_bdb_reset_via_local_action on the application. In this case, we should change 
+         * the comm status for the correct return code when commissioning is complete. */
+        if (ZB_BDB().bdb_commissioning_status == ZB_BDB_STATUS_IN_PROGRESS)
+        {
+          ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_CANCELLED;
+        }
       }
       else
       {
@@ -1344,7 +1536,10 @@ static void bdb_network_steering_machine(zb_uint8_t param)
 #endif
       /* TRICKY: Run steering one more time - to broadcast Permit Joining. This time it will be
        * steering for device on network. */
-      bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_STEERING_START, param);
+      if (!ZB_DIRECT_IS_EPHEMERAL_SESSION_STARTED())
+      {
+        bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_STEERING_START, param);
+      }
       break;
 
     case BDB_COMM_SIGNAL_NETWORK_STEERING_FINISH:
@@ -1384,6 +1579,7 @@ static void bdb_network_formation_machine(zb_uint8_t param)
 {
   TRACE_MSG(TRACE_ZDO1, "bdb_network_formation_machine param %hd signal %hd state %hd",
             (FMT__H_H_H, param, BDB_COMM_CTX().signal, ZB_BDB().bdb_commissioning_step));
+
   switch (BDB_COMM_CTX().signal)
   {
     case BDB_COMM_SIGNAL_NETWORK_FORMATION_START:
@@ -1409,7 +1605,7 @@ static void bdb_network_formation_machine(zb_uint8_t param)
           }
           else
           {
-            ZB_ASSERT(FORMATION_SELECTOR().start_formation != NULL);
+          ZB_ASSERT(FORMATION_SELECTOR().start_formation != NULL);
             /* call directly to simplify cancellation logic */
             FORMATION_SELECTOR().start_formation(param);
           }
@@ -1431,6 +1627,12 @@ static void bdb_network_formation_machine(zb_uint8_t param)
 
     case BDB_COMM_SIGNAL_NWK_FORMATION_OK:
       TRACE_MSG(TRACE_ZDO1, "Network is successfully formed", (FMT__0));
+      bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_FORMATION_FINISH, param);
+      break;
+
+    case BDB_COMM_SIGNAL_LEAVE_DONE:
+      TRACE_MSG(TRACE_ZDO1, "BDB_COMM_SIGNAL_LEAVE_DONE, finishing", (FMT__0));
+      ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_CANCELLED;
       bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_FORMATION_FINISH, param);
       break;
 
@@ -1561,6 +1763,7 @@ static void bdb_savepoint_before_rr()
 
 static void bdb_restore_cont(zb_uint8_t param)
 {
+#if defined ZB_ED_FUNC
   /* Undo effect of zdo_rejoin_clear_prev_join(). */
   /* If ZED, start poll again */
   if (ZB_IS_DEVICE_ZED())
@@ -1572,6 +1775,7 @@ static void bdb_restore_cont(zb_uint8_t param)
     zb_buf_free(param);
   }
   else
+#endif /* ZB_ED_FUNC */
   {
     BDB_COMM_CTX().rejoin.rr_ignore_start_router_conf = 1;
     ZB_SCHEDULE_CALLBACK(zb_zdo_start_router, param);
@@ -1642,7 +1846,7 @@ static void bdb_restore_saved_rr(zb_uint8_t param)
       Wait for X seconds or until additional triggers (example: user button push)
       a. Non-sleepy ED: X seconds will be equal to the Keepalive cluster value or 24 hours if
       Keepalive cluster is not Implemented
-      b. Sleepy ED: if WWAH rejoin algorithm is implemented then hte wait will be determined by the
+      b. Sleepy ED: if WWAH rejoin algorithm is implemented then the wait will be determined by the
       WWAH rejoin algorithm, else 15 minutes
    7. Non-sleepy ED or ZR - back to step 3.
    [These steps are only for Sleepy ED]
@@ -1773,7 +1977,8 @@ static void bdb_rejoin_machine(zb_uint8_t param)
 
         zdo_initiate_rejoin(param, ext_pan_id,
                               channel_list,
-                              (zb_bool_t)secure);
+                              (zb_bool_t)secure,
+                              bdb_get_scan_duration());
       }
     }
     break;
@@ -2027,14 +2232,23 @@ static void bdb_handle_join_failed_signal(zb_bufid_t param)
 }
 
 
-static void bdb_handle_initiate_rejoin_signal(zb_bufid_t param)
+static void bdb_force_rejoin_if_not_in_progress(zb_bufid_t param)
 {
-  zb_buf_free(param);
+  if (param != ZB_BUF_INVALID)
+  {
+    zb_buf_free(param);
+  }
 
   if (!zb_zdo_is_rejoin_active())
   {
     zdo_rejoin_clear_prev_join();
+
+    ZB_BDB().bdb_commissioning_step = ZB_BDB_COMMISSIONING_STOP;
+    ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_CANCELLED;
+    BDB_COMM_CTX().signal = BDB_COMM_SIGNAL_FINISH;
+
     ZB_BDB().bdb_force_router_rejoin = ZB_TRUE;
+
     bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
 
 #ifdef ZB_ZCL_ENABLE_WWAH_SERVER
@@ -2044,6 +2258,53 @@ static void bdb_handle_initiate_rejoin_signal(zb_bufid_t param)
       schedule_wwah_rejoin_backoff_attempt(0);
     }
 #endif
+  }
+}
+
+
+static void bdb_handle_initiate_rejoin_signal(zb_bufid_t param)
+{
+  /* Send leave signal with rejoin */
+  zb_uint8_t *p = zb_buf_get_tail(param, sizeof(zb_uint8_t));
+  zb_uint8_t rejoin_reason = *p;
+  TRACE_MSG(TRACE_ZDO1, ">> bdb_handle_initiate_rejoin_signal, param %d", (FMT__H, param));
+  TRACE_MSG(TRACE_ZDO1, "Handle init rejoin, reason: %d", (FMT__D, rejoin_reason));
+
+  if (rejoin_reason == ZB_REJOIN_REASON_DEV_ANNCE_SENDING_FAILED)
+  {
+    /* manually stop commissioning and rejoin*/
+    ZB_BDB().bdb_commissioning_step = ZB_BDB_COMMISSIONING_STOP;
+    BDB_COMM_CTX().signal = BDB_COMM_SIGNAL_FINISH;
+    ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_DEV_ANNCE_SEND_FAILURE;
+
+    ZB_SCHEDULE_CALLBACK(bdb_commissioning_machine, param);
+  }
+  else
+  {
+    bdb_force_rejoin_if_not_in_progress(param);
+  }
+
+  TRACE_MSG(TRACE_ZDO1, "<< bdb_handle_initiate_rejoin_signal", (FMT__0));
+}
+
+
+static void bdb_handle_dev_annce_sent_signal(zb_bufid_t param)
+{
+  /* This function is called in case when device_annce has been successfully sent.
+    Otherwise ZB_COMM_SIGNAL_INITIATE_REJOIN will be raised (bdb_handle_initiate_rejoin_signal).
+  */
+#ifndef NCP_MODE_HOST
+  bdb_initiate_key_exchange_if_needed();
+#endif /* NCP_MODE_HOST */
+#if !defined SNCP_MODE && defined ZB_ROUTER_ROLE
+  if (ZB_IS_DEVICE_ZR())
+  {
+    ZB_SCHEDULE_CALLBACK(zb_zdo_start_router, param);
+  }
+  else
+#endif /* !defined SNCP_MODE && defined ZB_ROUTER_ROLE */
+  {
+    bdb_commissioning_signal(BDB_COMM_SIGNAL_NWK_JOIN_DONE, param);
   }
 }
 
@@ -2067,6 +2328,17 @@ static void bdb_handle_leave_done_signal(zb_bufid_t param)
 
   /* TODO: Send special ZDO signal (LEAVE_DONE or so) - it will allow to avoid manual join
    * restarting after leave (from application). */
+
+#ifndef NCP_MODE_HOST
+  /* FIXME: this will only work for the monolithic build, generic fix requires refactoring
+            and moving of some logic from that file to some SoC file. See ZBS-1405 for more info */
+  if (zdo_secur_waiting_for_tclk_update())
+  {
+    TRACE_MSG(TRACE_ZDO1, "TC Link Key exchange in progress, stopping it", (FMT__0));
+    bdb_update_tclk_stop();
+  }
+#endif /* NCP_MODE_HOST */
+
   if (ZB_BDB().bdb_commissioning_step == ZB_BDB_COMMISSIONING_STOP)
   {
     TRACE_MSG(TRACE_NWK1, "BDB commissioning machine is already finished, do nothing",
@@ -2098,10 +2370,8 @@ static void bdb_handle_leave_done_signal(zb_bufid_t param)
 
 #ifndef NCP_MODE_HOST
 
-static void bdb_handle_auth_ok_signal(zb_bufid_t param)
+static void bdb_initiate_key_exchange_if_needed(void)
 {
-  /* TODO: Move this part to BDB commissioning machine: have some variations depending of the
-   * state when this signal is generated (initialization/TC rejoin/steering/etc) */
   if (!IS_DISTRIBUTED_SECURITY()
       && ZB_TCPOL().update_trust_center_link_keys_required
       && !ZB_TCPOL().waiting_for_tclk_exchange) /* TCLK is not already in progress */
@@ -2119,7 +2389,12 @@ static void bdb_handle_auth_ok_signal(zb_bufid_t param)
       zdo_initiate_tclk_gen_over_aps(0);
     }
   }
+}
 
+
+static void bdb_handle_auth_ok_signal(zb_bufid_t param)
+{
+  /* Logic from  this function has been moved to bdb_initiate_key_exchange_if_needed */
   if (param != ZB_BUF_INVALID)
   {
     zb_buf_free(param);
@@ -2132,9 +2407,8 @@ static void bdb_handle_rejoin_after_secur_failed_signal(zb_bufid_t param)
   zb_ext_pan_id_t ext_pan_id;
   /* rejoin to current pan */
   zb_get_extended_pan_id(ext_pan_id);
-  zdo_initiate_rejoin(param, ext_pan_id, ZB_AIB().aps_channel_mask_list, ZB_FALSE);
+  zdo_initiate_rejoin(param, ext_pan_id, ZB_AIB().aps_channel_mask_list, ZB_FALSE, bdb_get_scan_duration());
 }
-
 #endif /* !NCP_MODE_HOST */
 
 
@@ -2153,6 +2427,19 @@ static void bdb_handle_leave_with_rejoin_signal(zb_bufid_t param)
      without reset it's logic - then stack silently completes process without notifying application or further join attempts.
      Temporarily fix: use BDB logic for rejoin on receiving leave (locally or remotely).
   */
+
+  TRACE_MSG(TRACE_ZDO1, "bdb_handle_leave_with_rejoin_signal", (FMT__0));
+
+#ifndef NCP_MODE_HOST
+  /* FIXME: this will only work for the monolithic build, generic fix requires refactoring
+            and moving of some logic from that file to some SoC file. See ZBS-1405 for more info */
+  if (zdo_secur_waiting_for_tclk_update())
+  {
+    TRACE_MSG(TRACE_ZDO1, "TC Link Key exchange in progress, stopping it", (FMT__0));
+    bdb_update_tclk_stop();
+  }
+#endif /* NCP_MODE_HOST */
+
   zdo_inform_app_leave(ZB_NWK_LEAVE_TYPE_REJOIN);
 
 #ifndef NCP_MODE_HOST
@@ -2160,6 +2447,7 @@ static void bdb_handle_leave_with_rejoin_signal(zb_bufid_t param)
   *rejoin_reason = ZB_REJOIN_REASON_LEAVE_WITH_REJOIN;
   ZB_SCHEDULE_CALLBACK(zdo_commissioning_initiate_rejoin, param);
 #else
+  ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_REBOOT;
   zb_buf_free(param);
 #endif
 
@@ -2181,6 +2469,7 @@ static void bdb_handle_leave_with_rejoin_signal(zb_bufid_t param)
 static void bdb_handle_secured_rejoin_signal(zb_bufid_t param)
 {
   zb_apsme_transport_key_req_t *req = ZB_BUF_GET_PARAM(param, zb_apsme_transport_key_req_t);
+  zb_address_ieee_ref_t ref_to_addr;
   /* r21 doesn't use empty keys
    * In r21 setup alarm waiting for unique TCLK request.
    * Note: param must hold transport key request even while we do not
@@ -2196,6 +2485,15 @@ static void bdb_handle_secured_rejoin_signal(zb_bufid_t param)
       && !IS_DISTRIBUTED_SECURITY()
       && !zb_secur_get_link_key_by_address(req->dest_address.addr_long, ZB_SECUR_VERIFIED_KEY))
   {
+    /* Try to close link_key_alarm if address is found.
+       It's needed to remove possibility of
+         'bdb_link_key_refresh_alarm' duplication
+    */
+    if (zb_address_by_ieee(req->dest_address.addr_long, ZB_FALSE, ZB_FALSE, &ref_to_addr) == RET_OK)
+    {
+      bdb_cancel_link_key_refresh_alarm(bdb_link_key_refresh_alarm, ref_to_addr, ZB_TRUE);
+    }
+
     ZB_SCHEDULE_ALARM(bdb_link_key_refresh_alarm, param, ZB_TCPOL().trust_center_node_join_timeout);
   }
   else
@@ -2232,10 +2530,17 @@ static void bdb_handle_formation_failed_signal(zb_bufid_t param)
     ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_CANCELLED;
     bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_FORMATION_FINISH, param);
   }
+  else if (zb_buf_get_status(param) == RET_OPERATION_FAILED)
+  {
+    TRACE_MSG(TRACE_ZDO1, "formation failed", (FMT__0));
+    ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_FORMATION_FAILURE;
+    bdb_commissioning_signal(BDB_COMM_SIGNAL_NETWORK_FORMATION_FINISH, param);
+
+  }
   else
   {
-    ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_FORMATION_FAILURE;
-    ZB_SCHEDULE_CALLBACK(bdb_commissioning_machine, param);
+  ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_FORMATION_FAILURE;
+  ZB_SCHEDULE_CALLBACK(bdb_commissioning_machine, param);
   }
 }
 
@@ -2250,6 +2555,13 @@ static void bdb_handle_comm_signal(zb_commissioning_signal_t signal, zb_bufid_t 
 
   switch(signal)
   {
+    case ZB_COMM_SIGNAL_INIT:
+      bdb_force_link();
+      if (param != ZB_BUF_INVALID)
+      {
+        zb_buf_free(param);
+      }
+      break;
     case ZB_COMM_SIGNAL_START:
       bdb_initiate_commissioning(param);
       break;
@@ -2267,7 +2579,7 @@ static void bdb_handle_comm_signal(zb_commissioning_signal_t signal, zb_bufid_t 
       bdb_handle_initiate_rejoin_signal(param);
       break;
     case ZB_COMM_SIGNAL_DEV_ANNCE_SENT:
-      bdb_commissioning_signal(BDB_COMM_SIGNAL_NWK_JOIN_DONE, param);
+      bdb_handle_dev_annce_sent_signal(param);
       break;
     case ZB_COMM_SIGNAL_ROUTER_STARTED:
       bdb_commissioning_signal(BDB_COMM_SIGNAL_NWK_START_ROUTER_CONF, param);
@@ -2358,6 +2670,14 @@ static void bdb_handle_no_active_links_left_signal(zb_bufid_t param)
   {
     zb_send_no_active_links_left_signal(param);
   }
+  else
+  {
+    TRACE_MSG(TRACE_ZDO1,
+              "Received 'no active links' signal during touchlink target commissioning."
+              "Ignoring signal and freeing buffer with ID %d",
+              (FMT__D, param));
+    zb_buf_free(param);
+  }
 }
 #endif /* !ZB_COORDINATOR_ONLY && !NCP_MODE_HOST */
 
@@ -2406,6 +2726,12 @@ zb_uint8_t bdb_get_scan_duration(void)
 }
 
 
+void bdb_set_scan_duration(zb_uint8_t duration)
+{
+  ZB_BDB().bdb_scan_duration = duration;
+}
+
+
 void zb_bdb_initiate_tc_rejoin(zb_uint8_t param)
 {
   zb_ret_t ret = RET_OK;
@@ -2418,15 +2744,14 @@ void zb_bdb_initiate_tc_rejoin(zb_uint8_t param)
 
   TRACE_MSG(TRACE_ZDO1, ">> zb_bdb_initiate_tc_rejoin, param %hd", (FMT__H, param));
 
-  if ((!zb_zdo_tclk_valid() || (zb_aib_get_coordinator_version() < 21))
-        && !zb_aib_tcpol_get_allow_unsecure_tc_rejoins())
+  if (!zb_zdo_tclk_valid() && !zb_aib_tcpol_get_allow_unsecure_tc_rejoins())
   {
     TRACE_MSG(TRACE_ERROR, "TC rejoin is not allowed", (FMT__0));
     ret = RET_INVALID_STATE;
   }
 
   if (ret == RET_OK)
-  {
+{
     TRACE_MSG(TRACE_ZDO1, "Start TC rejoin", (FMT__0));
 
     ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_IN_PROGRESS;
@@ -2438,7 +2763,7 @@ void zb_bdb_initiate_tc_rejoin(zb_uint8_t param)
   else
   {
     (void)zb_app_signal_pack(param, ZB_BDB_SIGNAL_TC_REJOIN_DONE, ret, 0);
-    ZB_SCHEDULE_CALLBACK(zboss_signal_handler, param);
+    ZB_SCHEDULE_CALLBACK(zb_signal_dispatch, param);
   }
 
   TRACE_MSG(TRACE_ZDO1, "<< zb_bdb_initiate_tc_rejoin, ret %d", (FMT__D, ret));
@@ -2467,15 +2792,16 @@ zb_ret_t zb_bdb_start_secured_rejoin(void)
 
 void bdb_force_link(void)
 {
+  TRACE_MSG(TRACE_ZDO1, "bdb_force_link", (FMT__0));
   bdb_init();
 
 #if defined ZB_BDB_TOUCHLINK && !defined NCP_MODE_HOST
   ZG->nwk.selector.should_accept_frame_before_join = bdb_should_accept_frame_before_join;
 #endif /* ZB_BDB_TOUCHLINK && !NCP_MODE_HOST */
-#ifndef NCP_MODE_HOST
+#if !defined NCP_MODE_HOST && defined ZB_JOIN_CLIENT
   /* introduce some kind of setter? To be solved in the scope of ZBS-241 */
   ZG->nwk.selector.nwk_cancel_nwk_disc_resp = nwk_cancel_network_discovery_response;
-#endif
+#endif /* !defined NCP_MODE_HOST && defined ZB_JOIN_CLIENT */
 
   COMM_SELECTOR().signal = bdb_handle_comm_signal;
   COMM_SELECTOR().is_in_tc_rejoin = bdb_is_in_tc_rejoin;
@@ -2507,7 +2833,6 @@ void zb_set_network_router_role(zb_uint32_t channel_mask)
 
   zb_set_network_router_role_with_mode(channel_mask, ZB_COMMISSIONING_BDB);
 }
-
 
 void zb_set_network_router_role_ext(zb_channel_list_t channel_list)
 {
@@ -2581,7 +2906,7 @@ void zb_set_bdb_commissioning_mode(zb_uint8_t commissioning_mode)
 
 zb_bool_t zb_bdb_is_factory_new()
 {
-  return (zb_bool_t)!bdb_joined();
+  return (zb_bool_t)bdb_not_ever_joined();
 }
 
 
@@ -2784,6 +3109,7 @@ static void nwk_cancel_network_discovery_response(zb_bufid_t buf)
 
 #endif /* NCP_MODE_HOST */
 
+
 static void zb_bdb_close_network_local(zb_bufid_t buf)
 {
   zb_zdo_mgmt_permit_joining_req_param_t *req_param;
@@ -2848,6 +3174,31 @@ zb_ret_t zb_bdb_close_network(zb_bufid_t buf)
   TRACE_MSG(TRACE_ZDO3, "<< zb_bdb_close_network", (FMT__0));
   return ret;
 }
+
+#ifdef ZB_DISTRIBUTED_SECURITY_ON
+
+static void bdb_disable_distributed(void)
+{
+#ifdef ZB_FORMATION
+  FORMATION_SELECTOR().start_formation = NULL;
+  FORMATION_SELECTOR().get_formation_channels_mask = NULL;
+#endif
+  ZB_IEEE_ADDR_COPY(ZB_AIB().trust_center_address, g_zero_addr);
+}
+
+
+void zb_disable_distributed(void)
+{
+  bdb_disable_distributed();
+}
+
+
+void zb_bdb_disable_distributed_network_formation(void)
+{
+  bdb_disable_distributed();
+}
+
+#endif /* ZB_DISTRIBUTED_SECURITY_ON */
 
 
 /*! @} */

@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -117,7 +117,7 @@ enum zb_zcl_binary_input_status_flag_value_e
   ZB_ZCL_BINARY_INPUT_STATUS_FLAG_NORMAL    = 0x00,       /**< Normal (default) state. */
   ZB_ZCL_BINARY_INPUT_STATUS_FLAG_IN_ALARM  = 0x01,       /**< In alarm bit. */
   ZB_ZCL_BINARY_INPUT_STATUS_FLAG_FAULT     = 0x02,       /**< Fault bit. */
-  ZB_ZCL_BINARY_INPUT_STATUS_FLAG_OVERRIDEN = 0x04,       /**< Overridden bit. */
+  ZB_ZCL_BINARY_INPUT_STATUS_FLAG_OVERRIDDEN = 0x04,       /**< Overridden bit. */
   ZB_ZCL_BINARY_INPUT_STATUS_FLAG_OUT_OF_SERVICE = 0x08,  /**< Out of service bit. */
 };
 
@@ -231,7 +231,7 @@ enum zb_zcl_binary_input_status_flag_value_e
                          ZB_ZCL_ATTR_BINARY_INPUT_STATUS_FLAG_ID);                     \
   if (attr_desc)                                                                       \
   {                                                                                    \
-    val = *(zb_uint8_t*)attr_desc->data_p | ZB_ZCL_BINARY_INPUT_STATUS_FLAG_OVERRIDEN; \
+    val = *(zb_uint8_t*)attr_desc->data_p | ZB_ZCL_BINARY_INPUT_STATUS_FLAG_OVERRIDDEN; \
     ZB_ZCL_SET_ATTRIBUTE(ep, ZB_ZCL_CLUSTER_ID_BINARY_INPUT,                           \
                          ZB_ZCL_CLUSTER_SERVER_ROLE,                    \
                          ZB_ZCL_ATTR_BINARY_INPUT_STATUS_FLAG_ID,                      \

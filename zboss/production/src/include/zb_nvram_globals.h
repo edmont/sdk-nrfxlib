@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -111,27 +111,22 @@ typedef struct zb_nvram_globals_s
   zb_uint32_t current_pos;              /*!< Index of first free byte in Current Page NVRAM */
   zb_uint8_t current_page;              /*!< Current page NVRAM */
 
-  zb_bitfield_t refresh_flag:1;              /*! flag indicating that device need to store counters as soon as it increment it */
   zb_bitfield_t transaction_ongoing:1; /*!< @see @ref nvram_transaction_state  */
   zb_bitfield_t empty:1;             /*!< if true, NVRAM is empty (maybe, except NWK
                                  * counter), so device is factory new  */
   zb_bitfield_t inited:1;            /*!< if true, NVRAM is inited (read/write operations are
                                       * allowed) */
-  zb_bitfield_t alignment:4;
+  zb_bitfield_t alignment:5;
 
 #ifdef ZB_NVRAM_ENABLE_DIRECT_API
   /* positions of datasets; updated on each write operation; used for read operations */
   zb_nvram_ds_pos_t ds_pos[ZB_NVRAM_DATASET_NUMBER];
 #endif /* ZB_NVRAM_ENABLE_DIRECT_API */
 
-  /* Actually useful at Nordic only. Move it out of there? */
-  volatile zb_uint_t op_in_progress;
-
   /* Checker for nvram read/write calls */
   zb_nvram_pos_payload_checker_t gs_nvram_write_checker;
   zb_nvram_pos_payload_checker_t gs_nvram_read_checker;
   zb_nvram_pos_payload_checker_t gs_nvram_read_checker_cache;
-
 } zb_nvram_globals_t;
 
 #define ZB_NVRAM() ZG->nvram

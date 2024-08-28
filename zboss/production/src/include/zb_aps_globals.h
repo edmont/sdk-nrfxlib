@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -206,12 +206,26 @@ typedef struct zb_tc_policy_s
 #endif
   zb_bitbool_t control4_network_emulator:1; /*!< if 1, Emulates Control4 Network behaviour: Transport Key ext src= 0xff,0xff(...) */
 #endif /* defined ZB_ED_FUNC && defined ZB_CONTROL4_NETWORK_SUPPORT */
-  zb_bitbool_t aps_unencrypted_transport_key_join:1;         /*for joining the devices requiring APS unencrypted Transport key*/
-  zb_bitbool_t tc_swapped:1;                                 /*!< 1 if TC is just swapped.  */
+  zb_bitfield_t aps_unencrypted_transport_key_join:1;         /*!< for joining the devices requiring APS unencrypted Transport key*/
+  zb_bitfield_t use_aps_enc_for_zdo_in_distrib_nwk:1;         /*!< use APS Enc for zdo set/get_configuration and decommission reqs */
+  zb_bitfield_t encrypt_zdo_conf_cmd:1;                   /*!< use APS Enc for zdo commands which need configuration mode */
+  zb_bitfield_t tc_swapped:1;                                 /*!< 1 if TC is just swapped.  */
   zb_bitfield_t authenticate_always:1;                        /*!< If 1, then zb_authenticate_dev()
                                                                * ignore permit_join value */
   zb_bitbool_t allow_unsecure_tc_rejoins:1;   /*<! allow joiner devices perform TC rejoin, when there is
                                                    no unique TCLK */
+  zb_bitfield_t is_device_interview_enabled:1;                /*!< Shows whether Device Interview stage is enabled */
+
+  zb_bitfield_t disable_zvd_support:1; /*!< Disables ZVD support on TC side */
+
+#ifdef ZB_DIRECT_ENABLED
+  zb_bitfield_t allow_secured_rejoin_without_tclk:1;   /* if the BDB operation (steering or formation) is cancelled */
+#endif /* ZB_DIRECT_ENABLED */
+  zb_bitfield_t disable_link_key_tlv:1;
+#ifdef ZB_ALLOW_PROVISIONAL_KEY_AS_TCLK
+  zb_bitbool_t allow_provisional_key_as_tclk:1; /*!< if 1, allow joining to trust centers that claim revision r21 or higher
+                                                 *   but sends provisional key as a trust center link key */
+#endif /* ZB_ALLOW_PROVISIONAL_KEY_AS_TCLK */
 }
 zb_tc_policy_t;
 
@@ -223,6 +237,15 @@ zb_tc_policy_t;
 zb_bool_t zdo_secur_must_use_installcode(zb_bool_t is_client);
 #define ZB_JOIN_USES_INSTALL_CODE_KEY(is_client) zdo_secur_must_use_installcode(is_client)
 #endif
+
+#define ZB_APS_CHALLENGE_VAL_SIZE 8
+typedef struct zb_aps_cnt_challenge_ctx_s
+{
+  zb_uint8_t     aps_challenge_val[ZB_APS_CHALLENGE_VAL_SIZE];
+  zb_ieee_addr_t aps_challenge_target_eui64;
+  zb_uint8_t     aps_challenge_period_timeout_sec;
+  zb_bool_t      aps_challenge_in_progress;
+} zb_aps_cnt_challenge_ctx_t;
 
 /**
    APS Informational Base memory-resident data structure
@@ -248,8 +271,7 @@ typedef struct zb_apsib_s
   zb_bitfield_t   aps_nvram_erase_at_start:1; /*!< if 1, erase nvram at start  */
   zb_bitfield_t   always_rejoin:1; /*!< if 1, forbidden Association if Rejoin fail */
   zb_bitfield_t   is_tc:1;             /*!< true if this is a trusted center */
-  zb_bitfield_t   tc_address_locked:1; /*!< true if TC address was locked */
-  zb_bitfield_t   reserve : 1;
+  zb_bitfield_t   reserve : 2;
 
   zb_channel_list_t aps_channel_mask_list; /*!< This is the masks list containing allowable
                                                                     * channels on which the device may attempt
@@ -259,6 +281,10 @@ typedef struct zb_apsib_s
 //#ifndef ZB_COORDINATOR_ONLY
   zb_ieee_addr_t  trust_center_address;    /*!< Trust Center IEEE address */
 //#endif
+  zb_uint8_t trust_center_supported_key_negotiation_methods;    /*!< Trust Center Key Negotiation
+                                                                   * Methods Mask
+                                                                   * @see zb_tlv_key_negotiation_methods_t */
+  zb_uint8_t trust_center_supported_preshared_secrets; /*!< Trust Center Supported Pre-shared Secrets Bitmask */
 
 #ifndef ZB_NO_NWK_MULTICAST
   zb_uint8_t      aps_nonmember_radius;     /*!< Non-member radius for NWK multicast, a value of 0x07 is treated as infinity see 3.3.1.8.2 sub-clause */
@@ -266,8 +292,6 @@ typedef struct zb_apsib_s
   /* TODO: What value is required for mcf.max_nonmember_radius, where it should be set? */
   zb_uint8_t      aps_max_nonmember_radius; /*!< Maximum non-member radius value for multicast transmission */
 #endif                                      /* ZB_NO_NWK_MULTICAST */
-  zb_uint32_t outgoing_frame_counter; /*!< OutgoingFrameCounter for APS security
-                                       * Aux header when using standard key */
 
   zb_uint8_t tc_standard_key[ZB_CCM_KEY_SIZE];      /*!< Trust Center Standard Key */
 #ifdef ZB_DISTRIBUTED_SECURITY_ON
@@ -287,6 +311,8 @@ typedef struct zb_apsib_s
 #ifdef ZB_SECURITY_INSTALLCODES
   zb_uint8_t installcode[ZB_CCM_KEY_SIZE+ZB_CCM_KEY_CRC_SIZE];
   zb_uint8_t installcode_type;
+  zb_uint8_t passcode[ZB_PAKE_PASSCODE_LENGTH];
+  zb_uint8_t passcode_present;
 #endif
 
 #ifdef APS_FRAGMENTATION
@@ -296,7 +322,8 @@ typedef struct zb_apsib_s
 #endif
   zb_tc_policy_t tcpolicy;
   zb_uint8_t    bdb_remove_device_param; /*!< Used to store buffer param with Remove zb. */
-
+  zb_aps_cnt_challenge_ctx_t aps_challenge_ctx;
+  zb_uint16_t aps_security_time_out_period;
 } zb_apsib_t;
 
 #ifdef ZB_DISTRIBUTED_SECURITY_ON
@@ -382,9 +409,7 @@ typedef struct zb_aps_duplicate_s
 
 typedef ZB_PACKED_PRE struct zb_aps_in_fragmented_frame_s
 {
-#define ZB_APS_IN_FRAGMENTED_FRAME_EMPTY 0xFFFFu
-/* 07/31/2019 EE CR:MINOR Why not addr ref? */
-  zb_uint16_t src_addr;   /* 0xFFFF for empty entries */
+  zb_address_ieee_ref_t src_addr_ref;
   zb_uint8_t aps_counter;
   zb_uint8_t total_blocks_num;
   zb_uint8_t current_window;
@@ -394,7 +419,7 @@ typedef ZB_PACKED_PRE struct zb_aps_in_fragmented_frame_s
   {
     zb_bitbool_t  assemble_in_progress:1; /* probably, we don't need that */
     zb_bitbool_t  ack_timer_scheduled:1;
-    zb_bitfield_t state:3;
+    zb_bitfield_t state:3;                /*!< transaction state, @see aps_in_frag_states */
     zb_bitfield_t aps_ack_retry_cnt:3;
   } ZB_PACKED_STRUCT flags;
 } ZB_PACKED_STRUCT zb_aps_in_fragment_frame_t;
@@ -464,7 +489,7 @@ typedef void (*zb_aps_binding_added_handler_t)(zb_uint16_t bind_tbl_idx);
 
 typedef struct zb_aps_func_selector_s
 {
-  zb_callback_t authhenticate_child_directly;
+  zb_callback_t authenticate_child_directly;
   zb_aps_binding_added_handler_t new_binding_handler;
 } zb_aps_func_selector_t;
 
@@ -504,9 +529,10 @@ typedef struct zb_aps_globals_s
 #endif
 
   zb_bitbool_t              authenticated:1;                   /*!< if ZB_TRUE, the device is authenticated */
+  zb_bitbool_t              dev_interview_started:1;           /*!< if ZB_TRUE, the Device Interview stage is started on joiner's side */
   zb_bitbool_t              dups_alarm_running:1;              /*!< if ZB_TRUE, the dups packet is processed */
   zb_bitbool_t              max_trans_size_alarm_running:1;    /*!< if ZB_TRUE, we are process dups packet */
-  zb_time_t                 dups_alarm_start;
+  zb_time_t              dups_alarm_start;
 #ifdef ZB_APS_USER_PAYLOAD
   zb_aps_user_payload_callback_t aps_user_payload_cb;
 #endif
@@ -533,6 +559,15 @@ zb_bool_t zb_aps_call_user_payload_cb(zb_uint8_t param);
 #define ZB_AIB_APS_COUNTER() ZG->aps.aib.aps_counter
 
 /**
+   Get APS security timeout period field from AIB.
+
+   @return period (in milliseconds)
+ */
+#define ZB_AIB_APS_SECURITY_TIME_OUT_PERIOD() ZG->aps.aib.aps_security_time_out_period
+
+#define ZB_APS_SECURITY_TIME_OUT_PERIOD_IN_BEACON_INTERVAL() ZB_MILLISECONDS_TO_BEACON_INTERVAL(ZG->aps.aib.aps_security_time_out_period)
+
+/**
    Increment APS counter AIB field.
 */
 #define ZB_AIB_APS_COUNTER_INC() ZG->aps.aib.aps_counter++
@@ -557,6 +592,11 @@ void zb_aib_tcpol_set_is_distributed_security(zb_bool_t enable);
 void zb_aib_tcpol_clear_is_distributed_security(void);
 zb_bool_t zb_aib_tcpol_get_is_distributed_security(void);
 #endif /* ZB_DISTRIBUTED_SECURITY_ON */
+
+#ifdef ZB_DIRECT_ENABLED
+void zb_aib_allow_secured_rejoin_without_tclk(zb_bool_t allow_rejoin);
+zb_bool_t zb_aib_get_allow_secured_rejoin_without_tclk(void);
+#endif /* ZB_DIRECT_ENABLED */
 
 void zb_aib_set_trust_center_address(const zb_ieee_addr_t address);
 void zb_aib_get_trust_center_address(zb_ieee_addr_t address);

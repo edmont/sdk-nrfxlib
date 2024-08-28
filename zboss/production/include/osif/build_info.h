@@ -11,27 +11,28 @@
  * Please use release scripts to update it's contents.
  *
  * Repositories:
- * platform_ncs       f1ce38e33a03c03fb922eea2827c9bf978d16fb1 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/platform_ncs.git
- * zboss-stack-src    617305eb6e51ea20153fc520392177f56373cecf https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_stable
- * zboss-stack-doc    d185acb78465fce1252453a93635fc4e2aac2a68 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_doc
- * nrf                21f851fa7d3c91f0e45c67f741bbf9e8efea9fc9 https://github.com/nrfconnect/sdk-nrf
- * zephyr             bc59fe3cf65c054b13305aa977ecddddf7cf42e4 https://github.com/nrfconnect/sdk-zephyr
- * wfa-qt-control-app af011c8a8d338ba529f17aed2cc2ef4c1c591a58 https://github.com/nrfconnect/sdk-wi-fiquicktrack-controlappc
- * mcuboot            c9e44365fd6c7bb1c95000a2d38a6bf263298126 https://github.com/nrfconnect/sdk-mcuboot
+ * platform_ncs       b8e80b6164158838c35c4ea6eb5e262bfee57603 https://projecttools.nordicsemi.no/bitbucket/scm/ZOI/platform_ncs.git
+ * zboss-stack-src    90382b69f62c79e4f85705a54325abf636397c7b https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_r23
+ * zboss-stack-doc    2cad66c0a1943dda14683ce6d2981cf6180e259b https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_doc
+ * nrf                8e05aa2b1370ad560b9dcde8924b11ea6c017c00 https://github.com/edmont/sdk-nrf
+ * zephyr             100befc70c74f7ec83dd8ac3171ee18eeddb4dbd https://github.com/nrfconnect/sdk-zephyr
+ * hostap             6311fde66f87ac8c8838a2d5fcfe55a498a8682a https://github.com/nrfconnect/sdk-hostap
+ * wfa-qt-control-app 9f91589a5be2b95a77a2b109901aad3298255315 https://github.com/nrfconnect/sdk-wi-fiquicktrack-controlappc
+ * mcuboot            daf2946a0f07a14b57bd69d29ac4cdde6f810fb7 https://github.com/nrfconnect/sdk-mcuboot
  * qcbor              751d36583a9ce1a640900c57e13c9b6b8f3a2ba2 https://github.com/laurencelundblade/QCBOR
- * mbedtls            98603a8c91660beac00e0ee1d76198fb7c4ed29b https://github.com/nrfconnect/sdk-mbedtls
- * oberon-psa-crypto  b41e899e7302462eb952b0b6a7c6903e368fb395 https://github.com/nrfconnect/sdk-oberon-psa-crypto
- * nrfxlib            999c8a81426ed8d88915e008bfc13b8d33af1361 https://github.com/nrfconnect/sdk-nrfxlib
- * trusted-firmware-m 8c7fae3936da02b7db4f5c8aba174b252a2b326e https://github.com/nrfconnect/sdk-trusted-firmware-m
- * psa-arch-tests     3da9313e64806d352c519e3205e81cf959067588 https://github.com/nrfconnect/sdk-psa-arch-tests
- * matter             f67310e6166ce4738985168fb3d74c5314539688 https://github.com/nrfconnect/sdk-connectedhomeip
+ * mbedtls            72868c6f1421afa92cba9f6fe6d1a3f108c174b7 https://github.com/nrfconnect/sdk-mbedtls
+ * oberon-psa-crypto  e0800ec5283ba89b2619919ef1889d98a9a79132 https://github.com/nrfconnect/sdk-oberon-psa-crypto
+ * nrfxlib            05a5b841eec55f183db12a18e1a6a008705bbb5a https://github.com/edmont/sdk-nrfxlib
+ * trusted-firmware-m 553c47a6a4c490bc799f2b455dfd0ebe3a49b0d0 https://github.com/nrfconnect/sdk-trusted-firmware-m
+ * psa-arch-tests     94a349db22cd0e44136c281724ffc71b6e7391c3 https://github.com/nrfconnect/sdk-psa-arch-tests
+ * matter             022f2c92f6fc04ddebeea443513d050a6bd1d222 https://github.com/nrfconnect/sdk-connectedhomeip
  * soc-hwmv1          32b1ee3e4576815bebf9ce3e8d63efe73bd89c62 https://github.com/nrfconnect/sdk-soc-hwmv1
  * cjson              c6af068b7f05207b28d68880740e4b9ec1e4b50a https://github.com/nrfconnect/sdk-cjson
  * azure-sdk-for-c    308c171cb4b5eed266649012a68406487ec81fb2 https://github.com/nrfconnect/azure-sdk-for-c
  * cirrus             3873a08377d93a479105a75ac390d3bbcd31d690 https://github.com/nrfconnect/sdk-mcu-drivers
- * openthread         ee86dc26d71c9ef021fad8a28898829df772011a https://github.com/nrfconnect/sdk-openthread
- * suit-generator     a9b80a109a5da13101b69120f678add48d68cc57 https://github.com/nrfconnect/suit-generator
- * suit-processor     7d94614168540359651391e64aa4de6515e43fca https://github.com/nrfconnect/suit-processor
+ * openthread         a57d927b0ace94972a49ea2672c9073b88b86377 https://github.com/nrfconnect/sdk-openthread
+ * suit-generator     34583134444365cbf35a591c7f8c5c497a10feef https://github.com/nrfconnect/suit-generator
+ * suit-processor     45059255a7c863e00c2a31db7af268446208633b https://github.com/nrfconnect/suit-processor
  * cmock              f65066f15d8248e6dcb778efb8739904a4512087 https://github.com/ThrowTheSwitch/cmock
  * memfault-firmware-sdk 47d69c572c44c19d23936193629e19372e22c7e2 https://github.com/memfault/memfault-firmware-sdk
  * bsim               9ee22c707970f6621adba0375841c0a609e24628 https://github.com/BabbleSim/bsim_west
@@ -47,8 +48,8 @@
  * cmsis-nn           ea987c1ca661be723de83bd159aed815d6cbd430 https://github.com/zephyrproject-rtos/cmsis-nn
  * edtt               b9ca3c7030518f07b7937dacf970d37a47865a76 https://github.com/zephyrproject-rtos/edtt
  * fatfs              427159bf95ea49b7680facffaa29ad506b42709b https://github.com/zephyrproject-rtos/fatfs
- * hal_nordic         c1c448df1b751c1c03229a447a2216f29e6aaf99 https://github.com/zephyrproject-rtos/hal_nordic
- * hal_st             b2f548fe672f24122c7f92027b2c9eeea8a0483a https://github.com/zephyrproject-rtos/hal_st
+ * hal_nordic         ab5cb2e2faeb1edfad7a25286dcb513929ae55da https://github.com/zephyrproject-rtos/hal_nordic
+ * hal_st             b77157f6bc4395e398d90ab02a7d2cbc01ab2ce7 https://github.com/zephyrproject-rtos/hal_st
  * hal_wurthelektronik e5bcb2eac1bb9639ce13b4dafc78eb254e014342 https://github.com/zephyrproject-rtos/hal_wurthelektronik
  * hostap             44285310338f423021cc7df2c1056256882a00cc https://github.com/zephyrproject-rtos/hostap
  * libmetal           a6851ba6dba8c9e87d00c42f171a822f7a29639b https://github.com/zephyrproject-rtos/libmetal
@@ -63,22 +64,22 @@
  * picolibc           06bde1fd7531b1f788f6e42b6f7b358c0fe4f814 https://github.com/zephyrproject-rtos/picolibc
  * segger             b011c45b585e097d95d9cf93edf4f2e01588d3cd https://github.com/zephyrproject-rtos/segger
  * tinycrypt          1012a3ebee18c15ede5efc8332ee2fc37817670f https://github.com/zephyrproject-rtos/tinycrypt
- * uoscore-uedhoc     84ef879a46d7bfd9a423fbfb502b04289861f9ea https://github.com/zephyrproject-rtos/uoscore-uedhoc
- * zcbor              47f34dd7f5284e8750b5a715dee7f77c6c5bdc3f https://github.com/zephyrproject-rtos/zcbor
+ * uoscore-uedhoc     150f4eb2955eaf36ac0f9519d4f4f58d5ade5740 https://github.com/zephyrproject-rtos/uoscore-uedhoc
+ * zcbor              75d088037eb237b18e7ec1f47c9ce494b9b95aab https://github.com/zephyrproject-rtos/zcbor
  */
 
 
 /** ZBOSS build tag */
-#define ZBOSS_BUILD_TAG "ncs_release-3.11.5.0"
+#define ZBOSS_BUILD_TAG "ncs_release-4.1.0.0"
 
 /** ZBOSS platform build tag */
-#define ZBOSS_PLATFORM_BUILD_TAG "v3.11.5.0+v5.1.6"
+#define ZBOSS_PLATFORM_BUILD_TAG "v4.1.0.0+v5.1.5"
 
 /** ZBOSS build date (UTC) */
-#define ZBOSS_BUILD_DATE 20241104
+#define ZBOSS_BUILD_DATE 20240812
 
 /** ZBOSS build time (UTC) */
-#define ZBOSS_BUILD_TIME 094223
+#define ZBOSS_BUILD_TIME 140359
 
 
 #endif /* ZBOSS_BUILD_INFO_H__ */

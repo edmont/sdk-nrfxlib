@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -146,14 +146,10 @@ typedef enum zdo_diagnostics_counter_id_e
   ZDO_DIAGNOSTICS_PACKET_VALIDATEDROPCOUNT_ID = 22,
   /** @brief PacketBufferAllocateFeatures, Zigbee Diagnostic Cluster spec 1.2.2.2.24 */
   ZDO_DIAGNOSTICS_AVERAGE_MAC_RETRY_PER_APS_ID = 23,
-#ifdef ZB_ENABLE_NWK_RETRANSMIT
   /** A counter that is incremented on the NWK layer
    *  each time tries number of a packet resending are gone.
-   *
-   * @note It's a non-standard counter that depends on ZB_ENABLE_NWK_RETRANSMIT and
-   *       will be zero always when the macro isn't set. */
+   */
   ZDO_DIAGNOSTICS_NWK_RETRY_OVERFLOW_ID = 24,
-#endif /* ZB_ENABLE_NWK_RETRANSMIT */
   /** A non-standard counter of the number of times the NWK broadcast was dropped
    *  because the broadcast table was full. */
   ZDO_DIAGNOSTICS_NWK_BCAST_TABLE_FULL = 25

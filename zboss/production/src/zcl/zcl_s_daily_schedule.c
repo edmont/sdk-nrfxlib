@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -382,7 +382,7 @@ static zb_bool_t zb_zcl_daily_schedule_process_get_schedule_cancellation(zb_uint
 
   if (ZB_ZCL_DEVICE_CMD_PARAM_STATUS(param) == RET_OK)
   {
-#ifdef ZB_ZCL_DAILY_SCHEDULE_CANCEL_PARTICULAR_SCHEDULE
+#ifndef ZB_ZCL_DAILY_SCHEDULE_CANCEL_ALL_SCHEDULE
     ZB_ZCL_DAILY_SCHEDULE_SEND_CMD_HELPER(zb_zcl_daily_schedule_send_cmd_cancel_schedule, param, cmd_info, &pl_out, NULL);
 #else
     zb_zcl_daily_schedule_send_cmd_cancel_all_schedules(param,

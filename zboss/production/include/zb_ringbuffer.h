@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -291,7 +291,7 @@ do                                                                              
  */
 #define ZB_RING_BUFFER_PUT_REUSE_LAST(rb, value_ptr)                    \
 (                                                                       \
-  memcpy(&((rb)->ring_buf[((rb)->write_i ? (rb)->write_i - 1U : (rb)->write_i + ZB_RING_BUFFER_CAPACITY(rb) - 1U)]), \
+  ZB_MEMCPY(&((rb)->ring_buf[((rb)->write_i ? (rb)->write_i - 1U : (rb)->write_i + ZB_RING_BUFFER_CAPACITY(rb) - 1U)]), \
            (value_ptr),                                                 \
            sizeof((rb)->ring_buf[0]))                                   \
     )
@@ -347,6 +347,51 @@ do                                                                              
   ((rb)->read_i = ((rb)->read_i + 1U) % ZB_RING_BUFFER_CAPACITY(rb))     \
   )
 
+#define ZB_RING_BUFFER_READ_TAIL_SIZE(rb) \
+  (ZB_RING_BUFFER_CAPACITY(rb) - (rb)->read_i)
+
+#define ZB_RING_BUFFER_READ_POS_WITH_OFFSET(rb, offset) \
+    (((rb)->read_i + (offset)) % ZB_RING_BUFFER_CAPACITY(rb))
+
+/**
+ * Get entries from the ring buffer from specified offset which can be get at once
+ *
+ * @param rb -  ring buffer pointer.
+ * @param offset - offset from read position that should be used to find batch of entries
+ * @param size - (out) number of entries which can be got
+ *
+ * @return pointer to the ring buffer entry
+ *
+ * Simplified code look like this:
+ *
+ * let pos = (read_i + offset) % capacity
+ * let tail = capacity - read_i
+ *
+ * offset >= written => { size = 0, ptr = write_i }
+ * offset <  written => {
+ *    pos <= write_i => { size = written - offset,  ptr = pos }
+ *    pos > write_i  => { size = tail - offset,     ptr = pos }
+ * }
+ */
+#define ZB_RING_BUFFER_SEARCH_BATCH(rb, offset, size)                                    \
+  (                                                                                      \
+    ((offset) >= (rb)->written)                                                          \
+      ?                                                                                  \
+      (                                                                                  \
+        (size) = 0,                                                                      \
+        ((rb)->ring_buf + (rb)->write_i)                                                 \
+      )                                                                                  \
+      :                                                                                  \
+      (                                                                                  \
+        (size) = ((ZB_RING_BUFFER_READ_POS_WITH_OFFSET((rb), (offset)) <= (rb)->write_i) \
+          ?                                                                              \
+          ((rb)->written - (offset))                                                     \
+          :                                                                              \
+          (ZB_RING_BUFFER_READ_TAIL_SIZE(rb) - (offset))                                 \
+        ),                                                                               \
+        ((rb)->ring_buf + ZB_RING_BUFFER_READ_POS_WITH_OFFSET((rb), (offset)))           \
+      )                                                                                  \
+  )                                                                                      \
 
 /**
  * Get entries from the ring buffer read pointer position which can be get at once
@@ -356,16 +401,8 @@ do                                                                              
  *
  * @return pointer to the ring buffer entry
  */
-#define ZB_RING_BUFFER_GET_BATCH(rb, size)                              \
-  (                                                                     \
-    (size) = ((rb)->written <= (ZB_RING_BUFFER_CAPACITY(rb) - (rb)->read_i) \
-            ?                                                           \
-            (rb)->written                                               \
-            :                                                           \
-            (ZB_RING_BUFFER_CAPACITY(rb) - (rb)->read_i)),              \
-    (rb)->ring_buf + (rb)->read_i                                       \
-  )                                                                     \
-
+#define ZB_RING_BUFFER_GET_BATCH(rb, size) \
+  ZB_RING_BUFFER_SEARCH_BATCH((rb), 0, (size))
 
 
 /**

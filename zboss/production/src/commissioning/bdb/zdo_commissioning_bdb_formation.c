@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -135,6 +135,7 @@ static void bdb_formation_force_link(void)
 
   FORMATION_SELECTOR().start_formation = bdb_formation;
   FORMATION_SELECTOR().get_formation_channels_mask = bdb_commissioning_formation_channels_mask;
+  FORMATION_SELECTOR().get_scan_duration = bdb_get_scan_duration;
 }
 
 #ifdef ZB_COORDINATOR_ROLE
@@ -160,15 +161,37 @@ void zb_set_network_coordinator_role_ext(zb_channel_list_t channel_list)
 
 #ifdef ZB_DISTRIBUTED_SECURITY_ON
 
-void zb_enable_distributed(void)
+/* Note that "enable distributed" is in that file while "disable distributed" is
+ * in zdo_commissioning_bdb.c. The idea is that enabling distributed formation
+ * causes linking of Formation logic at ZR-only build while disabling it does
+ * not link Formation code freeing some flash space. */
+
+static void bdb_enable_distributed(void)
 {
   bdb_formation_force_link();
 }
 
-void zb_disable_distributed(void)
+void zb_enable_distributed(void)
 {
-  FORMATION_SELECTOR().start_formation = NULL;
-  FORMATION_SELECTOR().get_formation_channels_mask = NULL;
+  bdb_enable_distributed();
+}
+
+void zb_bdb_enable_distributed_network_formation(void)
+{
+  bdb_enable_distributed();
+  zb_zdo_setup_network_as_distributed();
+}
+
+void zb_bdb_enable_distributed_formation(zb_bool_t enable)
+{
+  if (enable)
+  {
+    zb_bdb_enable_distributed_network_formation();
+  }
+  else
+  {
+    zb_bdb_disable_distributed_network_formation();
+  }
 }
 
 #endif /* ZB_DISTRIBUTED_SECURITY_ON */

@@ -13,7 +13,7 @@ void zb_trans_set_long_addr(zb_ieee_addr_t long_addr);
 void zb_trans_set_short_addr(zb_uint16_t addr);
 void zb_trans_start_get_rssi(zb_uint8_t scan_duration_bi);
 void zb_trans_get_rssi(zb_uint8_t *rssi_value_p);
-void zb_trans_set_channel(zb_uint8_t channel_number);
+zb_ret_t zb_trans_set_channel(zb_uint8_t channel_number);
 void zb_trans_set_tx_power(zb_int8_t power);
 void zb_trans_get_tx_power(zb_int8_t *power);
 void zb_trans_set_pan_coord(zb_bool_t pan_coord);

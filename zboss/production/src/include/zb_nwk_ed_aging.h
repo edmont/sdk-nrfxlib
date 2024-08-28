@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -77,16 +77,14 @@ typedef zb_uint8_t nwk_requested_timeout_status_t;
 #define ZB_GET_KEEPALIVE_MODE() ZB_NIB().nwk_keepalive_modes
 #define ZB_SET_KEEPALIVE_MODE(mode) ZB_NIB().nwk_keepalive_modes = (mode)
 
-#ifdef ZB_ED_FUNC
 #define ZB_GET_ED_TIMEOUT() ZB_NIB().nwk_ed_timeout_default
 #define ZB_GET_KEEPALIVE_TIMEOUT() ZB_NIB().nwk_ed_keepalive_timeout
-#endif /* ZB_ED_FUNC */
 
 #define NWK_ED_DEVICE_TIMEOUT_DEFAULT 8U /*This is an index into. It indicates the default timeout in minutes for any end device that does not negotiate a different timeout value.*/
 
 #define NWK_ED_DEVICE_CONFIG_DEFAULT 0x00U /*At this time there are no enumerated bits in the configuration field. Devices adhering to this standard shall set the field to 0.*/
 
-#define ZB_NWK_ED_TIMEOUT_RESP_FAILURE_TMO (5U * ZB_TIME_ONE_SECOND)
+#define ZB_NWK_ED_TIMEOUT_RESP_FAILURE_TMO (7U * ZB_TIME_ONE_SECOND)
 
 /**
    End device timeout request command

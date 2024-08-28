@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -84,6 +84,11 @@ zb_uint32_t zb_crc32_next_v2(zb_uint32_t prev_crc, zb_uint8_t *p, zb_uint16_t le
  * Calculates number of '1' in 16bit bitmask
  */
 zb_uint8_t zb_bit_cnt16(zb_uint16_t a);
+
+/**
+ * Calculates number of '1' in 32bit bitmask
+ */
+zb_uint8_t zb_bit_cnt32(zb_uint32_t a);
 
 void zb_inverse_bytes(zb_uint8_t *ptr, zb_uint32_t len);
 

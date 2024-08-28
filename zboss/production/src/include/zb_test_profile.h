@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -172,6 +172,7 @@ typedef struct zb_buffer_test_req_param_s
   zb_uint8_t radius;        /*!< Radius */
   zb_uint8_t tx_options;    /*!< TX Options */
   zb_uint16_t profile_id;    /*!< profile id */
+  zb_uint8_t rx_timeout_s;
 }
 zb_buffer_test_req_param_t;
 
@@ -188,8 +189,9 @@ zb_buffer_test_req_param_t;
 		                                      _p->src_ep = ZB_TEST_PROFILE_EP;                    \
 		                                      _p->dst_ep = ZB_TEST_PROFILE_EP;                    \
 		                                      _p->radius = MAX_NWK_RADIUS;                        \
-		                                      _p->tx_options = 0;                        \
-                                                      _p->profile_id = ZB_TEST_PROFILE_ID
+                                                      _p->profile_id = ZB_TEST_PROFILE_ID;                \
+                                                      _p->tx_options = 0U;                                \
+                                                      _p->rx_timeout_s = 0U
 
 /**
    Set default data
@@ -243,6 +245,7 @@ typedef ZB_PACKED_PRE struct zb_buffer_test_response_param_s
   zb_uint8_t addr_mode; /*!< address type (group or device address) */
   zb_uint8_t src_ep;    /*!< Source endpoint */
   zb_uint8_t dst_ep;    /*!< Destination endpoint */
+  zb_uint8_t security;
   zb_uint8_t tx_options;/*!< TX Options */
 }
 ZB_PACKED_STRUCT
@@ -408,13 +411,15 @@ void zb_tp_buffer_test_request_EP_brdcast(zb_uint8_t param, zb_callback_t cb);
  */
 void zb_tp_device_announce(zb_uint8_t param);
 
+void zb_send_buf_test_req_signal(zb_uint8_t param, zb_ret_t status);
+
 #ifdef USE_COUNTER_RES_REQ
 void zb_tp_retrive_packet_count(zb_uint8_t param);
 #endif
 
 #if defined ZB_PRO_STACK && defined ZB_TEST_CUSTOM_LINK_STATUS && defined ZB_ROUTER_ROLE
 /* Custom link status command for testing purpose only
- * (allow to send cmd from some predefined adddress)
+ * (allow to send cmd from some predefined address)
  */
 zb_bool_t zb_tp_send_link_status_command(zb_uint8_t param, zb_uint16_t short_addr);
 #endif

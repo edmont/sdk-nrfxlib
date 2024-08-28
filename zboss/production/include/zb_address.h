@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -158,7 +158,7 @@ while (0)
   && (one).device_id[3] == (two).device_id[3]             \
   && (one).device_id[4] == (two).device_id[4] )
 */
-zb_bool_t zb_address_compressed_cmp(zb_ieee_addr_compressed_t *one, zb_ieee_addr_compressed_t *two);
+zb_bool_t zb_address_compressed_cmp(const zb_ieee_addr_compressed_t *one, const zb_ieee_addr_compressed_t *two);
 #define ZB_ADDRESS_COMPRESSED_CMP(one, two) zb_address_compressed_cmp(&one, &two)
 
 #define ZB_ADDRESS_COMPRESSED_COPY(dest, src)                       \
@@ -457,7 +457,7 @@ zb_ret_t zb_address_by_ieee(const zb_ieee_addr_t ieee, zb_bool_t create, zb_bool
    @par
 
  */
-zb_uint16_t zb_address_short_by_ieee(zb_ieee_addr_t ieee_address);
+zb_uint16_t zb_address_short_by_ieee(const zb_ieee_addr_t ieee_address);
 
 
 /**

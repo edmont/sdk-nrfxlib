@@ -52,11 +52,11 @@
 */
 
 #ifndef ZBOSS_MAJOR
-#define ZBOSS_MAJOR 3U
+#define ZBOSS_MAJOR 4U
 #endif
 
 #ifndef ZBOSS_MINOR
-#define ZBOSS_MINOR 11U
+#define ZBOSS_MINOR 1U
 #endif
 
 #endif /* ZB_VERSION_H */

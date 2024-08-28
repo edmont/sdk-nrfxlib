@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -79,6 +79,8 @@ shall have a value of 5A 69 67 42 65 65 41 6C 6C 69 61 6E 63 65 30 39
 /*! Define a default global trust center link key */
 #define ZB_STANDARD_TC_KEY {0x5A, 0x69, 0x67, 0x42, 0x65, 0x65, 0x41, 0x6C, 0x6C, 0x69, 0x61, 0x6E, 0x63, 0x65, 0x30, 0x39 };
 
+/*! ZigbeeAlliance18 key */
+#define ZB_STANDARD_ECDHE_KEY {0x5A, 0x69, 0x67, 0x42, 0x65, 0x65, 0x41, 0x6C, 0x6C, 0x69, 0x61, 0x6E, 0x63, 0x65, 0x31, 0x38 };
 
 /**
  In ZLL specification this is ZLL Certification pre-installed link key - see
@@ -153,6 +155,9 @@ key. They use same algorithm.
 /*! Define number of network keys with the frame counter */
 #define ZB_SECUR_N_SECUR_MATERIAL 3U
 #endif
+
+#define ZB_PAKE_PASSCODE_LENGTH 4
+#define ZB_PAKE_PASSCODE_EXPAND_LENGTH ZB_CCM_KEY_SIZE
 
 /* parameters for security level 5 - the only security level supported */
 /**
@@ -264,9 +269,20 @@ key. They use same algorithm.
 
 /*!
  APS: APS ACK wait time from Sleepy devices. After this timeout resend APS packet
-      see Zigbee specification revision 22 section 2.2.7.1 APS Constants
+      see Zigbee specification revision 23 section 2.2.7.1 APS Constants
 */
+#ifdef ZB_SLEEPY_ACK_WAIT_DURATION_INCREASE
+/*
+Motivation of increasing wait dueration: be able to retry send when ZED polling not so fast, else it all will be expired in MAC.
+ */
   #define ZB_N_APS_ACK_WAIT_DURATION_FROM_SLEEPY (10U*ZB_TIME_ONE_SECOND)
+#else
+/*
+To satisfy negative test in the testsute of some customer use same value as for ZR
+*/
+#define ZB_N_APS_ACK_WAIT_DURATION_FROM_SLEEPY ZB_N_APS_ACK_WAIT_DURATION_FROM_NON_SLEEPY
+#endif
+
 /** @cond internals_doc */
 /*!
  APS: The base amount of delay before each broadcast parent announce is sent.
@@ -287,7 +303,7 @@ The max amount of jitter that is added to the apsParentAnnounceBaseTimer before 
   /* Some devices send APS_ACK to AF and ZDO commands after sending appropriate response or
    * DefaultResponse. For example, ZCL On/Off command can be done within 5-7 seconds,
    * so 2 seconds for wail duration is insufficiently. */
-  #define ZB_N_APS_ACK_WAIT_DURATION_FROM_NON_SLEEPY (3U*ZB_TIME_ONE_SECOND)
+  #define ZB_N_APS_ACK_WAIT_DURATION_FROM_NON_SLEEPY (ZB_MILLISECONDS_TO_BEACON_INTERVAL(1600))
 
 /**
  APS: maximum number of tables with information from a binding table to be sent to the devices
@@ -305,7 +321,9 @@ The max amount of jitter that is added to the apsParentAnnounceBaseTimer before 
 /**
    Disable APS acknowledgement request bit in APS commands.
 */
+#if 0
 #define ZB_APS_DISABLE_ACK_IN_COMMANDS
+#endif
 /** @endcond *//*internals_doc*/
 
 /* EE: wrong place for that constant in zb_aps.h (this is not public APS API!) and wrong
@@ -334,6 +352,12 @@ At the worst case our NWK can skip long address at tx: 8 bytes of reserve.
    Maximal frame size
  */
 #define MAX_PHY_FRM_SIZE              127U
+
+/**
+   MAC overhead for unicast frame with Pan ID compression (normal case when
+   sending via nwk), including FCS bytes
+*/
+#define MAX_MAC_OVERHEAD_SHORT_ADDRS  11U
 
 /* ZB packet length must not exceed 127 bytes
  *
@@ -573,14 +597,15 @@ At the worst case our NWK can skip long address at tx: 8 bytes of reserve.
 
 /****************************NWK layer options**************************/
 /** @cond internals_doc */
+
 /*!
-   Define maximum number of children per node.
+ Define maximum number of nodes on network
+ that can be defined using configurable memory feature.
 
- This value should be defined in stack profile.
-
- See Zigbee specification revision 22 subclause 3.5.2
+ Maximum number of nodes on network in build
+ with configurable memory feature enabled shouldn't be greater than this value.
 */
-#define ZB_NWK_MAX_CHILDREN 4U
+#define ZB_NWK_CONFIGURABLE_MEM_MAX_NETWORK_SIZE 200U
 
 /*!
  Define maximum number of routers per node.
@@ -602,6 +627,7 @@ At the worst case our NWK can skip long address at tx: 8 bytes of reserve.
 #define ZB_NWK_STOCH_DEPTH    15U
 
 
+#ifndef ZB_CONFIGURABLE_MEM
 /*!
    NWK Mesh route stuff: route discovery table size
 */
@@ -609,12 +635,14 @@ At the worst case our NWK can skip long address at tx: 8 bytes of reserve.
 #define ZB_NWK_ROUTE_DISCOVERY_TABLE_SIZE 6U
 #endif
 
+#endif /* ZB_CONFIGURABLE_MEM */
+
 /* nwkcRouteDiscoveryTime == 0x2710 ms == 10 sec. Expiry function called once
  * per second */
-/*! Time period for calling route discovery expiry function */
-#define ZB_NWK_ROUTE_DISCOVERY_EXPIRY 10U
-/*! Length of the route discovery function */
-#define ZB_NWK_EXPIRY_ROUTE_DISCOVERY (ZB_N_APS_ACK_WAIT_DURATION_FROM_SLEEPY / ZB_NWK_ROUTE_DISCOVERY_EXPIRY)
+/*! Count of route discovery expiry function calls */
+#define ZB_NWK_ROUTE_DISCOVERY_EXPIRATION_TIME_CNTR 10U
+/*! Time period between the route discovery function (zb_nwk_mesh_expiry_route_disc) calls */
+#define ZB_NWK_ROUTE_DISCOVERY_EXPIRY_FUNC_PERIOD (ZB_TIME_ONE_SECOND)
 
 /*#define ZB_NWK_RREQ_TABLE_SIZE 5*/
 
@@ -646,7 +674,13 @@ At the worst case our NWK can skip long address at tx: 8 bytes of reserve.
 #endif
 
 /*! Pending entry expiry during route request */
-#define ZB_NWK_PENDING_ENTRY_EXPIRY 2U
+#define ZB_NWK_PENDING_ENTRY_EXPIRY_CNTR 2U
+
+/*! Period of expiration ctr decreasing. See nib.pending_table usage.
+    Pending table saves original request while discovery is in progress,
+      so keep timeout the same as in the discovery table. (Total of 10 seconds) */
+#define ZB_NWK_PENDING_EXPIRY_FUNC_PERIOD (ZB_SECONDS_TO_BEACON_INTERVAL(5U)) /* 5 seconds */
+
 /*! Network static path cost */
 #define ZB_NWK_STATIC_PATH_COST 7U
 
@@ -688,9 +722,6 @@ At the worst case our NWK can skip long address at tx: 8 bytes of reserve.
 /* nwkcRREQRetryInterval */
 #define ZB_NWKC_RREQ_RETRY_INTERVAL 0x1f02U
 
-/*! Expiration time of pending period */
-#define ZB_NWK_EXPIRY_PENDING (ZB_N_APS_ACK_WAIT_DURATION_FROM_SLEEPY / 2U) /* 5 seconds */
-
 /* 9 seconds */
 /* According to 2013 PICS, it should be 9 sec.
    According to spec, it should be converted from broadcastDeliveryTime */
@@ -700,7 +731,7 @@ At the worst case our NWK can skip long address at tx: 8 bytes of reserve.
 
 /* Check if it is really should be so long. According to r21 spec, 3.6.3.2 - it is out of
  * the scope of this spec. */
-/* Should correspond to ( 5 * minutes = 300 seconds / ZB_NWK_EXPIRY_PENDING )  */
+/* Should correspond to ( 5 * minutes = 300 seconds / ZB_NWK_PENDING_EXPIRY_FUNC_PERIOD )  */
 /*! Expiration time of the network routing table  */
 #define ZB_NWK_ROUTING_TABLE_EXPIRY 60U
 
@@ -802,12 +833,6 @@ nwkMaxBroadcastRetries
 #endif
 /** @endcond *//* internals_doc */
 
-/*!
- *   Default value of nib.max_children - max number of children which can join to this device
- *
- *   See Zigbee Specification revision 22 section 3.5.2 NWK Information Base
-*/
-#define ZB_DEFAULT_MAX_CHILDREN 32U
 /**@cond internals_doc */
 /* Old feature from pre-3.0 (HA) era */
 /* If there was an error in NWK security processing of incoming packet from parent,
@@ -823,11 +848,6 @@ nwkMaxBroadcastRetries
 #define ZB_TC_REJOIN_ENABLE
 
  /*!
-   Define policy of ignoring assoc. permit and corresponding flags during rejoin
- */
-#define  ZB_REJOIN_IGNORES_FLAGS
-
-/*!
 Workaround for secure rejoin
 */
 #define xZB_NO_KEY_AFTER_REJOIN
@@ -980,6 +1000,10 @@ Workaround for secure rejoin
    Timeout for turbo poll
  */
 #define ZB_PIM_TURBO_POLL_LEAVE_TIMEOUT (ZB_TIME_ONE_SECOND / 3U)
+/*!
+   Maximal number of turbo poll retries when data receiving failed
+ */
+#define ZB_PIM_TURBO_POLL_MAX_RETRIES (3U)
 /**@cond internals_doc*/
 /*!
    Timeout for poll buffer allocation retry
@@ -1028,7 +1052,7 @@ Workaround for secure rejoin
 #define ZB_ZDO_NWK_SCAN_ATTEMPTS 5U
 /** @cond internals_doc */
 /*! Delay for sending the end device request command. */
-#define ZB_ZDO_SEND_ED_TIMEOUT_REQ_DELAY ZB_MILLISECONDS_TO_BEACON_INTERVAL(100U)
+#define ZB_ZDO_SEND_ED_TIMEOUT_REQ_DELAY ZB_MILLISECONDS_TO_BEACON_INTERVAL(500U)
 /** @endcond *//*internals_doc*/
 /**********************************************************************/
 /************************** MAC SECTION********************************/
@@ -1243,14 +1267,11 @@ The CCA detection time shall be equal to 8 symbol periods.
  * If the ZB_MAC_RX_QUEUE_CAP is smaller than ZB_MAC_QUEUE_SIZE this situation is avoided,
  * since the node stops sending MAC ACKs for frames that it cannot send a response to immediately.
  */
+
+/* MAC queue size has been increased for R23 as TC_19_8 periodically overflowed the q_rx */
 #ifndef ZB_MAC_QUEUE_SIZE
-#if defined ZB_SUBGHZ_ONLY_MODE || defined ZB_R22_MULTIMAC_MODE
-/* Increased MAC queue size for Sub-GHz because the LBT mechanism periodically blocks the radio */
-#define ZB_MAC_QUEUE_SIZE 7U
-#else
-#define ZB_MAC_QUEUE_SIZE 5U
+#define ZB_MAC_QUEUE_SIZE 8U
 #endif
-#endif /* ZB_MAC_QUEUE_SIZE */
 
 /*
 The maximum time, in
@@ -1301,8 +1322,11 @@ request command frame.
 *  IEEE Standard for Low-Rate Wireless Networks 2006, section 7.4.2 MAC PIB attributes.
 *
 *  @note Make sure the time value is not too big.
+*  There is no defined value for sub-ghz now. In case of aLBTTxMinOff frame can be sent with a
+*  delay in case of it's own transmission right before Received Date Req. This value calculated
+*  taking into account this possible situation.
 */
-#define ZB_MAX_FRAME_TOTAL_WAIT_TIME_SUB_GHZ (ZB_MILLISECONDS_TO_BEACON_INTERVAL(48U) + 1U)
+#define ZB_MAX_FRAME_TOTAL_WAIT_TIME_SUB_GHZ (ZB_MILLISECONDS_TO_BEACON_INTERVAL(136U) + 1U)
 
 
 /*!
@@ -1315,7 +1339,10 @@ request command frame.
 /*!
 *  Sets MAC address at start
 */
+
+#ifndef ZB_DONT_SET_DEFAULT_IEEE_ADDRESS
 #define ZB_SET_MAC_ADDRESS
+#endif
 
 #ifndef ZB_SEND_BEACON_IMMEDIATELY
 /*!
@@ -1368,6 +1395,7 @@ request command frame.
 #endif /* ZB_MAC_HANDLE_BEACON_REQ_LOW_TMO */
 /*! @endcond */ /* internals_doc */
 /** @cond DOXYGEN_MULTIMAC_SECTION */
+
 /*!
 *  European Sub-GHz FSK reverence sensitivity level, in dBm
 *  D.10.2.2.1.2. Sensitivity Requirement,
@@ -1523,7 +1551,7 @@ request command frame.
 #define ZB_MAC_LBT_MAX_TX_RETRIES 3U
 
 /* Tuned to fit to 2 beacon intervals */
-/*! LBT transmition wait period in ms */
+/*! LBT transmission wait period in ms */
 #define ZB_MAC_LBT_TX_WAIT_QUANT_MS        33U
 
 /* aDUTYCYCLEMeasurementPeriod */
@@ -1639,7 +1667,9 @@ request command frame.
 #define ZB_DEFAULT_BDB_TCLINK_KEY_EXCHANGE_ATTEMPTS_MAX 3U
 /** @endcond *//*internals_doc*/
 /*! Specification version of the specification */
-#define ZB_STACK_SPEC_VERSION 22U
+#define ZB_STACK_SPEC_VERSION 23U
+
+#define ZB_MAX_BEACON_APPENDIX_TLV_SIZE    32U
 
 
 /*! @cond touchlink */
@@ -1697,7 +1727,7 @@ request command frame.
 *  the last stage is successful or,
 *  otherwise, start the cancel procedure.
 */
-#define ZB_ZGP_TIMEOUT_BEFORE_FORCE_CANCEL (3U * ZB_TIME_ONE_SECOND)
+#define ZB_ZGP_TIMEOUT_BEFORE_FORCE_CANCEL 0U
 
 /*! Unspecified Zigbee Green Power device manufacturer ID */
 #define ZB_ZGPD_MANUF_ID_UNSPEC     0xFFFFU
@@ -1710,9 +1740,13 @@ request command frame.
 /*! Maximum number of paired endpoints*/
 #define ZB_ZGP_MAX_PAIRED_ENDPOINTS 2U
 /*! Maximum number of paired Green Power devices commands */
-#define ZB_ZGP_MAX_PAIRED_CONF_GPD_COMMANDS 2U
+#ifndef ZB_ZGP_MAX_PAIRED_CONF_GPD_COMMANDS
+#define ZB_ZGP_MAX_PAIRED_CONF_GPD_COMMANDS 6U
+#endif /* ZB_ZGP_MAX_PAIRED_CONF_GPD_COMMANDS */
 /*! Maximum number of paired configuration clusters */
+#ifndef ZB_ZGP_MAX_PAIRED_CONF_CLUSTERS
 #define ZB_ZGP_MAX_PAIRED_CONF_CLUSTERS 2U
+#endif /* ZB_ZGP_MAX_PAIRED_CONF_CLUSTERS */
 /** @endcond */ /* DOXYGEN_ZGP_SECTION */
 /*! @} */
 
@@ -1758,5 +1792,41 @@ request command frame.
 #define ZB_MULTITEST_CONSOLE_SLEEP_TIMEOUT 4000000U
 #endif
 
+/**
+   Minimum time between PAN ID conflicts resolution.
+   It's need to prevent frequently PAN ID changes.
+*/
+#define ZB_PANID_CONFLICTS_RESOLUTION_DELAY_TIME (2U * 60U * ZB_TIME_ONE_SECOND)
+
+
+/**
+   Interval between detecting PANID conflict at ZC by monitoring
+   beacons or by receiving pre-r23 Network reports and sending
+   ZB_NWK_SIGNAL_PANID_CONFLICT_DETECTED to the application
+*/
+#define ZB_PANID_CONFLICT_SIGNAL_TIMEOUT (ZB_TIME_ONE_SECOND * 10U)
+
+/* This indicates the lowest LQA value for beacons received from routers so
+that they will be preferred for joining or rejoining. LQI is used instead of LQA when Active Power Control is
+used on this link. See section 3.6.1.5.2 for its usage. */
+#define ZB_GOOD_PARENT_LQA  (75U)
+
+/* Default timeout for aps counter sync. After this timeout the challenge context is cleared,
+ * if the aps counter sync was not completed.
+ * See apsChallengePeriodTimeoutSeconds (section 4.4.12 Security-Related AIB Attributes, Table 4-34 AIB Security Attributes) */
+#define ZB_APS_CHALLENGE_DEFAULT_TIMEOUT_SEC (5U)
+
+/* Delay for next key_negotiation_req after receiving key_neg_response with TEMPORARY_FAILURE status.
+ * Shall be 5 seconds or greater (see 2.4.4.4.1.4) */
+#define ZB_SECUR_KEY_NEG_DELAY_AFTER_FAILURE (5u * ZB_TIME_ONE_SECOND)
+
+#ifdef ZB_MACSPLIT
+#ifndef ZB_MACSPLIT_NO_ACK_DELAY
+/*! Delay for this number of beacon intervals when ACK sending logic
+decided that it can be good to delay sending ACK as a single packet
+but send it in the next data packet */
+#define ZB_MACSPLIT_ACK_DELAY_TIME 1u
+#endif
+#endif
 
 #endif /* ZB_CONFIG_COMMON_H */

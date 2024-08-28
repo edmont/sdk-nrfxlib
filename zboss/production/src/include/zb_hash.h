@@ -63,7 +63,7 @@
 #define ZB_1INT_HASH_FUNC(v1)          (ZB_HASH_FUNC_STEP(ZB_HASH_MAGIC_VAL, (v1)) & ZB_INT_MASK)
 
 /* Calculate a hash using DJB2 hash function */
-zb_uint32_t zb_64bit_hash(zb_uint8_t *data);
+zb_uint32_t zb_64bit_hash(zb_uint8_t const *data);
 
 /**
  * Calculate Fowler-Noll-Vo hash.

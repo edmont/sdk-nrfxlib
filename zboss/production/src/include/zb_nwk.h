@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -48,6 +48,7 @@
 #include "zb_nwk_nib.h"
 #include "zb_nwk_mm.h"
 #include "zb_nwk_ed_aging.h"
+#include "zb_nwk_neighbor.h"
 
 /** \addtogroup nwk_api */
 /** @{ */
@@ -60,7 +61,7 @@
  * @name NWK layer status values
  * @anchor nwk_status
  * @see ZB spec, clause 3.7
- */
+  */
 /** @{ */
 /** A request has been executed successfully. */
 #define ZB_NWK_STATUS_SUCCESS                0x00U
@@ -68,7 +69,7 @@
  */
 #define ZB_NWK_STATUS_INVALID_PARAMETER      0xC1U
 /** The next higher layer has issued a request that is invalid or cannot be executed given  the
- * current state of the  NWK layer. */
+                                                 * current state of the  NWK layer. */
 #define ZB_NWK_STATUS_INVALID_REQUEST        0xC2U
 /** An NLME-JOIN.request has been  disallowed. */
 #define ZB_NWK_STATUS_NOT_PERMITTED          0xC3U
@@ -82,7 +83,7 @@
 /** An NLME-JOIN-DIRECTLY.request has failed because there is no more room in the neighbor table. */
 #define ZB_NWK_STATUS_NEIGHBOR_TABLE_FULL    0xC7U
 /** An NLME-LEAVE.request has failed because the device addressed in the parameter list is not in
- * the neighbor table of the issuing device. */
+                                                 * the neighbor table of the issuing device. */
 #define ZB_NWK_STATUS_UNKNOWN_DEVICE         0xC8U
 /** An NLME-GET.request or NLME-SET.request has been  issued with an unknown attribute identifier.
  */
@@ -90,7 +91,7 @@
 /** An NLME-JOIN.request has been issued in an environment where no networks are detectable. */
 #define ZB_NWK_STATUS_NO_NETWORKS            0xCAU
 /** Security processing has been attempted on an outgoing frame, and has failed because the frame
- * counter has reached its maximum value. */
+                                                 * counter has reached its maximum value. */
 #define ZB_NWK_STATUS_MAX_FRM_COUNTER        0xCCU
 /** Security processing has been attempted on an outgoing frame, and has failed because no key was
  * available with which to process it. */
@@ -99,7 +100,7 @@
  * engine produced erroneous output. */
 #define ZB_NWK_STATUS_BAD_CCM_OUTPUT         0xCEU
 /** An attempt to discover a route has failed due to a lack of routing table or discovery table
- * capacity. */
+                                                 * capacity. */
 #define ZB_NWK_STATUS_NO_ROUTING_CAPACITY    0xCFU
 /** An attempt to discover a route has failed due to a reason other than a lack of routing capacity.
  */
@@ -107,14 +108,26 @@
 /** An NLDE-DATA.request has failed due to a routing failure on the sending device. */
 #define ZB_NWK_STATUS_ROUTE_ERROR            0xD1U
 /** An attempt to send a broadcast frame or member mode multicast has failed due to the fact that
- * there is no room in the BTT. */
+                                                 * there is no room in the BTT. */
 #define ZB_NWK_STATUS_BT_TABLE_FULL          0xD2U
 /** An NLDE-DATA.request has failed due to insufficient buffering available. A non-member mode
  * multicast frame was discarded pending route discovery. */
 #define ZB_NWK_STATUS_FRAME_NOT_BUFFERED     0xD3U
 /** An attempt was made to use a MAC Interface with state that is currently set to FALSE (disabled)
- * or that is unknown to the stack. */
+                                                 * or that is unknown to the stack. */
 #define ZB_NWK_STATUS_INVALID_INTERFACE      0xD5U
+
+/** A required TLV for processing the request was not present */
+#define ZB_NWK_STATUS_MISSING_TLV            0xD6U
+
+/** A TLV was malformed or missing relevant information */
+#define ZB_NWK_STATUS_INVALID_TLV            0xD7U
+
+/** A request was interrupted by a higher layer. */
+#define ZB_NWK_STATUS_INTERRUPTED            0xD8U
+/** An error occurred during executing a request. */
+#define ZB_NWK_STATUS_ERROR                  0xD9U
+
 /** @} */
 
 /**
@@ -133,22 +146,23 @@ typedef enum zb_nwk_multicast_mode_e
 }
 zb_nwk_multicast_mode_t;
 
-#ifdef ZB_APSDE_REQ_ROUTING_FEATURES
 /**
  * @name NLDE non-spec extension values
  * @anchor nlde_tx_opt
- *
+  *
  * Note: These values were members of `enum zb_nlde_tx_opt_e` type but were
  * converted to a set of macros due to MISRA violations.
- */
+  */
 /** @{ */
 /** Non-spec extension: Force mesh route discovery */
 #define ZB_NLDE_OPT_FORCE_MESH_ROUTE_DISC (1U << 0)
 /** Non-spec extension: Force send route record */
 #define ZB_NLDE_OPT_FORCE_SEND_ROUTE_REC (1U << 1)
-/** Non-spec extension: Force send route record. Auxillary bitfield for marking route as many-to-one
+/** Non-spec extension: Force send route record. Auxiliary bitfield for marking route as many-to-one
  * for force rrec sending */
 #define ZB_NLDE_OPT_TEMPORARY_MARK_ROUTE_AS_MTO (1U << 2)
+#define ZB_NLDE_OPT_NO_LONG_SRC                 (1U << 3)
+#define ZB_NLDE_OPT_NO_LONG_DST                 (1U << 4)
 /** @} */
 
 /**
@@ -159,7 +173,6 @@ zb_nwk_multicast_mode_t;
  * removed in future releases.
  */
 typedef zb_uint8_t zb_nlde_tx_opt_e;
-#endif
 
 /** @brief 'frame security failed' status mentioned in ZB spec, subclause 4.3.1.2.
   *
@@ -235,12 +248,10 @@ typedef struct zb_nlde_data_req_s
 			      */
 #endif /*ZB_USEALIAS*/
   /* 14/06/2016 CR [AEV] end */
-#ifdef ZB_APSDE_REQ_ROUTING_FEATURES
   zb_uint8_t extension_flags; /** The field for extension flags storing:
                                *  - force mesh route discovery
                                *  - force send route record
                                */
-#endif
 } zb_nlde_data_req_t;
 
 /** @brief NLDE-DATA.request primitive.
@@ -304,6 +315,14 @@ void zb_nlde_data_confirm(zb_uint8_t param);
 void zb_nlde_data_indication(zb_uint8_t param);
 
 /** @} */ /* NWK data service. */
+
+/*
+ * Alloc and fill nwk fake header for relayed frame
+ *
+ */
+zb_ret_t nwk_alloc_and_fill_hdr_fake(zb_bufid_t     buf,
+                                     zb_ieee_addr_t joiner_ieee,
+                                     zb_uint16_t    relay_via);
 
 /**
  *  @name NWK management service.
@@ -380,6 +399,7 @@ typedef struct zb_nlme_network_discovery_request_s
                                                                * within those pages that the discovery shall
                                                                * be performed upon. */
   zb_uint8_t        scan_duration;                            /**< Time to spend scanning each channel */
+  zb_callback_t     cb;                                       /* used by zb_zdo_active_scan_request */
 }
 zb_nlme_network_discovery_request_t;
 
@@ -404,26 +424,19 @@ void zb_nwk_cancel_network_discovery(zb_bufid_t buf);
  */
 typedef ZB_PACKED_PRE struct zb_nlme_network_descriptor_s
 {
+   /* use bitfields to fit descriptors array to the single buffer */
   zb_bitfield_t panid_ref:7; /**< Reference to extended Pan ID
                               * of the network. Was zb_address_pan_id_ref_t.
                               * Must be big enough to hold ZB_PANID_TABLE_SIZE.
                               * ZB_PANID_TABLE_SIZE is now 16, so 7 is more than enough.
                               */
   zb_bitfield_t    channel_page:5; /**< channel page. in r22 0 to 31  */
-  zb_bitfield_t    logical_channel:6; /**< The current logical channel occupied by
-                                       * the network. In r22 0 to 63 */
-  /* use bitfields to fit descriptors array to the single buffer */
-  zb_bitfield_t stack_profile:2; /**< Stack profile identifier. 4 bits by
-                                  * standard, but need 2 bits
-                                  * actually. */
-#if 0
-  /* Defined by standard, but not actually required for us */
-  zb_bitfield_t Zigbee_version:4; /**< The version of the Zigbee protocol */
-  zb_bitfield_t beacon_order:4; /**< How often the MAC sub-layer beacon is to
-                                 * be transmitted */
-  zb_bitfield_t superframe_order:4; /**< The length of the active period of the
-                                     * superframe  */
-#endif
+  zb_bitfield_t    logical_channel:7; /**< The current logical channel occupied by
+                                       * the network. In r22 0 to 76 */
+  zb_bitfield_t rvd0:1;
+  /* Stack profile, Zigbee version, beacon order and superframe order
+   * defined by standard, but not actually required for us.
+   * Stack profile is not required now as stack supports only Pro Stack Profile ID. */
   zb_bitfield_t permit_joining:1; /**< Indicates that at least one router on
                                    * the network currently permits joining */
   zb_bitfield_t router_capacity:1; /**< True if device is capable of accepting
@@ -662,7 +675,6 @@ zb_nlme_ed_scan_confirm_t;
  */
 void zb_nlme_ed_scan_confirm(zb_uint8_t param);
 
-
 /**
  *  @brief Parameters of the custom NLME-BEACON-SURVEY.request
  */
@@ -684,13 +696,11 @@ ZB_PACKED_STRUCT zb_nlme_beacon_survey_scan_request_t;
  */
 void zb_nlme_beacon_survey_scan(zb_uint8_t param);
 
-#if defined ZB_BEACON_SURVEY && defined ZB_ZCL_ENABLE_WWAH_SERVER
 /**
  *  @brief Report the results of the Beacon Survey scan
  *  @param param - buffer containing @zb_mac_scan_confirm_t
  */
 void zb_nlme_beacon_survey_scan_confirm(zb_uint8_t param);
-#endif /* ZB_BEACON_SURVEY && ZB_ZCL_ENABLE_WWAH_SERVER */
 
 /**
    Network join method.
@@ -700,11 +710,13 @@ void zb_nlme_beacon_survey_scan_confirm(zb_uint8_t param);
  * @anchor nlme_rejoin_method
  */
 /** @{ */
-#define ZB_NLME_REJOIN_METHOD_ASSOCIATION    0x00U /**< Throught association */
+#define ZB_NLME_REJOIN_METHOD_ASSOCIATION    0x00U /**< Through association */
 #define ZB_NLME_REJOIN_METHOD_DIRECT         0x01U /**< Join directly or rejoining using the orphaning */
 #define ZB_NLME_REJOIN_METHOD_REJOIN         0x02U /**< Using NWK rejoin procedure */
 #define ZB_NLME_REJOIN_METHOD_CHANGE_CHANNEL 0x03U /**< Changing the network channel  */
 /** @} */
+
+#define ZB_PARENT_PREFERENCE_KEY_NEGOTIATION_SUPPORT_BIT 0
 
 /**
  * @brief Type for network join method.
@@ -730,9 +742,7 @@ typedef struct zb_nlme_join_request_s
   zb_uint8_t security_enable;   /*!< If the value of RejoinNetwork is 0x02 and this is TRUE than the device will try to rejoin securely.
                                   Otherwise, this is set to FALSE.  */
 
-  /* There was insecure_rejoin: Insecure rejoining. Originally it was "secure_rejoin,
-                                * as specified in the spec. But because by default it is set to
-                                * ZB_FALSE (zero), let's handle it as "insecure" flag. */
+  zb_uint8_t parent_preference;
 }
 zb_nlme_join_request_t;
 
@@ -762,6 +772,10 @@ typedef ZB_PACKED_PRE struct zb_nlme_join_indication_s
   zb_nlme_rejoin_method_t rejoin_network;           /**< Join network method @see
                                                      * @ref nlme_rejoin_method */
   zb_uint8_t secure_rejoin;                         /**< Secure joining */
+  zb_bool_t is_commiss;
+#ifdef ZB_DIRECT_ENABLED
+  zb_bool_t zvd_capability; /*!< See section about Device Capability Extension in Zigbee Direct spec. */
+#endif /* ZB_DIRECT_ENABLED */
 } ZB_PACKED_STRUCT
 zb_nlme_join_indication_t;
 
@@ -854,8 +868,6 @@ typedef ZB_PACKED_PRE struct zb_nlme_leave_request_s
 {
   zb_ieee_addr_t device_address; /**< 64-bit IEEE address of the device to
                                   * remove, zero fill if device itself */
-  zb_uint8_t remove_children; /**< If true - remove child devices from the
-                                    * network */
   zb_uint8_t rejoin; /**< If true - Join after leave */
 } ZB_PACKED_STRUCT
 zb_nlme_leave_request_t;
@@ -869,7 +881,6 @@ zb_nlme_leave_request_t;
    zb_nlme_leave_request_t
    @return RET_OK on success, error code otherwise.
 
-   @snippet tp_pro_bv-67_zc.c zb_nlme_leave_request
  */
 void zb_nlme_leave_request(zb_uint8_t param);
 
@@ -986,7 +997,7 @@ void zb_nlme_reset_confirm(zb_uint8_t param);
 */
 typedef ZB_PACKED_PRE struct zb_nlme_sync_request_s
 {
-  zb_uint8_t track; /**< Whether ot not the sync should be maintained for
+  zb_uint8_t track; /**< Whether to not the sync should be maintained for
                      * future beacons */
   zb_time_t  poll_rate; /*!< MAC poll rate */
 } ZB_PACKED_STRUCT
@@ -1066,7 +1077,6 @@ zb_nlme_route_discovery_request_t;
    zb_nlme_route_discovery_request_t
    @return RET_OK on success, error code otherwise.
 
-   @snippet tp_pro_bv_08_zc.c zb_nlme_route_discovery_request
  */
 void zb_nlme_route_discovery_request(zb_uint8_t param);
 
@@ -1149,8 +1159,8 @@ void zb_nlme_send_status(zb_uint8_t param);
   (*((a) + sizeof(zb_uint16_t)) = ((*((a) + sizeof(zb_uint16_t)) & 0x70U) >> 4U) & 0x07U)
 #define ZB_GET_INCOMING_COST(a)                                                    \
   (*((a) + sizeof(zb_uint16_t)) & 0x7U)
-#define ZB_LS_SET_INCOMING_COST(a, b) ( *(a) = (*(a) & 0xF8U) | ( (b) & 0x07U) )
-#define ZB_LS_SET_OUTGOING_COST(a, b) ( *(a) = (*(a) & 0x0FU) | ( (b) << 4U) )
+#define ZB_LS_SET_INCOMING_COST(a, b) ( *(a) = (*(a) & 0x70U) | ( (b) & 0x07U) )
+#define ZB_LS_SET_OUTGOING_COST(a, b) ( *(a) = (zb_uint8_t)(*(a) & 0x07U) | (zb_uint8_t)( ((b) & 0x07U) << 4U) )
 
 #define ZB_NWK_LS_GET_COUNT(a) ((a) & ZB_NWK_LS_COUNT_MASK)
 #define ZB_NWK_LS_SET_COUNT(_a, _b) ((*(_a)) |= ((*(_a)) & (~ZB_NWK_LS_COUNT_MASK)) | (_b))
@@ -1160,6 +1170,8 @@ void zb_nlme_send_status(zb_uint8_t param);
 
 #define ZB_NWK_LS_SET_LAST_FRAME(_a, _b) (*(_a)) |= (((*(_a)) & (~ZB_NWK_LS_LAST_FRAME_MASK)) | ((_b)<<ZB_NWK_LS_LAST_FRAME_BIT))
 #define ZB_NWK_LS_GET_LAST_FRAME(_a) (((_a) & ZB_NWK_LS_FIRST_FRAME_MASK) >> ZB_NWK_LS_FIRST_FRAME_BIT)
+
+#define ZB_NWK_IS_ZC_OR_ZR(device_type) ( (device_type) == ZB_NWK_DEVICE_TYPE_COORDINATOR ||  (device_type) == ZB_NWK_DEVICE_TYPE_ROUTER )
 
 
 /** @} */
@@ -1176,13 +1188,13 @@ void zb_nwk_init(void);
   No recommendations about compare in the specification.  Now suppose overflow if difference
   between values > 1/2 of the entire values diapason. Is it right?
  */
-#define NWK_UPDATE_ID_MIDDLE 127
+#define NWK_UPDATE_ID_MIDDLE 127U
 
 /** @return true if id1 >= id2, taking overflow into account. */
-#define ZB_NWK_UPDATE_ID1_GE_ID2(id1, id2) (((zb_uint8_t)(id1) - (zb_uint8_t)(id2)) < NWK_UPDATE_ID_MIDDLE)
+#define ZB_NWK_UPDATE_ID1_GE_ID2(id1, id2) ((zb_uint8_t)((zb_uint8_t)(id1) - (zb_uint8_t)(id2)) < NWK_UPDATE_ID_MIDDLE)
 
 /** @return true if id1 < id2, taking overflow into account. */
-#define ZB_NWK_UPDATE_ID1_LT_ID2(id1, id2) (((zb_uint8_t)(id1) - (zb_uint8_t)(id2)) > NWK_UPDATE_ID_MIDDLE)
+#define ZB_NWK_UPDATE_ID1_LT_ID2(id1, id2) ((zb_uint8_t)((zb_uint8_t)(id1) - (zb_uint8_t)(id2)) > NWK_UPDATE_ID_MIDDLE)
 
 /** @brief Check that link quality is good enough to attempt to join.
   *
@@ -1199,10 +1211,13 @@ void zb_nwk_init(void);
 
 #define ZB_LINK_QUALITY_IS_OK_FOR_JOIN(lqi) (((lqi) / (256U / 8U)) >= 1U)
 
+#define ZB_LQA_IS_GOOD(lqa) ((lqa) >= (ZB_NIB().nwk_good_parent_lqa))
+
 /** @brief Compare link quality.
   * @return TRUE if lqi1 > lqi2
   */
 #define ZB_LINK_QUALITY_1_IS_BETTER(lqi1, lqi2) ((lqi1) > (lqi2))
+
 
 #if defined ZB_PRO_STACK && !defined ZB_NO_NWK_MULTICAST
 /** @brief NWK multicast control. */
@@ -1275,7 +1290,11 @@ typedef ZB_PACKED_PRE struct zb_apsde_data_ind_params_s
 
   zb_int8_t   rssi;
 
-  zb_uint8_t  handle;       /**< handle for transmitted/received packet */
+  zb_uint8_t  lqa;
+
+  zb_uint8_t  handle;       /*!<handle for transmitted/received packet */
+
+  zb_uint8_t  relayed;
 
   zb_uint8_t  iface_id;     /**< ID of MAC interface that received the packet */
 } ZB_PACKED_STRUCT zb_apsde_data_ind_params_t;
@@ -1336,7 +1355,7 @@ typedef ZB_PACKED_PRE struct zb_apsde_data_ind_params_s
 
    @param fctl - Frame Control Field of NWK header.
 */
-#define ZB_NWK_FRAMECTL_GET_DISCOVER_ROUTE(fctl) (((fctl)[ZB_PKT_16B_ZERO_BYTE] >> 5U) & 3U)
+#define ZB_NWK_FRAMECTL_GET_DISCOVER_ROUTE(fctl) (((fctl)[ZB_PKT_16B_ZERO_BYTE] >> 6U) & 3U)
 
 /** @brief Set 'discover route' in the NWK header Frame Control field.
 
@@ -1371,9 +1390,14 @@ typedef ZB_PACKED_PRE struct zb_apsde_data_ind_params_s
 /** @brief Set 'security' in the NWK header Frame Control field.
 
    @param fctl - Frame Control Field of NWK header.
-   @param s - 'security' value.
  */
-#define ZB_NWK_FRAMECTL_SET_SECURITY(fctl, s) ((fctl)[ZB_PKT_16B_FIRST_BYTE] |= ((s) << 1U))
+#define ZB_NWK_FRAMECTL_SET_SECURITY(fctl) ((fctl)[ZB_PKT_16B_FIRST_BYTE] |= (1U << 1U))
+
+/** @brief Clear 'security' in the NWK header Frame Control field.
+
+   @param fctl - Frame Control Field of NWK header.
+ */
+#define ZB_NWK_FRAMECTL_CLEAR_SECURITY(fctl) ((fctl)[ZB_PKT_16B_FIRST_BYTE] &= ~(1 << 1U))
 
 /** @brief Get 'source route' from the NWK header Frame Control field.
 
@@ -1572,6 +1596,10 @@ ZB_LETOH16(addr, &((zb_nwk_hdr_t *)nwk_hdr)->dst_addr)
 #define ZB_NWK_CMD_ED_TIMEOUT_REQUEST  0x0bU /**< End Device Timeout Request NWK command Id*/
 #define ZB_NWK_CMD_ED_TIMEOUT_RESPONSE 0x0cU /**< End Device Timeout Response NWK command Id*/
 #define ZB_NWK_CMD_LINK_POWER_DELTA    0x0dU /**< Link Power Delta command Id */
+#define ZB_NWK_CMD_NETWORK_COMMIS_REQ  0x0eU /**< Network Commissioning Request command Id */
+#define ZB_NWK_CMD_NETWORK_COMMIS_RSP  0x0fU /**< Network Commissioning Response command Id */
+#define ZB_NWK_CMD_RESERVED            0x10U
+
 /** @} */
 
 /**
@@ -1695,11 +1723,36 @@ zb_nwk_rejoin_request_t;
 */
 typedef ZB_PACKED_PRE struct zb_nwk_rejoin_response_s
 {
-  zb_uint16_t network_addr;         /**< Network address */
-  zb_uint8_t rejoin_status;         /**< Rejoin status */
+  zb_uint16_t network_addr;   /**< Network address */
+  zb_uint8_t  status;         /**< Rejoin status */
 } ZB_PACKED_STRUCT
 zb_nwk_rejoin_response_t;
 
+
+/* R23, 3.4.14.3 NWK Payload Fields
+ * zb_nwk_commissioning_type_t
+ */
+typedef zb_uint8_t zb_nwk_commissioning_type_t;
+
+#define ZB_NWK_COMMISSIONING_TYPE_INITIAL_JOIN_WITH_KN    0x00U
+#define ZB_NWK_COMMISSIONING_TYPE_REJOIN_WITH_KN          0x01U
+#define ZB_NWK_COMMISSIONING_TYPE_ESTABLISH_TRUSTED_LINK  0x02U
+
+/**
+   Commissioning request command
+*/
+typedef ZB_PACKED_PRE struct zb_nwk_commis_request_s
+{
+  zb_uint8_t association_type;
+  zb_mac_capability_info_t capability_information; /**< The operating capabilities of the
+                                                    * device */
+} ZB_PACKED_STRUCT
+zb_nwk_commis_request_t;
+
+/**
+   Commissioning response command
+*/
+typedef zb_nwk_rejoin_response_t zb_nwk_commis_response_t;
 
 #define ZB_NWK_COMMAND_SIZE(payload_size) (1U + (payload_size))
 
@@ -1726,7 +1779,15 @@ void zb_nwk_rejoin_sync_pibcache_with_mac(zb_uint8_t param, zb_callback_t cb);
  */
 void zb_nwk_forget_device(zb_uint8_t addr_ref);
 
+#if defined ZB_PRO_STACK && !defined ZB_LITE_NO_SOURCE_ROUTING && defined ZB_ROUTER_ROLE
+zb_nwk_rrec_t * nwk_find_src_route_for_packet(zb_uint16_t dst_addr);
+
+void nwk_fill_src_route_subheader(zb_uint8_t *ptr, zb_nwk_rrec_t *rrec);
+
 void zb_nwk_source_routing_record_delete(zb_uint16_t addr);
+
+void zb_nwk_source_delete_routes_by_first_hop_addr(zb_uint16_t first_hop_addr);
+#endif
 
 /**
    Update beacon payload in the PIB.
@@ -1831,6 +1892,16 @@ zb_time_t zb_nwk_get_default_keepalive_timeout(void);
 
 /*Return ZB_TRUE if nearest aging timeout expired*/
 zb_bool_t zb_nwk_check_aging(void);
+
+#if defined ZB_MAC_POWER_CONTROL
+/* Send NWK Link Power Delta command */
+void zb_nwk_link_power_delta_alarm(zb_uint8_t param);
+
+/* Handle received Link Power Delta command */
+void zb_nwk_handle_link_power_delta_command(zb_bufid_t buf,
+                                                 zb_nwk_hdr_t *nwk_hdr,
+                                                 zb_uint8_t hdr_size);
+#endif /* ZB_MAC_POWER_CONTROL */
 
 #if !(defined ZB_MACSPLIT_DEVICE)
 /**
@@ -2009,7 +2080,7 @@ void zb_nwk_set_dev_associate_cb(zb_addr_assignment_cb_t cb);
 #if defined ZB_NWK_NEIGHBOUR_PATH_COST_RSSI_BASED
 #define ZB_NWK_NEIGHBOUR_GET_PATH_COST(nbt) zb_nwk_neighbour_get_path_cost((nbt))
 #elif defined ZB_NWK_NEIGHBOUR_PATH_COST_LQI_BASED
-#define ZB_NWK_NEIGHBOUR_GET_PATH_COST(nbt) NWK_LQI_2_COST((nbt)->lqi)
+#define ZB_NWK_NEIGHBOUR_GET_PATH_COST(nbt) NWK_LQI_2_COST((nbt)->lqa)
 #else
 #error Please specify neighbour path cost calculation method!
 #endif /* ZB_NWK_NEIGHBOUR_PATH_COST_RSSI_BASED */
@@ -2020,7 +2091,7 @@ void zb_nwk_set_dev_associate_cb(zb_addr_assignment_cb_t cb);
    Convert cost to LQI
    To be used for testing, like in TP/PRO-BV-04
  */
-#define NWK_COST_TO_LQI(cost)   ((7U - (cost)) << 5U)
+#define NWK_COST_TO_LQI(cost)   (zb_uint8_t)((7U - (cost)) << 5U)
 
 /** @} */
 
@@ -2098,6 +2169,8 @@ void zb_nwk_reset_route_expire(zb_uint16_t addr);
 
 void zb_nwk_route_expire(zb_uint16_t addr);
 
+void zb_nwk_mesh_delete_routes_by_ref(zb_address_ieee_ref_t ref);
+
 void zb_nwk_load_pib(zb_uint8_t param);
 
 #if defined ZB_ASSERT_SEND_NWK_REPORT
@@ -2131,6 +2204,7 @@ void zb_nwk_restart_aging(void);
 zb_ret_t zb_nwk_validate_leave_req(zb_uint16_t src_addr);
 
 #ifdef ZB_LIMIT_VISIBILITY
+zb_bool_t zb_mac_is_short_addr_visible(zb_uint16_t addr);
 zb_bool_t zb_mac_is_long_addr_visible(const zb_ieee_addr_t ieee_addr);
 #endif
 
@@ -2170,16 +2244,25 @@ typedef struct zb_nwk_neighbor_element_s
 }
 zb_nwk_neighbor_element_t;
 
+typedef struct zb_nwk_direct_leave_req_s
+{
+  zb_uint16_t dst_addr;
+  zb_uint8_t iface_id;
+}
+zb_nwk_direct_leave_req_t;
+
 zb_ret_t zb_nwk_get_neighbor_element(zb_uint16_t addr, zb_bool_t create_if_absent, zb_nwk_neighbor_element_t *update);
 zb_ret_t zb_nwk_set_neighbor_element(zb_uint16_t addr, zb_nwk_neighbor_element_t *update);
 
 zb_ret_t zb_nwk_delete_neighbor_by_short(zb_uint16_t addr);
-zb_ret_t zb_nwk_delete_neighbor_by_ieee(zb_ieee_addr_t addr);
 
-void zb_nwk_send_direct_leave_req(zb_uint8_t param, zb_uint16_t dst_addr);
+void zb_nwk_send_direct_leave_req(zb_uint8_t param);
 
 zb_bool_t nwk_is_lq_bad_for_direct(zb_int8_t rssi, zb_uint8_t lqi);
 void nwk_maybe_force_send_via_routing(zb_uint16_t addr);
+void nwk_set_send_via_routing(zb_neighbor_tbl_ent_t *nbt, zb_bool_t set);
+void nwk_reset_send_via_routing_aging(zb_neighbor_tbl_ent_t *nbt);
+zb_bool_t nwk_can_send_via_nbt(zb_neighbor_tbl_ent_t *nbt);
 
 void nwk_internal_lock_in(void);
 void nwk_internal_unlock_in(void);
@@ -2191,6 +2274,7 @@ zb_ret_t zb_nwk_force_route_sending(zb_bool_t enable);
 #endif
 
 void nwk_mark_nwk_encr1(zb_bufid_t buf, zb_uint16_t file_id, zb_uint16_t line);
+void nwk_unmark_nwk_encr(zb_bufid_t buf);
 #define nwk_mark_nwk_encr(buf) nwk_mark_nwk_encr1((buf), ZB_TRACE_FILE_ID, __LINE__)
 
 void nwk_router_start_common(zb_uint8_t param);
@@ -2199,7 +2283,7 @@ void nwk_router_start_common(zb_uint8_t param);
 void zb_nwk_formation_force_link(void);
 #endif /* ZB_FORMATION */
 
-#if defined ZB_PARENT_CLASSIFICATION && defined ZB_ROUTER_ROLE
+#if defined ZB_ROUTER_ROLE
 void nwk_set_tc_connectivity(zb_uint8_t val);
 
 zb_bool_t nwk_get_tc_connectivity(void);
@@ -2227,6 +2311,54 @@ zb_uint32_t zb_nwk_get_octet_duration_us(void);
 #define ZB_NWK_OCTETS_TO_US(octets_cnt) ((octets_cnt) * ZB_NWK_OCTET_DURATION_US)
 #define ZB_NWK_OCTETS_TO_BI(octets_cnt) ZB_MILLISECONDS_TO_BEACON_INTERVAL(ZB_NWK_OCTETS_TO_US(octets_cnt) / 1000U)
 
+#define ZB_SET_R22_GU_BEHAVIOR(val) (ZB_NIB().r22_gu_behavior_enabled = (val))
+#define ZB_R22_GU_BEHAVIOR_ENABLED() (ZB_U2B(ZB_NIB().r22_gu_behavior_enabled))
+
+/**
+   TLV management
+ */
+
+#if defined ZB_JOIN_CLIENT
+
+void zb_nwk_commissioning_req_put_tlv(zb_uint8_t param, zb_bool_t put_supported_kn_methods);
+
+void zb_nwk_beacon_process_tlv(zb_uint8_t *tlv_ptr,
+                               zb_uint8_t tlv_data_len,
+                               zb_ext_neighbor_tbl_ent_t *enbt);
+
+#endif /* ZB_JOIN_CLIENT */
+
+#if defined ZB_ROUTER_ROLE
+
+/*
+ * Fill Trust Center Beacon Appendix TLVs
+ * Use this functions for init ZB_NIB().beacon_apx_tlv
+ * @param buf_ptr - buffer
+ * @return Size of the appendix
+ */
+zb_uint8_t zb_nwk_fill_tc_beacon_appendix(zb_uint8_t *buf_ptr);
+
+/*
+ * Fill Beacon Appendix TLVs
+ * @param buf_ptr - buffer
+ * @return Size of the appendix
+ */
+zb_uint8_t zb_nwk_fill_full_beacon_appendix(zb_uint8_t *buf_ptr);
+
+/*
+ * Get Length of the full Beacon Appendix TLVs
+ * @return Size
+ */
+zb_uint8_t zb_nwk_get_size_full_beacon_appendix(void);
+
+zb_ret_t zb_nwk_commissioning_req_process_tlv(zb_secur_ecdhe_common_ctx_t *ecdhe_ctx,
+                                              zb_uint8_t *tlv_ptr,
+                                              zb_uint8_t tlv_data_len,
+                                              zb_uint16_t src_short_addr);
+
+void zb_nwk_put_supported_key_neg_tlv(zb_uint8_t *ptr, zb_ieee_addr_t ieee_addr, zb_uint8_t methods, zb_uint8_t secrets);
+#endif /* ZB_ROUTER_ROLE */
+
 #ifdef ZB_CONTROL4_NETWORK_SUPPORT
 /* Internal Control4 functions to enable/disable Control4 controller behavior emulation */
 void zb_disable_control4_emulator();
@@ -2234,8 +2366,94 @@ void zb_disable_control4_emulator();
 void zb_enable_control4_emulator();
 #endif /* ZB_CONTROL4_NETWORK_SUPPORT */
 
+void zb_panid_conflict_set_new_panid(zb_bufid_t param, zb_uint16_t new_panid);
+
+/*
+  Get source ieee address from nwk header
+*/
+zb_ieee_addr_t *zb_nwk_get_src_long_from_hdr(zb_nwk_hdr_t *nwhdr);
+
+void nwk_panid_conflict_in_beacon(zb_uint8_t param);
+
+void zb_panid_conflict_got_network_report(zb_uint8_t param);
+
+void zb_panid_conflict_nwk_upd_rcv(zb_uint8_t param);
+
+void nwk_panid_conflict_handle_r23_resp(zb_uint8_t param);
+
+zb_uint8_t zb_nwk_calculate_raw_lqa(zb_uint8_t lqi, zb_int8_t rssi);
+
 #ifndef ZB_MACSPLIT_DEVICE
-zb_ext_neighbor_tbl_ent_t *nwk_choose_parent(zb_address_pan_id_ref_t panid_ref, zb_mac_capability_info_t capability_information);
+zb_ext_neighbor_tbl_ent_t *nwk_choose_parent(zb_address_pan_id_ref_t panid_ref, zb_mac_capability_info_t capability_information, zb_uint8_t parent_preference);
 #endif /* ZB_MACSPLIT_DEVICE */
+
+#ifdef ZB_LIMIT_VISIBILITY
+void nwk_clear_invisible(void);
+#endif
+
+void nwk_nbt_rm_all_except_parent(void);
+
+/**
+   Disable TLVs in beacon
+   @param value - flag that shows whether TLV is disabled or not
+*/
+void zb_nwk_disable_tlvs_in_beacon(zb_bool_t value);
+
+/**
+   Checks whether TLV in beacons is disable
+   @return TLV presence flag
+*/
+zb_bool_t zb_nwk_is_tlvs_in_beacon_disabled(void);
+
+/**
+ * Checks if mac association or rejoin request needs to be used for join
+   @return TRUE, if mac association or rejoin request need to use instead nwk commissioning request
+*/
+zb_bool_t zb_nwk_need_use_r22_joining(void);
+
+zb_uint8_t nwk_get_extra_src_routing_size(zb_uint16_t dst_addr);
+
+/**
+ * @brief Get Device Capability Extension TLV value
+ * This value is appended to Network Commissioning Request TLV from ZVD
+ *
+ * @return zb_uint16_t Device Capability Extension TLV value
+ */
+/* TODO: move func to zboss_api_direct.h and remove ifdef with cstat comments */
+#ifndef ZB_DIRECT_DISABLED
+/*cstat !MISRAC2012-Rule-8.6 */
+zb_uint16_t zbd_get_device_capability_extension_value(void);
+
+/**
+ * @brief Checks whether the device is operating in ZBD-aware network
+ * (whether TC have Zigbee Direct Configuration server cluster)
+ *
+ * @return Network ZBD awareness status
+ */
+/* TODO: move func to zboss_api_direct.h and remove ifdef with cstat comments */
+/*cstat !MISRAC2012-Rule-8.6 */
+zb_bool_t zb_zdd_is_network_zbd_aware(void);
+#endif
+
+#define ZBD_DEVICE_CAPABILITY_EXTENSION_ZVD_BIT 0U
+
+#define ZBD_CAPABILITY_EXTENSION_IS_ZVD_BIT_SET(ecdhe_ctx_ptr)                           \
+  (ZB_U2B((ecdhe_ctx_ptr)->device_capability_extension_tlv_found) &&                     \
+   ZB_CHECK_BIT_IN_BIT_VECTOR(&((ecdhe_ctx_ptr)->device_capability_extension_tlv_value), \
+                              ZBD_DEVICE_CAPABILITY_EXTENSION_ZVD_BIT))
+
+void zb_nwk_advise_to_run_mtorr(zb_bool_t hi_pri);
+
+void zb_nwk_advise_to_delay_mtorr(void);
+
+void zb_nwk_mtor_got_rejoin(void);
+
+void nwk_maybe_add_route_by_pkt(zb_uint16_t nwk_src, zb_uint16_t mac_src);
+
+void zb_nwk_mesh_send_pending_data(zb_uint16_t dest_addr);
+
+#ifdef ZB_ROUTER_ROLE
+zb_ret_t zb_check_address_conflict(zb_ieee_addr_t ieee_addr, zb_uint16_t short_addr);
+#endif /* ZB_ROUTER_ROLE */
 
 #endif /* ZB_NWK_H */

@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -53,6 +53,10 @@ Do not include that file directly into the application source!
  */
 #ifdef ZB_CONFIGURABLE_MEM
 
+#ifndef ZB_NWK_CONFIGURABLE_MEM_MAX_NETWORK_SIZE
+#error "You should include zboss_api.h or zb_config.h to add custom memory configuration."
+#endif /* ZB_NWK_CONFIGURABLE_MEM_MAX_NETWORK_SIZE */
+
 #ifdef ZB_ED_ROLE
 /* If ZBOSS library is compiled for ZED only, force ZED config role. */
 #ifndef ZB_CONFIG_ROLE_ZED
@@ -80,6 +84,7 @@ OVERALL_NETWORK_SIZE 16 to 200
 - ZB_N_APS_KEY_PAIR_ARR_MAX_SIZE: set = OVERALL_NETWORK_SIZE
 - ZB_IEEE_ADDR_TABLE_SIZE - set = OVERALL_NETWORK_SIZE + reserve for redirected entries
 - ZB_NEIGHBOR_TABLE_SIZE - set = ZB_IEEE_ADDR_TABLE_SIZE
+- ZB_CONFIG_ZDO_KEY_NEGOTIATIONS_NUM: set = OVERALL_NETWORK_SIZE
 
 ## Total network traffic
 HIGH_TRAFFIC / MODERATE_TRAFFIC / LIGHT_TRAFFIC
@@ -105,7 +110,7 @@ APPLICATION_SIMPLE / APPLICATION_MODERATE / APPLICATION_COMPLEX
  */
 #ifndef ZB_CONFIG_OVERALL_NETWORK_SIZE
 #error Define ZB_CONFIG_OVERALL_NETWORK_SIZE!
-#elif ZB_CONFIG_OVERALL_NETWORK_SIZE < 2U || ZB_CONFIG_OVERALL_NETWORK_SIZE > 200U
+#elif ZB_CONFIG_OVERALL_NETWORK_SIZE < 2U || ZB_CONFIG_OVERALL_NETWORK_SIZE > ZB_NWK_CONFIGURABLE_MEM_MAX_NETWORK_SIZE
 #error ZB_CONFIG_OVERALL_NETWORK_SIZE must be between 2 and 200!
 #else
 /* Derive constands from the network size */
@@ -131,7 +136,9 @@ APPLICATION_SIMPLE / APPLICATION_MODERATE / APPLICATION_COMPLEX
 #define ZB_CONFIG_IEEE_ADDR_TABLE_SIZE (ZB_CONFIG_OVERALL_NETWORK_SIZE + ZB_IEEE_ADDR_TABLE_SIZE_RESERVE(ZB_CONFIG_OVERALL_NETWORK_SIZE))
 /* Let's have enough space to have the entire network in neighbors - Star topology */
 #define ZB_CONFIG_NEIGHBOR_TABLE_SIZE ZB_CONFIG_OVERALL_NETWORK_SIZE
+#define ZB_CONFIG_NWK_DISC_TABLE_SIZE ZB_CONFIG_OVERALL_NETWORK_SIZE
 #define ZB_CONFIG_NWK_MAX_SOURCE_ROUTES ZB_CONFIG_OVERALL_NETWORK_SIZE
+#define ZB_CONFIG_ZDO_KEY_NEGOTIATIONS_NUM ZB_CONFIG_OVERALL_NETWORK_SIZE
 
 #elif defined ZB_CONFIG_ROLE_ZR
 
@@ -146,6 +153,7 @@ APPLICATION_SIMPLE / APPLICATION_MODERATE / APPLICATION_COMPLEX
 #define ZB_CONFIG_NEIGHBOR_TABLE_SIZE ZB_CONFIG_OVERALL_NETWORK_SIZE
 /* 10/21/2019 EE CR:MINOR Why we ever need that constant for ZR? Only ZC is a concentrator. */
 #define ZB_CONFIG_NWK_MAX_SOURCE_ROUTES ZB_CONFIG_OVERALL_NETWORK_SIZE
+#define ZB_CONFIG_ZDO_KEY_NEGOTIATIONS_NUM 1U
 
 #elif defined ZB_CONFIG_ROLE_ZED
 
@@ -154,18 +162,21 @@ APPLICATION_SIMPLE / APPLICATION_MODERATE / APPLICATION_COMPLEX
 #endif
 
 /* 2 is needed to perform BDB TCLK, 1 more is needed to request new TCLK */
-#define ZB_CONFIG_N_APS_KEY_PAIR_ARR_MAX_SIZE 4
+#define ZB_CONFIG_N_APS_KEY_PAIR_ARR_MAX_SIZE 4U
 /* Set it here big enough; may decrease it later */
 #define ZB_CONFIG_IEEE_ADDR_TABLE_SIZE ZB_CONFIG_OVERALL_NETWORK_SIZE
 
-/* ZED needs neighbor table at join time only. More devices and nets around - bigger nbt required. Let's use some heuristics. */
+/* ZED has single nbt entry - for its parent */
+#define ZB_CONFIG_NEIGHBOR_TABLE_SIZE 1U
+/* More devices and nets around - bigger nwk discovery table required. Let's use some heuristics. */
 #if ZB_CONFIG_OVERALL_NETWORK_SIZE < 8U
-#define ZB_CONFIG_NEIGHBOR_TABLE_SIZE 8U
+#define ZB_CONFIG_NWK_DISC_TABLE_SIZE 8U
 #elif ZB_CONFIG_OVERALL_NETWORK_SIZE < 32U
-#define ZB_CONFIG_NEIGHBOR_TABLE_SIZE 16U
+#define ZB_CONFIG_NWK_DISC_TABLE_SIZE 16U
 #else
-#define ZB_CONFIG_NEIGHBOR_TABLE_SIZE 32U
+#define ZB_CONFIG_NWK_DISC_TABLE_SIZE 32U
 #endif
+#define ZB_CONFIG_ZDO_KEY_NEGOTIATIONS_NUM 1U
 
 #else
 
@@ -186,6 +197,7 @@ APPLICATION_SIMPLE / APPLICATION_MODERATE / APPLICATION_COMPLEX
 /* More NWK traffic we route or send/recv from our app - more packet buffers required. */
 #define ZB_CONFIG_IOBUF_POOL_SIZE 48U
 #define ZB_CONFIG_NWK_ROUTING_TABLE_SIZE ZB_CONFIG_NEIGHBOR_TABLE_SIZE
+#define ZB_CONFIG_NWK_ROUTE_DISC_TABLE_SIZE 32U
 #define ZB_CONFIG_MAC_PENDING_QUEUE_SIZE (ZB_CONFIG_IOBUF_POOL_SIZE / 4U)
 #define ZB_CONFIG_APS_BIND_TRANS_TABLE_SIZE ((ZB_CONFIG_IOBUF_POOL_SIZE + 15U)/16U * 4U) /* 1/4, at least 4 */
 #define ZB_CONFIG_SINGLE_TRANS_INDEX_SIZE ((ZB_CONFIG_APS_BIND_TRANS_TABLE_SIZE + 7U) / 8U)
@@ -198,8 +210,9 @@ APPLICATION_SIMPLE / APPLICATION_MODERATE / APPLICATION_COMPLEX
 #error Only one ZB_CONFIG_xxx_TRAFFIC can be defined!
 #endif
 
-#define ZB_CONFIG_IOBUF_POOL_SIZE 32U
+#define ZB_CONFIG_IOBUF_POOL_SIZE 40U
 #define ZB_CONFIG_NWK_ROUTING_TABLE_SIZE ZB_CONFIG_NEIGHBOR_TABLE_SIZE
+#define ZB_CONFIG_NWK_ROUTE_DISC_TABLE_SIZE 16U
 #define ZB_CONFIG_MAC_PENDING_QUEUE_SIZE (ZB_CONFIG_IOBUF_POOL_SIZE / 4U)
 #define ZB_CONFIG_APS_BIND_TRANS_TABLE_SIZE ((ZB_CONFIG_IOBUF_POOL_SIZE + 15U)/16U * 4U) /* 1/4, at least 4 */
 #define ZB_CONFIG_SINGLE_TRANS_INDEX_SIZE ((ZB_CONFIG_APS_BIND_TRANS_TABLE_SIZE + 7U) / 8U)
@@ -214,6 +227,7 @@ APPLICATION_SIMPLE / APPLICATION_MODERATE / APPLICATION_COMPLEX
 
 #define ZB_CONFIG_IOBUF_POOL_SIZE 26U
 #define ZB_CONFIG_NWK_ROUTING_TABLE_SIZE 8U
+#define ZB_CONFIG_NWK_ROUTE_DISC_TABLE_SIZE 6U
 #define ZB_CONFIG_MAC_PENDING_QUEUE_SIZE (ZB_CONFIG_IOBUF_POOL_SIZE / 4U)
 #define ZB_CONFIG_APS_BIND_TRANS_TABLE_SIZE ((ZB_CONFIG_IOBUF_POOL_SIZE + 15U)/16U * 4U) /* 1/4, at least 4 */
 #define ZB_CONFIG_SINGLE_TRANS_INDEX_SIZE ((ZB_CONFIG_APS_BIND_TRANS_TABLE_SIZE + 7U) / 8U)
@@ -292,10 +306,10 @@ ZB_ASSERT_COMPILE_DECL(ZB_CONFIG_APS_SRC_BINDING_TABLE_SIZE <= (1U<<5U));
 
 #endif  /* ZB_CONFIG_APPLICATION_COMPLEX */
 
-#ifdef ZB_CONFIG_SCHEDULER_Q_SIZE 
+#ifdef ZB_CONFIG_SCHEDULER_Q_SIZE
 /**
    The purpose of the define. Ret code handling implementation on the application side
-   (via ZB_SCHEDULE_USER_APP_ALARM and ZB_SCHEDULE_USER_APP_CALLBACK) implies that we have some part 
+   (via ZB_SCHEDULE_USER_APP_ALARM and ZB_SCHEDULE_USER_APP_CALLBACK) implies that we have some part
    of the callback and alarm queues which can not be used from the user app and always should be reserved
    for stack schedule purposes. So, let's define this part as 12 (for both immediate callbacks and alarms)
    for all configurations.
@@ -311,8 +325,10 @@ ZB_ASSERT_COMPILE_DECL(ZB_CONFIG_APS_SRC_BINDING_TABLE_SIZE <= (1U<<5U));
  * compiler fail if routing parameter used by mistake. */
 #undef ZB_CONFIG_NWK_ROUTING_TABLE_SIZE
 #undef ZB_CONFIG_MAC_PENDING_QUEUE_SIZE
+#undef ZB_CONFIG_NWK_ROUTE_DISC_TABLE_SIZE
 #define ZB_CONFIG_NWK_ROUTING_TABLE_SIZE 0U
 #define ZB_CONFIG_MAC_PENDING_QUEUE_SIZE 0U
+#define ZB_CONFIG_NWK_ROUTE_DISC_TABLE_SIZE 0U
 #endif
 
 #ifdef ZB_MAC_SOFTWARE_PB_MATCHING

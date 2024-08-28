@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2020 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -41,9 +41,26 @@
 /* PURPOSE: ZCL WWAH cluster specific commands handling
 */
 
-#define ZB_TRACE_FILE_ID 12082
+#define ZB_TRACE_FILE_ID 13982
 
 #include "zb_common.h"
+
+/*
+ * Check if WWAH server behaviour is enabled
+ * @return ZB_TRUE if WWAH server behaviour is enabled and WWAH server endpoint is exist
+ *         ZB_FALSE otherwise */
+
+zb_bool_t zb_is_wwah_server(void)
+{
+  zb_bool_t ret = ZB_FALSE;
+  /* 10/29/2020 EE CR:MINOR Do not call ZCL directly here. Our goal is to not include ZCL into Platform when possible. Call WWAH-level routine instead. */
+#if (defined ZB_ZCL_ENABLE_WWAH_SERVER || defined ZB_ZCL_ENABLE_WWAH_CLIENT)
+  zb_uint8_t wwah_endpoint = get_endpoint_by_cluster(ZB_ZCL_CLUSTER_ID_WWAH,
+                                                     ZB_ZCL_CLUSTER_SERVER_ROLE);
+  ret = (zb_bool_t)(((zb_zcl_wwah_behavior_t)WWAH_CTX().wwah_behavior == ZB_ZCL_WWAH_BEHAVIOR_SERVER) && wwah_endpoint);
+#endif
+  return ret;
+}
 
 #if (defined ZB_ZCL_ENABLE_WWAH_SERVER || defined ZB_ZCL_ENABLE_WWAH_CLIENT)
 
@@ -60,23 +77,11 @@ void zb_zcl_wwah_set_wwah_behavior(zb_uint8_t behavior)
  * @return ZB_TRUE if WWAH client (TC) behaviour is enabled and WWAH client endpoint is exist
  *         ZB_FALSE otherwise */
 
-zb_bool_t zb_is_wwah_client()
+zb_bool_t zb_is_wwah_client(void)
 {
   zb_uint8_t wwah_endpoint = get_endpoint_by_cluster(ZB_ZCL_CLUSTER_ID_WWAH,
                                                      ZB_ZCL_CLUSTER_CLIENT_ROLE);
   return (zb_bool_t)(((zb_zcl_wwah_behavior_t)WWAH_CTX().wwah_behavior == ZB_ZCL_WWAH_BEHAVIOR_CLIENT) && wwah_endpoint);
-}
-
-/*
- * Check if WWAH server behaviour is enabled
- * @return ZB_TRUE if WWAH server behaviour is enabled and WWAH server endpoint is exist
- *         ZB_FALSE otherwise */
-
-zb_bool_t zb_is_wwah_server()
-{
-  zb_uint8_t wwah_endpoint = get_endpoint_by_cluster(ZB_ZCL_CLUSTER_ID_WWAH,
-                                                     ZB_ZCL_CLUSTER_SERVER_ROLE);
-  return (zb_bool_t)(((zb_zcl_wwah_behavior_t)WWAH_CTX().wwah_behavior == ZB_ZCL_WWAH_BEHAVIOR_SERVER) && wwah_endpoint);
 }
 
 #endif

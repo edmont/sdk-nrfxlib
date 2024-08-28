@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -86,8 +86,6 @@ void zb_zcl_init()
   TRACE_MSG(TRACE_ZCL1, ">>zcl_init", (FMT__0));
 
   ZB_BZERO(&ZCL_CTX(), sizeof(zb_zcl_globals_t));
-
-  ZB_BZERO(&ZCL8_CTX(), sizeof(zb_zcl8_globals_t));
 /*
   min_interval and max_interval are set to ZERO value by BZERO call
 #if !(defined ZB_ZCL_DISABLE_REPORTING)
@@ -226,16 +224,13 @@ zb_zcl_status_t zb_zcl_parse_header(zb_uint8_t param, zb_zcl_parsed_hdr_t *cmd_i
   ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).dst_endpoint = ind->dst_endpoint;
   ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).fc = ind->fc;
 
-#ifdef ZB_ENABLE_SE
   if (ZB_SE_MODE())
   {
-    ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).aps_key_source = ind->aps_key_source;
+    ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).aps_initial_join_auth = ind->aps_initial_join_auth;
+    ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).aps_key_upd_method = ind->aps_key_upd_method;
     ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).aps_key_attrs = ind->aps_key_attrs;
   }
-#endif
-#if (defined ZB_ENABLE_SE) || (defined ZB_ZCL_SUPPORT_CLUSTER_WWAH)
   ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).aps_key_from_tc = ind->aps_key_from_tc;
-#endif
 
   cmd_info->cluster_id = ind->clusterid;
   cmd_info->profile_id = ind->profileid;
@@ -356,7 +351,7 @@ zb_zcl_cluster_handler_t zb_zcl_get_cluster_handler(zb_uint16_t cluster_id, zb_u
          * positive. There are no side effect to 'ZCL_CTX()'. This violation seems to be caused by
          * the fact that 'ZCL_CTX()' is an external macro, which cannot be analyzed by C-STAT. */
         && (ZCL_CTX().zcl_handlers[i].cluster_role == cluster_role
-            /* || ZCL_CTX().zcl_handlers[i].cluster_role == ZB_ZCL_CLUSTER_MIXED_ROLE */))
+         /* || ZCL_CTX().zcl_handlers[i].cluster_role == ZB_ZCL_CLUSTER_MIXED_ROLE */))
     {
       ret = ZCL_CTX().zcl_handlers[i].cluster_handler;
       break;
@@ -744,8 +739,15 @@ void zb_zcl_send_cmd_tsn(
   }
   else if (put_payload == NULL && payload != NULL)
   {
-    ZB_MEMCPY(cmd_ptr, payload, payload_size);
+    if (zb_buf_safecopy(cmd_ptr, payload, payload_size))
+    {
     cmd_ptr += payload_size;
+  }
+  else
+  {
+      TRACE_MSG(TRACE_ERROR, "invalid pointer!", (FMT__0));
+      ZB_ASSERT(0);
+    }
   }
   else
   {
@@ -878,9 +880,23 @@ void zb_zcl_process_command_finish_new(zb_bufid_t buffer, zb_zcl_parsed_hdr_t *p
 void zb_zcl_send_default_resp_ext(zb_uint8_t param,
                                   const zb_zcl_parsed_hdr_t *cmd_info, zb_zcl_status_t status)
 {
+  zb_bool_t aps_encrypted;
+
+  /**
+   * If incoming ZCL frame is not secured with APS key,
+   * device shall response with unsecured default response, indicating a failure.
+   *
+   * SE spec:
+   *
+   * If link key encryption is NOT used but
+   * required, the receiving device shall generate a ZCL Default Response, employing the Network
+   * Key, with a FAILURE (0x01) status code.
+   */
+  aps_encrypted = ZB_APS_FC_IS_SECURE(cmd_info->addr_data.common_data.fc);
+
   if (ZB_ZCL_CHECK_IF_SEND_DEFAULT_RESP(*cmd_info, status))
   {
-    ZB_ZCL_SEND_DEFAULT_RESP_EXT(
+    ZB_ZCL_SEND_DEFAULT_RESP_EXT_SECURED(
       param,
       ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info).source.u.short_addr,
       ZB_APS_ADDR_MODE_16_ENDP_PRESENT,
@@ -894,7 +910,8 @@ void zb_zcl_send_default_resp_ext(zb_uint8_t param,
       ZB_ZCL_REVERT_DIRECTION(cmd_info->cmd_direction),
       cmd_info->is_manuf_specific,
       cmd_info->manuf_specific,
-      NULL);
+      NULL,
+      aps_encrypted);
   }
   else
   {

@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -67,6 +67,8 @@
 
 #include "zb_nvram.h"
 
+#include "zb_error_indication.h"
+
 /*! \addtogroup init_api */
 /*! @{ */
 
@@ -114,6 +116,28 @@ extern char** g_argv;
 #define MAIN void TN_CAT(ZB_TEST_NAME,_main)
 #define ZB_ZDO_STARTUP_COMPLETE void TN_CAT(ZB_TEST_NAME,_zb_zdo_startup_complete)
 #define ZGPD_STARTUP_COMPLETE void TN_CAT(ZB_TEST_NAME,_zgpd_startup_complete)
+#ifdef ZB_INIT_HAS_ARGS
+#define TO_STR(s) #s
+#define MACRO_TO_STR(s) TO_STR(s)
+/* Stringizing in C
+ * When a macro parameter is used with a leading ‘#’,
+ * the preprocessor replaces it with the literal text
+ * of the actual argument, converted to a string constant
+ */
+#define ZB_TEST_NAME_STR MACRO_TO_STR(ZB_TEST_NAME)
+#undef ZB_INIT
+/* ZB_TEST_NAME_STR contains a value of the ZB_TEST_NAME macro as a const string
+ * sizeof() of a const string returns a string size taking into account the null-symbol
+ */
+#define ZB_INIT(trace_comment)         \
+  {                                    \
+    zb_char_t buf[64];                 \
+    ZVUNUSED(trace_comment);           \
+    ZB_MEMCPY(buf, ZB_TEST_NAME_STR, sizeof(ZB_TEST_NAME_STR)); \
+    ZB_CHECK_LIBRARY();                \
+    zb_init(buf);                      \
+  }
+#endif /* ZB_INIT_HAS_ARGS */
 
 /* List of MAC primitives' callbacks */
 #define ZB_MLME_ASSOCIATE_INDICATION void TN_CAT(ZB_TEST_NAME,_zb_mlme_associate_indication)
@@ -181,11 +205,12 @@ extern char** g_argv;
 /**
  * @brief Assert using #ZB_THEREFORE macro
  */
-#define ZB_ASSERT_IF(cond, assert) (ZB_ASSERT(ZB_THEREFORE((cond), (assert))))
+#define ZB_ASSERT_IF(cond, assert) ZB_ASSERT(ZB_THEREFORE((cond), (assert)))
 
 #ifndef ZB_CONFIGURABLE_MEM
 #define ZB_RESYNC_CFG_MEM()
 #else /* ZB_CONFIGURABLE_MEM */
+void zb_assign_global_pointers(void);
 void zb_init_configurable_mem(int clear);
 #define ZB_RESYNC_CFG_MEM() zb_init_configurable_mem(0)
 #endif /* ZB_CONFIGURABLE_MEM */

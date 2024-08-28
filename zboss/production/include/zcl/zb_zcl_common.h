@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -75,6 +75,7 @@
  * enabled, long address is specified). Possibly - recalculate this
  * max size in run-time taking into account current parameters */
 /* TODO: check this value - calculate it correctly!!! */
+#define ZB_MAX_PHY_PAYLOAD_SIZE 127U
 /*
   Let's count:
 - max PHY payload - 127 bytes
@@ -247,40 +248,44 @@ zb_zcl_cluster_write_attr_hook_t zb_zcl_get_control4_cluster_write_attr_hook(zb_
 
 #define ZB_ZCL_CLUSTER_ID_OTA_UPGRADE 0x0019U /*!< Over The Air cluster identifier. */
 
-/* General clusters */
+  /* General clusters */
 #define ZB_ZCL_CLUSTER_ID_POLL_CONTROL 0x0020U /*!< Poll control cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_GREEN_POWER  0x0021U /*!< Green Power cluster identifier. */
 
 #define ZB_ZCL_CLUSTER_ID_KEEP_ALIVE 0x0025U /*!< Keep Alive cluster identifier. */
 
-/* Closures clusters */
+  /* Closures clusters */
 #define ZB_ZCL_CLUSTER_ID_SHADE_CONFIG    0x0100U /*!< Shade configuration cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_DOOR_LOCK       0x0101U /*!< Door lock cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_WINDOW_COVERING 0x0102U /*!< Window covering cluster identifier. */
-/* HVAC clusters */
+  /* HVAC clusters */
 #define ZB_ZCL_CLUSTER_ID_PUMP_CONFIG_CONTROL  0x200U /*!< Pump configuration and control cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_THERMOSTAT           0x201U /*!< Thermostat cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_FAN_CONTROL          0x202U /*!< Fan control cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_DEHUMID_CONTROL      0x203U /*!< Dehumidification control cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_THERMOSTAT_UI_CONFIG 0x204U /*!< Thermostat user interface configuration cluster identifier. */
 
-/* Lighting clusters */
+  /* Lighting clusters */
 #define ZB_ZCL_CLUSTER_ID_COLOR_CONTROL  0x0300U /*!< Color control cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_BALLAST_CONFIG 0x0301U /*!< Ballast configuration cluster identifier. */
 
-/* Measurement and Sensing */
+  /* Measurement and Sensing */
 #define ZB_ZCL_CLUSTER_ID_ILLUMINANCE_MEASUREMENT  0x0400U /*!< Illuminance measurement */
 #define ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT         0x0402U /*!< Temperature measurement */
 #define ZB_ZCL_CLUSTER_ID_PRESSURE_MEASUREMENT     0x0403U /*!< Pressure measurement */
 #define ZB_ZCL_CLUSTER_ID_REL_HUMIDITY_MEASUREMENT 0x0405U /*!< Relative humidity measurement */
 #define ZB_ZCL_CLUSTER_ID_OCCUPANCY_SENSING        0x0406U /*!< Occupancy sensing */
 
-/* IAS clusters */
+/* Measurement and Sensing: Concentration Measurement */
+#define ZB_ZCL_CLUSTER_ID_CARBON_DIOXIDE_MEASUREMENT 0x040DU /*!< Carbon Dioxide (CO2) measurement */
+#define ZB_ZCL_CLUSTER_ID_PM2_5_MEASUREMENT          0x042AU /*!< PM2.5 measurement */
+
+  /* IAS clusters */
 #define ZB_ZCL_CLUSTER_ID_IAS_ZONE 0x0500U /*!< IAS Zone cluster identifier */
 #define ZB_ZCL_CLUSTER_ID_IAS_ACE  0x0501U /*!< IAS ACE cluster identifier */
 #define ZB_ZCL_CLUSTER_ID_IAS_WD   0x0502U /*!< IAS WD cluster identifier */
 
-/* Smart Energy */
+  /* Smart Energy */
 #define ZB_ZCL_CLUSTER_ID_PRICE             0x0700U /*!< Price cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_DRLC              0x0701U /*!< Demand-Response cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_METERING          0x0702U /*!< Metering cluster identifier. */
@@ -297,18 +302,18 @@ zb_zcl_cluster_write_attr_hook_t zb_zcl_get_control4_cluster_write_attr_hook(zb_
 #define ZB_ZCL_CLUSTER_ID_KEY_ESTABLISHMENT 0x0800U /*!< Key Establishment cluster identifier. */
 
 
-/* Home Automation */
+  /* Home Automation */
 #define ZB_ZCL_CLUSTER_ID_APPLIANCE_EVENTS_AND_ALERTS 0x0b02U /*!< Appliance events and alerts cluster identifier */
 /* HA specU rev. 29U ver. 1.2 - Electricity MeasurementU not sure that its Electrical Measurement */
 #define ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT      0x0b04U /*!< Electrical Measurement cluster identifier. */
 #define ZB_ZCL_CLUSTER_ID_DIAGNOSTICS                 0x0b05U /*!< Home Automation Diagnostics */
 
 #define ZB_ZCL_CLUSTER_ID_WWAH                    0xFC57U /*!< Works with All Hubs cluster identifier */
-/** @cond touchlink */
+  /** @cond touchlink */
 #define ZB_ZCL_CLUSTER_ID_TOUCHLINK_COMMISSIONING 0x1000U       /*!< Touchlink Commissioning cluster identifier */
-/** @endcond */ /* touchlink */
+  /** @endcond */ /* touchlink */
 
-/************** Manufacturer specific clusters ****************/
+  /************** Manufacturer specific clusters ****************/
 
 #define ZB_ZCL_CLUSTER_ID_TUNNEL     0xfc00U /*!< Manufacturer specific Tunnel cluster */
 #define ZB_ZCL_CLUSTER_ID_IR_BLASTER 0xfc01U /*!< Manufacturer specific IR Blaster cluster */
@@ -317,9 +322,11 @@ zb_zcl_cluster_write_attr_hook_t zb_zcl_get_control4_cluster_write_attr_hook(zb_
 
 #define ZB_ZCL_CLUSTER_ID_METER_IDENTIFICATION 0x0B01U /*!< Meter Identification cluster identifier */
 
-/* TODO: define other clusters IDs */
-/* Measurements and sensing clusters */
-/* Security and safety clusters */
+  /* TODO: define other clusters IDs */
+  /* Measurements and sensing clusters */
+  /* Security and safety clusters */
+
+#define ZB_ZCL_CLUSTER_ID_DIRECT_CONFIGURATION 0x003DU /*!< Zigbee Direct Configuration cluster identifier */
 
 /** @} */
 
@@ -356,6 +363,14 @@ typedef enum zb_zcl_attribute_reporting_status_e
   ZB_ZCL_AR_STATUS_COMPLETE = 0x01  /**< Attribute Reporting Complete. */
 } zb_zcl_attribute_reporting_status_t;
 
+/** @brief Security use option. */
+typedef enum zb_zcl_security_use_option_e
+{
+  ZB_ZCL_SU_DISABLED,
+  ZB_ZCL_SU_ENABLED,
+  ZB_ZCL_SU_AUTO
+} zb_zcl_security_use_option_t;
+
 /**
  * @name ZCL status values
  * @anchor zcl_status
@@ -363,25 +378,25 @@ typedef enum zb_zcl_attribute_reporting_status_e
  * @note The enumeration does not contain statuses not used in ZB HA profile
  */
 /** @{ */
-#define ZB_ZCL_STATUS_SUCCESS                       0x00U /*!< ZCL Success */
-#define ZB_ZCL_STATUS_FAIL                          0x01U /*!< ZCL Fail */
-#define ZB_ZCL_STATUS_NOT_AUTHORIZED                0x7EU /*!< The sender of the command does not have authorization to carry out this command. */
+#define ZB_ZCL_STATUS_SUCCESS               0x00U /*!< ZCL Success */
+#define ZB_ZCL_STATUS_FAIL                  0x01U /*!< ZCL Fail */
+#define ZB_ZCL_STATUS_NOT_AUTHORIZED        0x7EU /*!< The sender of the command does not have authorization to carry out this command. */
 #define ZB_ZCL_STATUS_RESERVED                      0x7FU /*!< CCB 2318 a reserved field may be used in the future and then be non-zero. */
-#define ZB_ZCL_STATUS_MALFORMED_CMD                 0x80U /*!< Malformed command */
+#define ZB_ZCL_STATUS_MALFORMED_CMD         0x80U /*!< Malformed command */
 #define ZB_ZCL_STATUS_UNSUP_CMD                     0x81U /*!< ZCL8: Unsupported command */
 #define ZB_ZCL_STATUS_UNSUP_CLUST_CMD               0x81U /*!< ZCL7: Unsupported cluster command, ZCL8: use UNSUP_COMMAND*/
 #define ZB_ZCL_STATUS_UNSUP_GEN_CMD                 0x82U /*!< ZCL7: Unsupported general command, ZCL8: use UNSUP_COMMAND*/
 #define ZB_ZCL_STATUS_UNSUP_MANUF_CLUST_CMD         0x83U /*!< ZCL7: Unsupported manuf-specific clust command, ZCL8: use UNSUP_COMMAND*/
 #define ZB_ZCL_STATUS_UNSUP_MANUF_GEN_CMD           0x84U /*!< ZCL7: Unsupported manuf-specific general command, ZCL8: use UNSUP_COMMAND*/
-#define ZB_ZCL_STATUS_INVALID_FIELD                 0x85U /*!< Invalid field */
-#define ZB_ZCL_STATUS_UNSUP_ATTRIB                  0x86U /*!< Unsupported attribute */
-#define ZB_ZCL_STATUS_INVALID_VALUE                 0x87U /*!< Invalid value */
-#define ZB_ZCL_STATUS_READ_ONLY                     0x88U /*!< Read only */
-#define ZB_ZCL_STATUS_INSUFF_SPACE                  0x89U /*!< Insufficient space */
+#define ZB_ZCL_STATUS_INVALID_FIELD         0x85U /*!< Invalid field */
+#define ZB_ZCL_STATUS_UNSUP_ATTRIB          0x86U /*!< Unsupported attribute */
+#define ZB_ZCL_STATUS_INVALID_VALUE         0x87U /*!< Invalid value */
+#define ZB_ZCL_STATUS_READ_ONLY             0x88U /*!< Read only */
+#define ZB_ZCL_STATUS_INSUFF_SPACE          0x89U /*!< Insufficient space */
 #define ZB_ZCL_STATUS_DUPE_EXISTS                   0x8aU /*!< ZCL7: Duplicate exists, ZCL8: use SUCCESS*/
-#define ZB_ZCL_STATUS_NOT_FOUND                     0x8bU /*!< Not found */
-#define ZB_ZCL_STATUS_UNREPORTABLE_ATTRIB           0x8cU /*!< Unreportable attribute */
-#define ZB_ZCL_STATUS_INVALID_TYPE                  0x8dU /*!< Invalid type */
+#define ZB_ZCL_STATUS_NOT_FOUND             0x8bU /*!< Not found */
+#define ZB_ZCL_STATUS_UNREPORTABLE_ATTRIB   0x8cU /*!< Unreportable attribute */
+#define ZB_ZCL_STATUS_INVALID_TYPE          0x8dU /*!< Invalid type */
 #define ZB_ZCL_STATUS_WRITE_ONLY                    0x8fU /*!< ZCL7: Write only, ZCL8: use NOT_AUTHORIZED*/
 #define ZB_ZCL_STATUS_INCONSISTENT_STARTUP_STATE    0x90U /*!< ZCL7: The value can put the device in an inconsistent state on startup, ZCL8: FAILURE, CCB 2477 Status Code Cleanup: never used */
 #define ZB_ZCL_STATUS_DEFINED_OUT_OF_BAND           0x91U /*!< ZCL7: Out-of-band method to write an attribute, ZCL8: FAILURE, CCB 2477 Status Code Cleanup: never used */
@@ -389,21 +404,21 @@ typedef enum zb_zcl_attribute_reporting_status_e
 /** ZCL7: The credentials presented by the device sending the command are not sufficient to perform this
  * action.
  * ZCL8: use FAILURE*/
-#define ZB_ZCL_STATUS_ACTION_DENIED                 0x93U
-#define ZB_ZCL_STATUS_TIMEOUT                       0x94U /*!< Timeout */
-#define ZB_ZCL_STATUS_ABORT                         0x95U /*!< Abort */
-#define ZB_ZCL_STATUS_INVALID_IMAGE                 0x96U /*!< Invalid OTA upgrade image */
-#define ZB_ZCL_STATUS_WAIT_FOR_DATA                 0x97U /*!< Server does not have data block available yet */
+#define ZB_ZCL_STATUS_ACTION_DENIED         0x93U
+#define ZB_ZCL_STATUS_TIMEOUT               0x94U /*!< Timeout */
+#define ZB_ZCL_STATUS_ABORT                 0x95U /*!< Abort */
+#define ZB_ZCL_STATUS_INVALID_IMAGE         0x96U /*!< Invalid OTA upgrade image */
+#define ZB_ZCL_STATUS_WAIT_FOR_DATA         0x97U /*!< Server does not have data block available yet */
 /**< No OTA upgrade image available for a particular client. */
-#define ZB_ZCL_STATUS_NO_IMAGE_AVAILABLE            0x98U
+#define ZB_ZCL_STATUS_NO_IMAGE_AVAILABLE    0x98U
 /** The client still requires more OTA upgrade image files in order to successfully upgrade. */
-#define ZB_ZCL_STATUS_REQUIRE_MORE_IMAGE            0x99U
+#define ZB_ZCL_STATUS_REQUIRE_MORE_IMAGE    0x99U
 /** The command has been received and is being processed.*/
-#define ZB_ZCL_STATUS_NOTIFICATION_PENDING          0x9AU
+#define ZB_ZCL_STATUS_NOTIFICATION_PENDING  0x9AU
 #define ZB_ZCL_STATUS_HW_FAIL                       0xc0U /*!< ZCL7: Hardware failure, ZCL8: use FAILURE */
 #define ZB_ZCL_STATUS_SW_FAIL                       0xc1U /*!< ZCL7: Software failure, ZCL8: use FAILURE */
 #define ZB_ZCL_STATUS_CALIB_ERR                     0xc2U /*!< ZCL7: Calibration error, ZCL8: reserved, CCB 2477 Status Code Cleanup: never used  */
-#define ZB_ZCL_STATUS_UNSUP_CLUST                   0xc3U /*!< Cluster is not found on the target endpoint */
+#define ZB_ZCL_STATUS_UNSUP_CLUST           0xc3U /*!< Cluster is not found on the target endpoint */
 #define ZB_ZCL_STATUS_LIMIT_REACHED                 0xc4U /*!< ZCL7: Cluster is not found on the target endpoint, ZCL8: use SUCCESS */
 /** @} */
 
@@ -412,7 +427,7 @@ typedef enum zb_zcl_attribute_reporting_status_e
  *
  * Holds one of @ref zcl_status. Kept only for backward compatibility as
  * @ref zcl_status were declared previously as enum.
- */
+*/
 typedef zb_uint8_t zb_zcl_status_t;
 
 /** @brief ZCL global attribute: cluster revision returned by default.
@@ -668,7 +683,7 @@ static ZB_INLINE zb_uint16_t zb_zcl_string_append_byte(zb_uint8_t *zcl_str,
  *
  * @deprecated holds one of @ref zcl_attr_type. Kept only for backward compatibility as
  * @ref zcl_attr_type were declared previously as enum. Can be removed in future releases.
- */
+*/
 typedef zb_uint8_t zb_zcl_attr_type_t;
 
 /**
@@ -681,15 +696,15 @@ typedef zb_uint8_t zb_zcl_attr_type_t;
 /** Attribute is read/write */
 #define ZB_ZCL_ATTR_ACCESS_READ_WRITE (ZB_ZCL_ATTR_ACCESS_READ_ONLY | ZB_ZCL_ATTR_ACCESS_WRITE_ONLY)
 #define ZB_ZCL_ATTR_ACCESS_REPORTING  0x04U /*!< Attribute is allowed for reporting */
-/** @cond internals_doc */
+  /** @cond internals_doc */
 /** Attribute is read only, but may be marked as writable due to ZCL specification (using
- * ZB_ZCL_SET_ATTR_WRITABLE) */
+                                                                      * ZB_ZCL_SET_ATTR_WRITABLE) */
 #define ZB_ZCL_ATTR_ACCESS_WRITE_OPTIONAL (ZB_ZCL_ATTR_ACCESS_READ_ONLY)
-/** @endcond */ /* internals_doc */
+  /** @endcond */ /* internals_doc */
 #define ZB_ZCL_ATTR_ACCESS_SINGLETON  0x08U /*!< Attribute is singleton */
 #define ZB_ZCL_ATTR_ACCESS_SCENE      0x10U /*!< Attribute is accessed through scene */
 
-/* Use free bit in access attribute field to save RAM */
+  /* Use free bit in access attribute field to save RAM */
 #define ZB_ZCL_ATTR_MANUF_SPEC        0x20U /*!< Attribute is manufacturer specific */
 #define ZB_ZCL_ATTR_ACCESS_INTERNAL   0x40U /*!< ZBOSS Internal access only Attribute */
 /** @} */
@@ -804,9 +819,7 @@ zb_zcl_attr_t;
     (void*) &(cluster_revision_##attrs_desc_name)                                                  \
   },
 
-/** @endcond */ /* internals_doc */
-
-/*! @brief Start declaration of attributes list with cluster revision */
+/*! @internal @brief Start declaration of attributes list with cluster revision */
 #define ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attrs_desc_name, cluster_name)           \
   zb_uint16_t cluster_revision_##attrs_desc_name = cluster_name##_CLUSTER_REVISION_DEFAULT;        \
   zb_zcl_attr_t attrs_desc_name [] = {                                                             \
@@ -817,8 +830,6 @@ zb_zcl_attr_t;
     ZB_ZCL_NON_MANUFACTURER_SPECIFIC,                                                              \
     (void*) &(cluster_revision_##attrs_desc_name)                                                  \
   },
-
-/** @cond internals_doc */
 
 /*! @internal @brief Start declaration of static attributes list with cluster revision */
 #define ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION_STATIC(attrs_desc_name, cluster_name)    \
@@ -965,6 +976,10 @@ zb_zcl_attr_t;
 #define ZB_ZCL_GET_ATTRIBUTE_VAL_S32(attr_desc)          \
   (*(zb_int32_t*)attr_desc->data_p)
 
+/*! Get 32-bit unsigned attribute value (without any check) */
+#define ZB_ZCL_GET_ATTRIBUTE_VAL_SINGLE(attr_desc)        \
+  (*(zb_single_t*)attr_desc->data_p)
+
 
 /*! @} */ /* General attributes' description */
 
@@ -994,7 +1009,7 @@ zb_zcl_attr_t;
 /** @name ZCL frame type
  * @brief Defines Permitted values for Frame Type subfield of Frame Control field in ZCL frame.
  * @anchor zcl_frame_type
- */
+*/
 /** @{ */
 #define ZB_ZCL_FRAME_TYPE_COMMON           0x00U /*!< Command acts across the entire profile  */
 #define ZB_ZCL_FRAME_TYPE_CLUSTER_SPECIFIC 0x01U /*!< Command is specific to a cluster */
@@ -1005,7 +1020,7 @@ zb_zcl_attr_t;
  *
  * @deprecated holds one of @ref zcl_frame_type. Kept only for backward compatibility as
  * @ref zcl_frame_type were declared previously as enum. Can be removed in future releases.
- */
+*/
 typedef zb_uint8_t zb_zcl_frame_type_t;
 
 /**
@@ -1028,7 +1043,7 @@ typedef zb_uint8_t zb_zcl_frame_type_t;
  * @deprecated holds one of @ref zcl_manufacturer_specific. Kept only for backward compatibility as
  * @ref zcl_manufacturer_specific were declared previously as enum. Can be removed in future
  * releases.
- */
+    */
 typedef zb_uint8_t zb_zcl_manufacturer_specific_t;
 
 #define ZB_ZCL_MANUFACTURER_WILDCARD_ID 0xFFFFU
@@ -1039,7 +1054,7 @@ typedef zb_uint8_t zb_zcl_manufacturer_specific_t;
  * @name Disable default response subfield of FCF in ZCL frame
  * @anchor zcl_disable_default_response
  * @see ZCL spec, subclause 2.3.1.1.3
- */
+*/
 /** @{ */
 /** Enable default response */
 #define ZB_ZCL_ENABLE_DEFAULT_RESPONSE  0x00U
@@ -1060,11 +1075,11 @@ typedef zb_uint8_t zb_zcl_disable_default_response_t;
  * @name ZCL frame direction
  * @anchor zcl_frame_direction
  * @see ZCL spec, subclause 2.3.1.1.3.
- */
+*/
 /** @{ */
-/*! Command sent from client to a server */
+  /*! Command sent from client to a server */
 #define ZB_ZCL_FRAME_DIRECTION_TO_SRV 0x00U
-/*! Command sent from server to a client */
+  /*! Command sent from server to a client */
 #define ZB_ZCL_FRAME_DIRECTION_TO_CLI 0x01U
 /** @} */
 
@@ -1088,8 +1103,8 @@ typedef ZB_PACKED_PRE struct zb_zcl_frame_ctrl_s
   zb_bitfield_t frame_type:2;       /*!< Frame type @ref zcl_frame_type */
   zb_bitfield_t manufacturer:1;     /*!< Manufacturer specific frame @ref zcl_manufacturer_specific*/
   zb_bitfield_t direction:1;        /*!< Direction @ref zcl_frame_direction */
-  zb_bitfield_t disable_def_resp:1; /*!< Disable default response */
-  zb_bitfield_t reserved:3;
+  zb_bitfield_t disable_def_resp  :1;     /*!< Disable default response */
+  zb_bitfield_t reserved          :3;
 } ZB_PACKED_STRUCT zb_zcl_frame_ctrl_t;
 
 /*! @brief ZCL frame header with manufacturer code
@@ -1170,12 +1185,15 @@ typedef ZB_PACKED_PRE  struct zb_zcl_parsed_hdr_s
       zb_uint8_t  src_endpoint;
       zb_uint8_t  dst_endpoint;
       zb_uint8_t  fc;
-#if (defined ZB_ENABLE_SE) || (defined ZB_ZCL_SUPPORT_CLUSTER_WWAH)
-      zb_uint8_t aps_key_source:1;
+      /* There was ifdef for next fields. r23 uses that fields everywhere  */
+      /* TODO: use doxygen @ ref for aps_initial_join_auth (zb_initial_join_auth_t) and
+       * aps_key_upd_method (zb_post_join_key_upd_method_t) */
+      zb_uint8_t aps_initial_join_auth:3;
+      zb_uint8_t aps_key_upd_method:3;
+
       zb_uint8_t aps_key_attrs:2;
       zb_uint8_t aps_key_from_tc:1;
-      zb_uint8_t reserved:4;
-#endif
+      zb_uint8_t reserved:7;
     } ZB_PACKED_STRUCT common_data;
 #if defined ZB_ENABLE_ZLL
     ZB_PACKED_PRE struct
@@ -1354,41 +1372,41 @@ void *zb_zcl_start_command_header(zb_bufid_t zbbuf, zb_uint8_t frame_ctl, zb_uin
 #define ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_REQ_FRAME_CONTROL_A(buf_ptr, direction,                  \
                                                               is_manufacturer_specific, def_resp)  \
   (ZB_ZCL_CONSTRUCT_SET_FRAME_CONTROL(*(buf_ptr),                                                  \
-                                      ZB_ZCL_FRAME_TYPE_CLUSTER_SPECIFIC,                          \
+    ZB_ZCL_FRAME_TYPE_CLUSTER_SPECIFIC,                                 \
                                       ((is_manufacturer_specific) ? ZB_ZCL_MANUFACTURER_SPECIFIC   \
                                                             : ZB_ZCL_NOT_MANUFACTURER_SPECIFIC),   \
-                                      (direction),                                                 \
-                                      (def_resp)),                                                 \
+    (direction),                                                        \
+    (def_resp)),                                                        \
    (buf_ptr)++)
 
 #define ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_RESP_FRAME_CONTROL_A(buf_ptr, direction,                  \
                                                               is_manufacturer_specific)            \
   (ZB_ZCL_CONSTRUCT_SET_FRAME_CONTROL(*(buf_ptr),                                                  \
-                                      ZB_ZCL_FRAME_TYPE_COMMON,                                    \
+    ZB_ZCL_FRAME_TYPE_COMMON,                                           \
                                       ((is_manufacturer_specific)                                  \
                                            ? ZB_ZCL_MANUFACTURER_SPECIFIC                          \
                                            : ZB_ZCL_NOT_MANUFACTURER_SPECIFIC),                    \
-                                      (direction),                                                 \
-                                      ZB_ZCL_DISABLE_DEFAULT_RESPONSE),                            \
+    (direction),                                                        \
+    ZB_ZCL_DISABLE_DEFAULT_RESPONSE),                                   \
    (buf_ptr)++)
 
 #define ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_RESP_FRAME_CONTROL_A(buf_ptr, direction,                 \
                                                                is_manufacturer_specific)           \
   (ZB_ZCL_CONSTRUCT_SET_FRAME_CONTROL(*(buf_ptr),                                                  \
-                                      ZB_ZCL_FRAME_TYPE_CLUSTER_SPECIFIC,                          \
+    ZB_ZCL_FRAME_TYPE_CLUSTER_SPECIFIC,                                 \
                                       ((is_manufacturer_specific)                                  \
                                            ? ZB_ZCL_MANUFACTURER_SPECIFIC                          \
                                            : ZB_ZCL_NOT_MANUFACTURER_SPECIFIC),                    \
-                                      (direction),                                                 \
-                                      ZB_ZCL_DISABLE_DEFAULT_RESPONSE),                            \
+    (direction),                                                        \
+    ZB_ZCL_DISABLE_DEFAULT_RESPONSE),                                   \
    (buf_ptr)++)
 
 /*! @internal Construct ZCL header frame control valueZB_ZCL_CONSTRUCT_GENERAL_COMMAND_RESP_FRAME_CONTROL for General command response */
-#define ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_RESP_FRAME_CONTROL(buf_ptr)                               \
+#define ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_RESP_FRAME_CONTROL(buf_ptr) \
   (ZB_ZCL_CONSTRUCT_SET_FRAME_CONTROL(*(buf_ptr), ZB_ZCL_FRAME_TYPE_COMMON,                        \
-                                      ZB_ZCL_NOT_MANUFACTURER_SPECIFIC,                            \
-                                      ZB_ZCL_FRAME_DIRECTION_TO_CLI,                               \
-                                      ZB_ZCL_DISABLE_DEFAULT_RESPONSE),                            \
+    ZB_ZCL_NOT_MANUFACTURER_SPECIFIC,                                \
+    ZB_ZCL_FRAME_DIRECTION_TO_CLI,                                   \
+    ZB_ZCL_DISABLE_DEFAULT_RESPONSE),                                \
    (buf_ptr)++)
 
 
@@ -1397,11 +1415,11 @@ void *zb_zcl_start_command_header(zb_bufid_t zbbuf, zb_uint8_t frame_ctl, zb_uin
 #define ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_RESP_FRAME_CONTROL_EXT(_buf_ptr, _is_manuf_specific,      \
                                                                 _direction)                        \
   (ZB_ZCL_CONSTRUCT_SET_FRAME_CONTROL(*(_buf_ptr),                                                 \
-                                      ZB_ZCL_FRAME_TYPE_COMMON,                                    \
+    ZB_ZCL_FRAME_TYPE_COMMON,                                        \
                                       ((_is_manuf_specific) ? ZB_ZCL_MANUFACTURER_SPECIFIC         \
                                                             : ZB_ZCL_NOT_MANUFACTURER_SPECIFIC),   \
-                                      (_direction),                                                \
-                                      ZB_ZCL_DISABLE_DEFAULT_RESPONSE),                            \
+    (_direction),                                                    \
+    ZB_ZCL_DISABLE_DEFAULT_RESPONSE),                                \
    (_buf_ptr)++)
 
 /** @endcond */ /* internals_doc */
@@ -1423,7 +1441,7 @@ void *zb_zcl_start_command_header(zb_bufid_t zbbuf, zb_uint8_t frame_ctl, zb_uin
  *  @note To add Manufacturer specific field, use ZB_ZCL_CONSTRUCT_COMMAND_HEADER_EXT(), macro.
  *  @hideinitializer
  */
-#define ZB_ZCL_CONSTRUCT_COMMAND_HEADER(data_ptr, tsn, cmd_id)                                     \
+#define ZB_ZCL_CONSTRUCT_COMMAND_HEADER(data_ptr, tsn, cmd_id)                        \
   (ZB_ZCL_PACKET_PUT_DATA8((data_ptr), (tsn)), ZB_ZCL_PACKET_PUT_DATA8((data_ptr), (cmd_id)))
 
 /*! @brief Construct ZCL header, Manufacturer specific value is conditionally supported */
@@ -1559,7 +1577,9 @@ void *zb_zcl_start_command_header(zb_bufid_t zbbuf, zb_uint8_t frame_ctl, zb_uin
 zb_bool_t zb_zcl_can_cluster_be_fragmented(zb_uint16_t profile_id, zb_uint16_t cluster_id);
 
 #define ZB_ZCL_GET_BYTES_AVAILABLE_WITH_FRAGMENTATION(zbbuf, ptr) \
-  (ZB_ASDU_MAX_FRAG_LEN - ZB_ZCL_GET_BYTES_WRITTEN(zbbuf, ptr))
+  ((zb_buf_get_max_size(zbbuf) -\
+   (ZB_MAX_PHY_PAYLOAD_SIZE-ZB_ZCL_HI_WO_IEEE_MAX_PAYLOAD_SIZE))-\
+   ZB_ZCL_GET_BYTES_WRITTEN(zbbuf, ptr))
 
 #define ZB_ZCL_GET_BYTES_AVAILABLE_WO_FRAGMENTATION(zbbuf, ptr) \
   (ZB_ZCL_HI_WO_IEEE_MAX_PAYLOAD_SIZE - ZB_ZCL_GET_BYTES_WRITTEN(zbbuf, ptr))
@@ -1578,6 +1598,9 @@ zb_bool_t zb_zcl_can_cluster_be_fragmented(zb_uint16_t profile_id, zb_uint16_t c
   ZB_ZCL_GET_BYTES_AVAILABLE_WO_FRAGMENTATION(zbbuf, ptr)
 #endif /* APS_FRAGMENTATION */
 
+#define ZB_ZCL_ATTR_SZ_RAW(attr_size) ((sizeof(zb_zcl_read_attr_res_t)      \
+                                        - sizeof(zb_uint8_t)) + (attr_size))
+
 /**
  *  @brief Put 8-bit value to packet.
  *  @hideinitializer
@@ -1589,11 +1612,11 @@ zb_bool_t zb_zcl_can_cluster_be_fragmented(zb_uint16_t profile_id, zb_uint16_t c
   @param ptr - pointer to the place to put value to
   @param val - pointer to the value to put into packet
 */
-#define ZB_ZCL_PACKET_PUT_DATA16(ptr, val) \
+#define ZB_ZCL_PACKET_PUT_DATA16(ptr, val)      \
 do                                         \
-{                                          \
-  ZB_HTOLE16((ptr), (val));                \
-  (ptr) += 2;                              \
+ {                                              \
+   ZB_HTOLE16((ptr), (val));                    \
+   (ptr) += 2;                                  \
 } while (ZB_FALSE)
 
 /*!
@@ -1835,6 +1858,13 @@ zb_ret_t zb_zcl_finish_and_send_packet_new(zb_bufid_t buffer, zb_uint8_t *ptr,
                                    zb_bool_t disable_aps_ack, zb_uint16_t delay);
 
 
+zb_ret_t zb_zcl_finish_and_send_packet_common(zb_bufid_t buffer,
+                                              zb_uint8_t *ptr,
+                                              zb_callback_t cb,
+                                              zb_zcl_security_use_option_t security_option,
+                                              zb_bool_t disable_aps_ack,
+                                              zb_uint16_t delay);
+
 /*!
   Finish ZCL packet filling. Used bytes number are marked in a buffer.
   @param zbbuf - pointer to zb_buf_t buffer.
@@ -1846,18 +1876,18 @@ zb_ret_t zb_zcl_finish_and_send_packet_new(zb_bufid_t buffer, zb_uint8_t *ptr,
         Please use @ref zb_zcl_finish_and_send_packet() function directly to be able to check ret code.
  */
 /* Glue ZB_ZCL_FINISH_PACKET and ZB_ZCL_SEND_COMMAND_SHORT into one call */
-#define ZB_ZCL_FINISH_PACKET(zbbuf, ptr) (void) zb_zcl_finish_and_send_packet((zbbuf), (ptr),
+#define ZB_ZCL_FINISH_PACKET(zbbuf, ptr) (void)zb_zcl_finish_and_send_packet((zbbuf), (ptr),
 
 #define ZB_ZCL_SEND_COMMAND_SHORT(buffer, addr, dst_addr_mode, dst_ep, ep, prof_id, cluster_id,    \
                                   cb)                                                              \
   (const zb_addr_u *)(const void *)(&(addr)), (dst_addr_mode), (dst_ep), (ep), (prof_id), (cluster_id), (cb))
 
 
-#define ZB_ZCL_FINISH_N_SEND_PACKET(zbbuf, ptr, addr, dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb)                          \
+#define ZB_ZCL_FINISH_N_SEND_PACKET(zbbuf, ptr, addr, dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb)     \
   (void) zb_zcl_finish_and_send_packet((zbbuf), (ptr),(const zb_addr_u *)(const void *)(&(addr)), dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb)
 
 #define ZB_ZCL_FINISH_N_SEND_PACKET_NEW(zbbuf, ptr, addr, dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb, aps_secured, disable_aps_ack, delay)                         \
-  (void) zb_zcl_finish_and_send_packet_new((zbbuf), (ptr),(zb_addr_u *)(void *)(&(addr)), dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb, aps_secured, disable_aps_ack, delay)
+  (void) zb_zcl_finish_and_send_packet_new((zbbuf), (ptr),(const zb_addr_u *)(const void *)(&(addr)), dst_addr_mode, dst_ep, ep, prof_id, cluster_id, cb, aps_secured, disable_aps_ack, delay)
 
 /* TODO: Implement via zb_zcl_finish_and_send_packet() */
 #define ZB_ZCL_FINISH_PACKET_O(zbbuf, ptr)                              \
@@ -1882,12 +1912,16 @@ zb_uint48_t zb_zcl_attr_get48(zb_uint8_t *value);
 #define ZB_ZCL_ATTR_GET24(value) zb_zcl_attr_get24(value)
 #define ZB_ZCL_ATTR_GET48(value) zb_zcl_attr_get48(value)
 
+zb_single_t zb_zcl_attr_getsingle(zb_uint8_t *value);
+#define ZB_ZCL_ATTR_GETSINGLE(value) zb_zcl_attr_getsingle(value)
+
 #else
 
 #define ZB_ZCL_ATTR_GET16(value) (*((zb_uint16_t *)value))
 #define ZB_ZCL_ATTR_GETS16(value) (*((zb_int16_t *)value))
 #define ZB_ZCL_ATTR_GET32(value) (*((zb_uint32_t *)value))
 #define ZB_ZCL_ATTR_GETS32(value) (*((zb_int32_t *)value))
+#define ZB_ZCL_ATTR_GETSINGLE(value) (*((zb_single_t *)value))
 
 #define ZB_ZCL_ATTR_GET24(value) (*((zb_int24_t *)value))
 #define ZB_ZCL_ATTR_GET48(value) (*((zb_uint48_t *)value))
@@ -1971,7 +2005,7 @@ zcl_cb_hash_ent_t;
 /** Command send status structure */
 typedef struct zb_zcl_command_send_status_s
 {
-  zb_ret_t    status;         /*!< command send status */
+  zb_ret_t status;            /*!< command send status */
   zb_uint8_t  dst_endpoint;   /*!< Destination endpoint */
   zb_zcl_addr_t dst_addr;     /*!< Destination address */
   zb_uint8_t  src_endpoint;   /*!< Source endpoint */
@@ -2095,7 +2129,7 @@ zb_uint8_t zb_zcl_get_attribute_size(zb_uint8_t attr_type, zb_uint8_t *attr_valu
 zb_uint8_t zb_zcl_get_analog_attribute_size(zb_uint8_t attr_type);
 
 /**
- * @brief Check whether type of ZCL attrbiute is analog
+ * @brief Check whether type of ZCL attribute is analog
  * @param attr_type - attribute type in question (see @ref zcl_attr_type)
  *
  * @return ZB_TRUE if type is analog, ZB_FALSE otherwise
@@ -2385,7 +2419,7 @@ typedef struct zb_zcl_set_attr_value_param_s
         ZB_MEMCPY(ptr, (p_value), size);                                       \
         data->cb_param.set_attr_value_param.values.data_variable.size = size;  \
         data->cb_param.set_attr_value_param.values.data_variable.p_data = ptr; \
-        break;                                                                 \
+      break;                                                                   \
       }                                                                        \
                                                                                \
       default:                                                                 \
@@ -2485,7 +2519,14 @@ void zb_zcl_schedule_status_abort(zb_bufid_t  buffer, zb_addr_u *addr,
 
 zb_bool_t zb_zcl_handle_specific_commands(zb_uint8_t param);
 zb_bool_t cluster_needs_aps_encryption(zb_uint8_t endpoint_id, zb_uint16_t cluster_id);
-zb_zcl_status_t zb_zcl_get_zcl_status_from_ret(zb_ret_t result);
 
+zb_zcl_status_t zb_zcl_set_attr_val_manuf_internal(zb_uint8_t ep,
+                                                   zb_uint16_t cluster_id,
+                                                   zb_uint8_t cluster_role,
+                                                   zb_uint16_t attr_id,
+                                                   zb_uint16_t manuf_code,
+                                                   zb_uint8_t *value,
+                                                   zb_bool_t check_access,
+                                                   zb_bool_t check_attr_writable);
 /** @endcond */ /* DOXYGEN_ZCL_SECTION */
 #endif /* ZB_ZCL_COMMON_H */

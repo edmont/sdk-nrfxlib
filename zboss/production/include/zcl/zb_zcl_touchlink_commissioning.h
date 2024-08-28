@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -103,6 +103,7 @@
 
 /*! @name Touchlink Commissioning cluster internals
     Internal structures for Touchlink Commissioning cluster
+    @cond internals_doc
     @internal
     @{
 */
@@ -143,7 +144,8 @@ zb_uint8_t* zb_zll_get_nib_ext_pan_id(void);
 /** @brief Get NIB Update ID */
 zb_uint8_t zb_zll_get_nib_update_id(void);
 
-/*! @} */ /* Commissioning cluster internals */
+/*! @}
+    @endcond */ /* Commissioning cluster internals */
 
 /*! @name Touchlink Commissioning cluster commands
     @{
@@ -773,8 +775,8 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_identify_req_param_s
   /**
    *  @brief Time to identify.
    *  Has special values:
-   *  @li @ref ZB_ZLL_IDENTIFY_STOP - instructs target to exit identify mode.
-   *  @li @ref ZB_ZLL_IDENTIFY_DEFAULT_TIME - instructs target to identify for a default period
+   *  @li ZB_ZLL_IDENTIFY_STOP - instructs target to exit identify mode.
+   *  @li ZB_ZLL_IDENTIFY_DEFAULT_TIME - instructs target to identify for a default period
    *  known by the receiver.
    */
   zb_uint16_t identify_time;
@@ -830,7 +832,7 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_identify_req_param_s
  *  zb_zll_commissioning_identify_req_param_s structure as parameter.
  *  @returns
  *  @li RET_OK in case of success. In this case application will be notified on further status
- *  (packet received, timed out, etc.) via zboss_signal_handler().
+ *  (packet received, timed out, etc.) via application signals.
  *  @li RET_INVALID_STATE if identify time period doesn't correspond to the transaction state. I.e.
  *  either identify request was already sent, and identify period is non-zero, or request was not
  *  sent, and identify period is zero zus instructing the target to exit identify state.
@@ -925,7 +927,7 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_network_start_req_s
  *  @param encrypted_nwk_key [IN] - encrypted network key.
  *  @param logical_channel [IN] - Touchlink channel to be used for the new network.
  *  @param pan_id_ [IN] - new network Pan ID.
- *  @param nwk_addr [IN] - short network address for the recepient.
+ *  @param nwk_addr [IN] - short network address for the recipient.
  *  @param grp_ids_begin [IN] - group identifiers begin field.
  *  @param grp_ids_end [IN] - group identifiers end field.
  *  @param free_nwk_addrs_begin_ [IN] - free network addresses begin field.
@@ -1142,7 +1144,7 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_network_join_router_req_s
  *  @param buffer to put packet to (by pointer).
  *  @param key_index [IN] - index of the field to be used in the encrypted network key field.
  *  @param encrypted_nwk_key [IN] - encrypted network key.
- *  @param nwk_addr [IN] - short network address for the recepient.
+ *  @param nwk_addr [IN] - short network address for the recipient.
  *  @param grp_ids_begin [IN] - group identifiers begin field.
  *  @param grp_ids_end [IN] - group identifiers end field.
  *  @param free_nwk_addrs_begin_ [IN] - free network addresses begin field.
@@ -1320,7 +1322,7 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_network_join_end_device_req_s
  *  @param key_index [IN] - index of the field to be used in the encrypted network key field.
  *  @param encrypted_nwk_key [IN] - encrypted network key.
  *  @param logical_channel [IN] - Touchlink channel to be used for the new network.
- *  @param nwk_addr [IN] - short network address for the recepient.
+ *  @param nwk_addr [IN] - short network address for the recipient.
  *  @param grp_ids_begin [IN] - group identifiers begin field.
  *  @param grp_ids_end [IN] - group identifiers end field.
  *  @param free_nwk_addrs_begin_ [IN] - free network addresses begin field.
@@ -2059,8 +2061,6 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_endpoint_information_s
     (data_ptr)->version = src_ptr->version;                                        \
   }                                                                                \
 }
-
-/*! @} */ /* Touchlink Commissioning cluster commands */
 
 /*! @} */ /* Touchlink Commissioning cluster */
 

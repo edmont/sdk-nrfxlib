@@ -85,7 +85,7 @@
  */
 void zb_secur_setup_nwk_key(zb_uint8_t *key, zb_uint8_t i);
 
-#ifdef ZB_COORDINATOR_ROLE
+#if defined ZB_COORDINATOR_ROLE || defined DOXYGEN
 /**
  *  Initiate procedure of NWK key switching.
  *
@@ -153,13 +153,62 @@ void se_tc_update_link_key(zb_uint16_t addr_of_interest);
 /**
  * @name IC types
  * @anchor ic_types
+ *
+ * @snippet r23_new_api/r23_zed.c ic_passcode_set_snippet
  */
 /** @{ */
-#define ZB_IC_TYPE_48  0U
-#define ZB_IC_TYPE_64  1U
-#define ZB_IC_TYPE_96  2U
-#define ZB_IC_TYPE_128 3U
-#define ZB_IC_TYPE_MAX 4U
+#define ZB_IC_TYPE_48         0U
+#define ZB_IC_TYPE_64         1U
+#define ZB_IC_TYPE_96         2U
+#define ZB_IC_TYPE_128        3U
+#define ZB_IC_TYPE_PASSCODE   4U  /*<! Not an Installcode indeed, but r23 passcode (4 bytes) - extends to 128bit */
+#define ZB_IC_TYPE_128_HASHED 5U  /*<! Hashed installcode, allows to prepare and
+                                       add Link Key via zb_secur_ic_add() from
+                                       the application side */
+#define ZB_IC_TYPE_MAX        6U
+/** @} */
+
+/**
+ * @name The Key Negotiation Protocols Bitmask Table I.5.1-4-54
+ * @anchor zb_tlv_key_negotiation_methods_t
+ *
+ * The Key Negotiation Protocols Bitmask Table I.5.1-4-54
+ * (merged with Zigbee Direct 6.5.2.1. Zigbee Direct Key Negotiation Method TLV)
+ *
+ * @snippet r23_new_api/r23_zc.c zb_disable_key_neg_method_snippet
+ *
+ * Note: These values were members of zb_tlv_key_negotiation_methods_t `enum zb_tlv_key_negotiation_methods_e` type but were
+ * converted to a set of macros due to MISRA violations.
+ */
+/** @{ */
+typedef zb_uint8_t zb_tlv_key_negotiation_methods_t;
+#define ZB_TLV_KEY_ECDHE_KEY_REQUEST_ZB_30          0x00U /*<! Static Key Update Request */
+#define ZB_TLV_DIRECT_KEY_ECDHE_RESERVED_MIN        0x00U /*<! 0 is reserved in zigbee direct */
+#define ZB_TLV_KEY_ECDHE_CURVE_25519_HASH_AESMMO128 0x01U /*<! DLK with curve 25519 and hash AESMMO128   */
+#define ZB_TLV_KEY_ECDHE_CURVE_25519_HASH_SHA256    0x02U /*<! DLK with curve 25519 and hash SHA256   */
+#define ZB_TLV_KEY_ECDHE_RESERVED_MAX               0x03U /*<! 3-15 is reserved in r23 */
+#define ZB_TLV_KEY_ECDHE_CURVE_P256_HASH_SHA256     0x03U /*<! ZB Direct only: curve P256, hash SHA256 */
+#define ZB_TLV_DIRECT_KEY_ECDHE_RESERVED_MAX        0x04U /*<! reserved value for Direct  */
+/** @} */
+
+/**
+ * @name bitmask for support_secrets, value for selected secret
+ * @anchor zb_tlv_psk_secrets_t
+ *
+ * @snippet r23_new_api/r23_zc.c zb_set_supported_psk_secrets_snippet
+ *
+ * Note: These values were members of zb_tlv_psk_secrets_t `enum zb_tlv_psk_secrets_e` type but were
+ * converted to a set of macros due to MISRA violations.
+*/
+/** @{ */
+typedef zb_uint8_t zb_tlv_psk_secrets_t;
+#define ZB_TLV_PSK_SECRET_AUTH_TOKEN                0x00U
+#define ZB_TLV_PSK_SECRET_INSTALL_CODE              0x01U
+#define ZB_TLV_PSK_SECRET_PAKE_PASSCODE             0x02U
+#define ZB_TLV_PSK_SECRET_BASIC_ACCESS_KEY          0x03U
+#define ZB_TLV_PSK_SECRET_ADMINISTRATIVE_ACCESS_KEY 0x04U
+#define ZB_TLV_PSK_SECRET_RESERVED_MAX              0x05U /* 6-7 is reserved */
+#define ZB_TLV_PSK_SECRET_WELL_KNOWN_KEY            0xFFU
 /** @} */
 
 /**
@@ -177,44 +226,37 @@ typedef zb_uint8_t zb_ic_types_t;
  */
 typedef void (*zb_secur_ic_add_cb_t)(zb_ret_t status);
 
-#if defined ZB_COORDINATOR_ROLE && defined ZB_SECURITY_INSTALLCODES
-/** @fn void zb_secur_ic_add(zb_ieee_addr_t address, zb_uint8_t ic_type, zb_uint8_t *ic, zb_secur_ic_add_cb_t cb)
+#if (defined ZB_COORDINATOR_ROLE && defined ZB_SECURITY_INSTALLCODES) || (defined DOXYGEN)
+/**
  *  @brief Add install code for the device with specified long address
  *  @param[in]  address - long address of the device to add the install code
- *  @param[in]  ic_type - install code type as enumerated in
+ *  @param[in]  ic_type - install code type as enumerated in @ref ic_types
  *  @param[in]  cb      - callback that will be called after installcode addition
- *  @if ZB_SECUR
- *    @ref ic_types
- *  @else
- *    ic_types
- *  @endif
  *  @param[in]  ic - pointer to the install code buffer
  *  @details This call allows to add install codes for several devices into NVRAM. It makes
  *    sense for Trust Center/Coordinator devices only as usual device doesn't need to have
  *    someone's else install codes.
  *  @note This call is valid only for the TC (ZC)!
  *  @par Example
- *  @snippet doxygen_snippets.dox wrong_ic_snippet_cs_ick_tc_02_dut_using_ic_c
+ *  @snippet ic_sample/ic_zc.c zb_secur_ic_add_usage_1
+ *  @snippet ic_sample/ic_zc.c zb_secur_ic_add_usage_2
  */
-void zb_secur_ic_add(zb_ieee_addr_t address, zb_uint8_t ic_type, zb_uint8_t *ic, zb_secur_ic_add_cb_t cb);
+void zb_secur_ic_add(const zb_ieee_addr_t address, zb_uint8_t ic_type, zb_uint8_t const *ic, zb_secur_ic_add_cb_t cb);
 #endif /* ZB_COORDINATOR_ROLE && ZB_SECURITY_INSTALLCODES */
 
 
-/** @fn zb_ret_t zb_secur_ic_set(zb_uint8_t ic_type, zb_uint8_t *ic)
+/**
  *  @brief Set install code for the device
- *  @param[in]  ic_type - install code type as enumerated in
- *  @if ZB_SECUR
- *    @ref ic_types
- *  @else
- *    ic_types
- *  @endif
+ *  @param[in]  ic_type - install code type as enumerated in @ref ic_types
  *  @param[in]  ic - pointer to the install code buffer
  *  @details This call allows to set the install code for the current device. It is assumed
  *    that device can have only one install code.
  *  @note This function is to be run at client side (not at TC).
  *  @return RET_OK on success or RET_CONVERSION_ERROR on error in install code
+ *  @snippet ic_sample/ic_zr1.c zb_secur_ic_set_usage
+ *  @snippet r23_new_api/r23_zed.c ic_passcode_set_snippet
  */
-zb_ret_t zb_secur_ic_set(zb_uint8_t ic_type, zb_uint8_t *ic);
+zb_ret_t zb_secur_ic_set(zb_uint8_t ic_type, const zb_uint8_t *ic);
 
 /** @brief Request for zb_secur_ic_get_list_req.
 */
@@ -239,6 +281,16 @@ typedef ZB_PACKED_PRE struct zb_secur_ic_get_list_resp_s
 ZB_PACKED_STRUCT
 zb_secur_ic_get_list_resp_t;
 
+/** @brief IC entry type zb_secur_ic_get_list_req
+*/
+typedef ZB_PACKED_PRE struct zb_secur_ic_entry_s
+{
+  zb_ieee_addr_t  device_address;         /*!< Partner address */
+  zb_uint8_t      options;                /* lowest 2 bits [0-1]: 00-48, 01-64, 10-96, 11-128 bits ic type */
+  zb_uint8_t      align;
+  zb_uint8_t      installcode[ZB_CCM_KEY_SIZE+ZB_CCM_KEY_CRC_SIZE]; /*!< 16b installcode +2b crc */
+} ZB_PACKED_STRUCT zb_secur_ic_entry_t;
+
 /** @brief Request for zb_secur_ic_get_by_idx_req.
   */
 typedef ZB_PACKED_PRE struct zb_secur_ic_get_by_idx_req_s
@@ -258,6 +310,7 @@ typedef ZB_PACKED_PRE struct zb_secur_ic_get_by_idx_resp_s
   zb_ieee_addr_t device_address;               /*!< Partner address */
   zb_ic_types_t ic_type;                       /*!< Installcode type.*/
   zb_uint8_t installcode[ZB_CCM_KEY_SIZE+ZB_CCM_KEY_CRC_SIZE];   /*!< 16b installcode +2b crc */
+  zb_uint8_t ic_index;                        /*!< Starting Index for the requested elements */
 }
 ZB_PACKED_STRUCT
 zb_secur_ic_get_by_idx_resp_t;
@@ -299,12 +352,14 @@ typedef ZB_PACKED_PRE struct zb_secur_ic_remove_all_resp_s
 ZB_PACKED_STRUCT
 zb_secur_ic_remove_all_resp_t;
 
-#if defined ZB_COORDINATOR_ROLE && defined ZB_SECURITY_INSTALLCODES
+#if (defined ZB_COORDINATOR_ROLE && defined ZB_SECURITY_INSTALLCODES) || defined DOXYGEN
 /**
  * @brief Get list of the install codes.
  * It is valid only for the TC (ZC).
  *
  * @param param buffer with request parameters, will be also used to store response.
+ *
+ *  @snippet ic_sample/ic_zc.c zb_secur_ic_get_list_req_usage
 */
 void zb_secur_ic_get_list_req(zb_uint8_t param);
 
@@ -313,6 +368,7 @@ void zb_secur_ic_get_list_req(zb_uint8_t param);
  * It is valid only for the TC (ZC).
  *
  * @param param buffer with request parameters, will be also used to store response.
+ *  @snippet ic_sample/ic_zc.c zb_secur_ic_get_by_idx_req_usage
 */
 void zb_secur_ic_get_by_idx_req(zb_uint8_t param);
 
@@ -322,6 +378,7 @@ void zb_secur_ic_get_by_idx_req(zb_uint8_t param);
  * It is valid only for the TC (ZC).
  *
  * @param param buffer with request parameters, will be also used to store response.
+ * @snippet ic_sample/ic_zc.c zb_secur_ic_remove_req_usage
 */
 void zb_secur_ic_remove_req(zb_uint8_t param);
 
@@ -330,6 +387,7 @@ void zb_secur_ic_remove_req(zb_uint8_t param);
  * It is valid only for the TC (ZC).
  *
  * @param param buffer with request parameters, will be also used to store response.
+ * @snippet ic_sample/ic_zc.c zb_secur_ic_remove_all_req_usage
 */
 void zb_secur_ic_remove_all_req(zb_uint8_t param);
 #endif /* ZB_COORDINATOR_ROLE && ZB_SECURITY_INSTALLCODES */
@@ -341,6 +399,8 @@ void zb_secur_ic_remove_all_req(zb_uint8_t param);
  *    that device can have only one install code.
  *  @note This function is to be run at client side (not at TC).
  *  @returns RET_OK on success.
+ *  @snippet ic_sample/ic_zr2.c zb_secur_ic_str_set_usage_1
+ *  @snippet ic_sample/ic_zr2.c zb_secur_ic_str_set_usage_2
  */
 zb_ret_t zb_secur_ic_str_set(char *ic_str);
 
@@ -355,6 +415,7 @@ zb_ret_t zb_secur_ic_str_set(char *ic_str);
  *    sense for Trust Center/Coordinator devices only as usual device doesn't need to have
  *    someone's else install codes.
  *  @note This call is valid only for the TC (ZC)!
+ *  @snippet ic_sample/ic_zc.c zb_secur_ic_str_add_usage
  */
 void zb_secur_ic_str_add(zb_ieee_addr_t address, char *ic_str, zb_secur_ic_add_cb_t cb);
 
@@ -364,6 +425,7 @@ void zb_secur_ic_str_add(zb_ieee_addr_t address, char *ic_str, zb_secur_ic_add_c
    Set installcode policy flag.
 
    @param allow_ic_only - use ZB_TRUE value to check installcodes
+   @snippet ic_sample/ic_zc.c zb_set_installcode_policy_usage
 */
 void zb_set_installcode_policy(zb_bool_t allow_ic_only);
 /** @} */ /* secur_ic_usage */
@@ -521,18 +583,17 @@ zb_ret_t zb_set_tx_power(zb_uint8_t tx_power);
 #endif
 
 #ifdef ZB_MAC_CONFIGURABLE_TX_POWER
-
 /**
  * @brief A struct with params for zb_get_tx_power_async and zb_set_tx_power_async
  */
 typedef struct zb_tx_power_params_s
 {
-  zb_ret_t status;    /*!< Status of the operation. Can be RET_OK, RET_UNINITIALIZED or one of 
+  zb_ret_t status;    /*!< Status of the operation. Can be RET_OK, RET_UNINITIALIZED or one of
                             RET_INVALID_PARAMETET_1, RET_INVALID_PARAMETET_2 or RET_INVALID_PARAMETET_3
                             for the following three fields respectively. */
   zb_uint8_t page;    /*!< Page number. Should be provided by the application. */
   zb_uint8_t channel; /*!< Channel number on a given page. Should be provided by the application. */
-  zb_int8_t tx_power; /*!< Transceiver power for a given page and channel. 
+  zb_int8_t tx_power; /*!< Transceiver power for a given page and channel.
                             Should be provided by the application in case of setting the power */
   zb_callback_t cb;   /*!< Callback function to be called after the function finishes. Should be provided by the application. */
 } zb_tx_power_params_t;
@@ -540,25 +601,46 @@ typedef struct zb_tx_power_params_s
 
 /**
  * @brief Get transceiver power for given page and channel asynchronously.
- * 
- * This function requires param to contain @ref zb_tx_power_params_t. 
+ *
+ * This function requires param to contain @ref zb_tx_power_params_t.
  * Will return status RET_UNINITIALIZED if the channel/page storage hasn't been initialized yet.
- * 
+ *
  * @param param - buffer, containing @ref zb_tx_power_params_t.
 */
 void zb_get_tx_power_async(zb_bufid_t param);
 
 /**
  * @brief Set transceiver power to a given value on a given page and channel asynchronously.
- * 
- * This function requires param to contain @ref zb_tx_power_params_t. 
- * If the power change is for the current channel, the function will attempt to change power immediately, 
+ *
+ * This function requires param to contain @ref zb_tx_power_params_t.
+ * If the power change is for the current channel, the function will attempt to change power immediately,
  *  otherwise it will save the change until channel switch.
- * 
+ *
  * @param param - buffer, containing @ref zb_tx_power_params_t.
 */
 void zb_set_tx_power_async(zb_bufid_t param);
-#endif
+
+/* Required for the Multi MAC compatibility reasons.
+ *
+ * Prototypes for the disabled ZB_MAC_INTERFACE_SINGLE defined in internal MAC layer headers */
+#if defined(ZB_MACSPLIT_HOST) && defined(ZB_MAC_INTERFACE_SINGLE)
+
+/** Moved here for the Multi MAC compatibility reasons
+ *
+ * @warning do not use directly, use @ref zb_get_tx_power_async instead
+ */
+void zb_get_tx_power_async_macsplit(zb_bufid_t param);
+/** Moved here for the Multi MAC compatibility reasons
+ *
+ * @warning do not use directly, use @ref zb_set_tx_power_async instead
+ */
+void zb_set_tx_power_async_macsplit(zb_bufid_t param);
+
+#define zb_set_tx_power_async zb_set_tx_power_async_macsplit
+#define zb_get_tx_power_async zb_get_tx_power_async_macsplit
+#endif /* ZB_MACSPLIT_HOST && ZB_MAC_INTERFACE_SINGLE*/
+
+#endif /* ZB_MAC_CONFIGURABLE_TX_POWER */
 
 /** @endcond */ /* DOXYGEN_BDB_SECTION */
 
@@ -593,7 +675,7 @@ zb_bool_t zb_get_rx_on_when_idle(void);
   * Typical device start: init, load some parameters from NVRAM and proceed with startup.
   *
   * Startup means either Formation (for ZC), rejoin or discovery/association join.  After startup
-  * complete @ref zboss_signal_handler callback is called, so application will know when to do
+  * complete a signal is sent, so application will know when to do
   * some useful things.
   *
   * Precondition: stack must be inited by @ref ZB_INIT() call. @ref ZB_INIT() sets default IB
@@ -616,6 +698,12 @@ zb_ret_t zboss_start(void);
  *  @returns Pointer to zero-terminated version string.
  */
 const zb_char_t ZB_IAR_CODE *zb_get_version(void);
+
+/**
+ *  @brief Get ZBOSS numeric version.
+ *  @returns (MAJOR << 24 | MINOR << 16 | REVISION)
+ */
+zb_uint32_t zboss_version_get(void);
 /*! @} */ /* zb_general_get */
 
 /*! @addtogroup zb_general_start */
@@ -649,10 +737,41 @@ const zb_char_t ZB_IAR_CODE *zb_get_version(void);
  */
 zb_ret_t zboss_start_no_autostart(void);
 
+/**
+   Continue ZBOSS start if was starting using zboss_start_no_autostart(), after ZB_ZDO_SIGNAL_SKIP_STARTUP signal.
+ */
 void zboss_start_continue(void);
 
 
 #ifdef ZB_ZBOSS_DEINIT
+
+#if defined ZB_MACSPLIT_HOST || defined ZB_EXTMAC
+/**
+   Initiate ZBOSS shut with pseudo reset procedure.
+
+   ZBOSS shutdown with pseudo reset as well as zboss_start_shut is meaningful for Linux platform where it is necessary to stop
+   or restart ZBOSS without stopping the current process.
+
+   It is used when it is impossible to reset MAC layer on MACSPLIT architecture and resets only host.
+
+   That function must be called after application received @ref ZB_SIGNAL_READY_TO_SHUT signal.
+   It then must call @ref zboss_complete_shut() and must not use ZBOSS afterwords.
+
+ */
+void zboss_shut_with_host_reset(zb_bufid_t param);
+#endif /* #if defined ZB_MACSPLIT_HOST || defined ZB_EXTMAC */
+
+/**
+   Initiate ZBOSS aborting procedure.
+
+   ZBOSS abort as well as zboss_start_shut is meaningful for Linux platform where it is necessary to stop
+   or restart ZBOSS without stopping the current process.
+
+   Important use case is OOM situation, when it's impossible to allocate a buffer to reset MAC layer and send @ref ZB_SIGNAL_READY_TO_SHUT signal.
+
+   The function doesn't send @ref ZB_SIGNAL_READY_TO_SHUT signal to application and calls @ref zboss_complete_shut() directly.
+ */
+void zboss_abort(void);
 
 /**
    Initiate ZBOSS shut procedure.
@@ -677,6 +796,18 @@ void zboss_start_shut(zb_bufid_t param);
 void zboss_complete_shut(void);
 #endif  /* #ifdef ZB_ZBOSS_DEINIT */
 
+#ifdef ZB_INTERPAN_PREINIT
+/**
+   Start ZBOSS pre-init to be able to send inter-pan before Formation/Join
+
+   That function is to be called after ZB_ZDO_SIGNAL_SKIP_STARTUP signal received, before commissioning start.
+   After pre-init complete ZBOSS issues ZB_SIGNAL_INTERPAN_PREINIT.
+   After that it is possible to use zb_intrp_data_request_with_chan_change() API.
+
+   @param param - work buffer
+*/
+void zboss_preinit_for_interpan(zb_bufid_t param);
+#endif  /* #ifdef ZB_INTERPAN_PREINIT */
 
 #ifdef ZB_PROMISCUOUS_MODE
 
@@ -715,13 +846,18 @@ void zboss_sniffer_stop(void);
 zb_bool_t zb_zdo_joined(void);
 /** @endcond */ /* DOXYGEN_INTERNAL_DOC */
 
+/* [VK]: It's required to use direct context access in case of ZDD unit tests only (see zb_zdo_globals.h)
+ *       In all other cases use zb_zdo_joined() function.
+ */
+#ifndef TEST_SUITE
 /**
    Checks that device is joined to the network.
    @return true if device is joined; false - otherwise
 */
-#define ZB_JOINED()  zb_zdo_joined()
+#define ZB_JOINED() zb_zdo_joined()
+#endif /* TEST_SUITE */
 
-/*! @} */ /* zb_general_get */
+/*! @} */ /*zb_general_get */
 
 /*! @addtogroup zb_general_main_loop */
 /*! @{ */
@@ -772,7 +908,7 @@ void zb_set_pan_id(zb_uint16_t pan_id);
  * Declares callback that is called after setting manufacturer code
  *
  * @param status - status of manufacturer code setting
- */
+*/
 typedef void (*zb_set_manufacturer_code_cb_t)(zb_ret_t status);
 
 /**
@@ -784,7 +920,10 @@ typedef void (*zb_set_manufacturer_code_cb_t)(zb_ret_t status);
 void zb_set_node_descriptor_manufacturer_code_req(zb_uint16_t manuf_code, zb_set_manufacturer_code_cb_t cb);
 
 /**
-   Set Extended Pan ID (apsUseExtendedPANID attribute)
+   Set APS Use Extended Pan ID (apsUseExtendedPANID attribute)
+
+   Note: that function is obsolete. Use zb_set_use_extended_pan_id() instead!
+
    @param ext_pan_id - Long (64-bit) Extended Pan ID
 */
 void zb_set_extended_pan_id(const zb_ext_pan_id_t ext_pan_id);
@@ -825,15 +964,38 @@ zb_uint8_t zb_get_current_page(void);
 */
 zb_uint8_t zb_get_current_channel(void);
 
+#ifdef ZB_ENABLE_PTA
+/**
+   Enable or disable PTA
+
+   This API can be called before zboss_start but after ZB_INIT or after stack is
+   started already.
+
+   Ok to call it between ZB_INIT and zboss_start/zboss_start_no_autostart or after
+   receiving signals ZB_ZDO_SIGNAL_SKIP_STARTUP or
+   ZB_BDB_SIGNAL_DEVICE_FIRST_START.  Do not call it when ZBOSS start is already
+   initiated by, for example, zboss_start_continue() or
+   bdb_start_top_level_commissioning() but commissioning is not completed yet
+   (ZB_BDB_SIGNAL_DEVICE_FIRST_START is not received), else there is a risk of race
+   conditions.
+
+   @param state: 0 - disable PTA, 1 - enable PTA
+*/
+void zb_enable_pta(zb_uint8_t state);
+#endif
+
 /*! @} */ /* zb_general_get */
 
 /*! @addtogroup zb_general_set */
 /*! @{ */
 
-#ifdef ZB_COORDINATOR_ROLE
+#if defined ZB_COORDINATOR_ROLE || defined DOXYGEN
 /**
    Initiate device as a Zigbee 3.0 (not SE!) coordinator
    @param channel_mask - Zigbee channel mask
+
+   @note BDB channel sets that are set using @ref zb_set_bdb_primary_channel_set() and @ref
+   zb_set_bdb_secondary_channel_set(), are always reset to zero after changing network role of the device.
 */
 void zb_set_network_coordinator_role(zb_uint32_t channel_mask);
 #endif /* ZB_COORDINATOR_ROLE */
@@ -842,6 +1004,9 @@ void zb_set_network_coordinator_role(zb_uint32_t channel_mask);
 /**
    Initiate device as a Zigbee Zigbee 3.0 (not SE!) router
    @param channel_mask - Zigbee channel mask
+
+   @note BDB channel sets that are set using @ref zb_set_bdb_primary_channel_set() and @ref
+   zb_set_bdb_secondary_channel_set(), are always reset to zero after changing network role of the device.
 */
 void zb_set_network_router_role(zb_uint32_t channel_mask);
 #endif /* ZB_ROUTER_ROLE && ZB_BDB_MODE && !BDB_OLD */
@@ -850,13 +1015,16 @@ void zb_set_network_router_role(zb_uint32_t channel_mask);
 /**
    Initiate device as a Zigbee Zigbee 3.0 (not SE!) End Device
    @param channel_mask - Zigbee channel mask
+
+   @note BDB channel sets that are set using @ref zb_set_bdb_primary_channel_set() and @ref
+   zb_set_bdb_secondary_channel_set(), are always reset to zero after changing network role of the device.
 */
 void zb_set_network_ed_role(zb_uint32_t channel_mask);
 #endif /* ZB_ED_FUNC && ZB_BDB_MODE && !BDB_OLD */
 
 #ifndef ZB_USE_INTERNAL_HEADERS
 
-#ifdef ZB_COORDINATOR_ROLE
+#if defined ZB_COORDINATOR_ROLE || defined DOXYGEN
 /**
    Initiate device as a legacy (pre-r21) Zigbee coordinator
    @param channel_mask - Zigbee channel mask
@@ -886,7 +1054,7 @@ void zb_set_network_ed_role_legacy(zb_uint32_t channel_mask);
 #ifdef ZB_COORDINATOR_ROLE
 /**
    Initiate device as a Zigbee 3.0 BDB coordinator with channel list.
-   Provides functionality to set mask for Sub-GHz and 2.4GHz page.
+   Provides functionality to set mask for 2.4 GHz or Sub-GHz page.
    @param channel_list - Zigbee channels list
 */
 void zb_set_network_coordinator_role_ext(zb_channel_list_t channel_list);
@@ -904,7 +1072,7 @@ void zb_set_network_router_role_ext(zb_channel_list_t channel_list);
 #if defined ZB_ED_FUNC && defined ZB_BDB_MODE && !defined BDB_OLD
 /**
    Initiate device as a Zigbee 3.0 BDB End Device with channel list.
-   Provides functionality to set mask for Sub-GHz and 2.4GHz page.
+   Provides functionality to set mask for 2.4 GHz or Sub-GHz page.
    @param channel_list - Zigbee channels list
 */
 void zb_set_network_ed_role_ext(zb_channel_list_t channel_list);
@@ -925,6 +1093,8 @@ zb_nwk_device_type_t zb_get_network_role(void);
 
 /**
  * Returns the maximum number of children allowed
+ * @deprecated This function will be removed in the next Major release after March 2025
+ *             Use @ref zb_nwk_get_max_ed_capacity() instead
  */
 zb_uint8_t zb_get_max_children(void);
 
@@ -980,9 +1150,137 @@ zb_ret_t zb_channel_list_add(zb_channel_list_t channel_list, zb_uint8_t page_num
 /**
    Set the maximum number of connected devices. Used for coordinators
    and routers
-   @param max_children - maximum number of connected devices.
+   @deprecated This function will be removed in the next Major release after March 2025
+               Use @ref zb_nwk_set_max_ed_capacity() instead
+   @param max_children - maximum number of connected devices
 */
 void zb_set_max_children(zb_uint8_t max_children);
+
+/** @} */ /* zb_general_set */
+
+/** @addtogroup r23_secur
+    @{
+*/
+
+
+/**
+   Add supported key negotiation method into a bitmask
+
+   @param method - key negotiation method @ref zb_tlv_key_negotiation_methods_t
+   @param var - destination bitmask to be passed to @ref zb_set_supported_key_neg_mthd()
+ */
+#define ZB_TLV_KEY_ECDHE_METHOD_ENABLE(var, method)     ((var) |= (1u << (method)))
+
+/**
+   Add supported PSK secret into a bitmask
+
+   @param secret - PSK secret @ref zb_tlv_psk_secrets_t
+   @param var - destination bitmask to be passed to @ref zb_set_supported_psk_secrets
+
+   @snippet r23_new_api/r23_zc.c zb_set_supported_psk_secrets_snippet
+ */
+#define ZB_TLV_PSK_SECRET_ENABLE(var, secret) ZB_TLV_KEY_ECDHE_METHOD_ENABLE((var), (secret))
+
+
+/**
+   Set the supported by this device Key Negotiation Protocols Bitmask
+   @param methods_mask - bitmask of the supported methods - @ref zb_tlv_key_negotiation_methods_t
+*/
+void zb_set_supported_key_neg_mthd(zb_uint8_t methods_mask);
+#define zb_set_supported_key_neg_method zb_set_supported_key_neg_mthd
+
+/**
+   Enable the supported by this device Key Negotiation Protocols Method
+   @param method - @ref zb_tlv_key_negotiation_methods_t
+
+   @snippet r23_new_api/r23_zc.c zb_disable_key_neg_method_snippet
+*/
+void zb_enable_key_neg_method(zb_uint8_t method);
+
+/**
+   Disable the supported by this device Key Negotiation Protocols Method
+   @param method - @ref zb_tlv_key_negotiation_methods_t
+
+   @snippet r23_new_api/r23_zc.c zb_disable_key_neg_method_snippet
+*/
+void zb_disable_key_neg_method(zb_uint8_t method);
+
+/**
+   Set the supported by this device Pre-shared secrets Bitmask
+   @param secret_mask - bitmask of the supported secrets - @ref zb_tlv_psk_secrets_t
+
+   @snippet r23_new_api/r23_zc.c zb_set_supported_psk_secrets_snippet
+*/
+void zb_set_supported_psk_secrets(zb_uint8_t secret_mask);
+
+/**
+   Set the supported by this device Key Negotiation Protocols Bitmask (in scope of Zigbee Direct functionality)
+   @param methods_mask - bitmask of the supported methods - @ref zb_tlv_key_negotiation_methods_t
+*/
+void zb_set_supported_key_neg_mthd_direct(zb_uint16_t methods_mask);
+#define zb_set_supported_key_neg_method_direct zb_set_supported_key_neg_mthd_direct
+
+/**
+   Set the supported by this device Pre-shared secrets Bitmask (in scope of Zigbee Direct functionality)
+   @param secret_mask - bitmask of the supported methods - @ref zb_tlv_psk_secrets_t
+*/
+void zb_set_supported_psk_secrets_direct(zb_uint8_t secret_mask);
+/**
+   Enable the supported by this device Pre-shared secret
+   @param secret - @ref zb_tlv_psk_secrets_t
+*/
+void zb_enable_psk_secret(zb_uint8_t secret);
+
+/**
+   Disable the supported by this device Pre-shared secret
+   @param secret - @ref zb_tlv_psk_secrets_t
+*/
+void zb_disable_psk_secret(zb_uint8_t secret);
+
+/**
+   Get the supported by this device Key Negotiation Protocols Bitmask
+   @return bitmask of the supported methods - @ref zb_tlv_key_negotiation_methods_t
+*/
+zb_uint8_t zb_get_supported_key_neg_mtd(void);
+
+#define zb_get_supported_key_neg_method zb_get_supported_key_neg_mtd
+
+/**
+   Get the supported by this device Supported Pre-shared secrets Bitmask
+   @return bitmask of the supported secrets - @ref zb_tlv_psk_secrets_t
+*/
+zb_uint8_t zb_get_supported_psk_secrets(void);
+
+/**
+   Get the supported by this device Key Negotiation Protocols Bitmask (in scope of Zigbee Direct functionality)
+   @return bitmask of the supported methods - @ref zb_tlv_key_negotiation_methods_t
+*/
+zb_uint16_t zb_get_supported_key_neg_mtd_direct(void);
+
+#define zb_get_supported_key_neg_method_direct zb_get_supported_key_neg_mtd_direct
+
+/**
+   Get the supported by this device Supported Pre-shared secrets Bitmask (in scope of Zigbee Direct functionality)
+   @return bitmask of the supported secrets - @ref zb_tlv_psk_secrets_t
+*/
+zb_uint8_t zb_get_supported_psk_secrets_direct(void);
+
+/**
+   Set/unset aps security for zdo commands, which need configuration mode
+*/
+void zb_set_aps_enc_for_zdo_conf_cmd(zb_bool_t val);
+
+/**
+   Set/unset aps security for zdo set/get conf and decommission reqs
+*/
+void zb_set_aps_enc_for_zdo_in_distrib_nwk(zb_bool_t val);
+
+/** @} r23_secur */
+
+/** @addtogroup zb_general_set
+@{
+*/
+
 
 /**
  * @name End Device (ED) timeout request
@@ -1070,9 +1368,9 @@ void zb_set_keepalive_mode(nwk_keepalive_supported_method_t mode);
 #ifndef ZB_USE_INTERNAL_HEADERS
 
 /**
-   ZBOSS application signal handler.
+   Legacy ZBOSS application signal handler.
 
-   Mandatory for all applications implemented on the top of ZBOSS stack.
+   If implemented by a ZBOSS application, it will be called for every signal.
    See @ref zdo_app_signal_type.
 
    @param param - reference to the buffer which contains signal. See @ref zb_get_app_signal.
@@ -1080,6 +1378,44 @@ void zb_set_keepalive_mode(nwk_keepalive_supported_method_t mode);
 void zboss_signal_handler(zb_uint8_t param);
 
 #endif /* ZB_USE_INTERNAL_HEADERS */
+
+/**
+ * @brief ZBOSS signal handler function.
+ *
+ * An application or any ZBOSS subsystem can subscribe to
+ * all ZBOSS signals through this function.
+ *
+ * @note If the signal was processed and the function returns TRUE, it shall free the buffer as well.
+ *
+ * @return ZB_TRUE if the signal was fully processed and no more actions needed by other handler in the subsription chain.
+ *
+ */
+typedef zb_bool_t (*zb_signal_handler_t)(zb_uint8_t param);
+
+/**
+ * @brief Add new signal handler to the end of a subscription chain.
+ *
+ * @return ZB_TRUE if the handler was registered successfully. ZB_FALSE if there is no space left in the chain.
+ *
+ */
+zb_bool_t zb_signal_handler_add_back(zb_signal_handler_t handler);
+
+/**
+ * @brief Add new signal handler to the beginning of a subscription chain.
+ *
+ * @return ZB_TRUE if the handler was registered successfully. ZB_FALSE if there is no space left in the chain.
+ *
+ */
+zb_bool_t zb_signal_handler_add_front(zb_signal_handler_t handler);
+
+/**
+ * @brief Remove signal handler from the subscription chain.
+ *
+ * @return ZB_TRUE if the handler was removed successfully, ZB_FALSE otherwise.
+ *
+ */
+zb_bool_t zb_signal_handler_remove(zb_signal_handler_t handler);
+
 
 /** @} */ /* zb_comm_signals */
 
@@ -1104,14 +1440,14 @@ typedef enum zb_nvram_dataset_types_e
   ZB_NVRAM_APS_SECURE_DATA_GAP   = 4, /**< Reserved value */
   ZB_NVRAM_APS_BINDING_DATA_GAP  = 5, /**< Reserved value */
   ZB_NVRAM_HA_POLL_CONTROL_DATA  = 6, /**< Dataset, contains HA POLL CONTROL data */
-  ZB_IB_COUNTERS                 = 7, /**< Dataset, contains NIB outgoing frame counter */
+  ZB_NVRAM_APS_SECURE_DATA       = 7, /**< Dataset, contains NIB outgoing frame counter */
   ZB_NVRAM_DATASET_GRPW_DATA     = 8, /**< Green Power dataset */
   ZB_NVRAM_APP_DATA1             = 9, /**< Application-specific data #1 */
   ZB_NVRAM_APP_DATA2             = 10, /**< Application-specific data #2 */
   ZB_NVRAM_ADDR_MAP              = 11, /**< Dataset stores address map info */
   ZB_NVRAM_NEIGHBOUR_TBL         = 12, /**< Dataset stores Neighbor table info */
   ZB_NVRAM_INSTALLCODES          = 13, /**< Dataset contains APS installcodes data */
-  ZB_NVRAM_APS_SECURE_DATA       = 14, /**< Dataset, contains APS secure keys data */
+  ZB_NVRAM_IB_COUNTERS           = 14, /**< Dataset, contains APS secure keys data */
   ZB_NVRAM_APS_BINDING_DATA      = 15, /**< Dataset, contains APS binding data */
   ZB_NVRAM_DATASET_GP_PRPOXYT    = 16, /**< Green Power Proxy table */
   ZB_NVRAM_DATASET_GP_SINKT      = 17, /**< Green Power Sink table */
@@ -1125,16 +1461,20 @@ typedef enum zb_nvram_dataset_types_e
   ZB_NVRAM_APP_DATA3             = 27, /**< Application-specific data #3 */
   ZB_NVRAM_APP_DATA4             = 28, /**< Application-specific data #4 */
   ZB_NVRAM_KE_WHITELIST          = 29,
+  ZB_NVRAM_DATASET_ZB_DIRECT     = 30, /**< Zigbee Direct dataset */
   ZB_NVRAM_ZDO_DIAGNOSTICS_DATA  = 31, /**< Dataset of the Diagnostics cluster */
-  ZB_NVRAM_DATASET_NUMBER        = 32, /**< Count of Dataset */
-  ZB_NVRAM_DATA_SET_TYPE_PAGE_HDR = 30, /**< Special internal dataset type  */
+  ZB_NVRAM_DATASET_NUMBER,             /**< Count of Dataset */
+  ZB_NVRAM_DATA_SET_TYPE_PAGE_HDR = 0xFFFFU, /**< Special internal dataset type  */
 } zb_nvram_dataset_types_t;
+
+#define ZB_NVRAM_DATA_SET_TYPE_PAGE_HDR_R22 30u
 
 #define ZB_NVRAM_APP_DATASET_NUMBER 4U
 
 /**
  * @brief Structure that contains report about any NVRAM failure.
- *
+ *  Pointer to this structure will be set as additional info in error_app_handler
+ *    with error code ERROR_CODE(ERROR_CATEGORY_NVRAM, ZB_ERROR_NVRAM_WRITE_VALIDATION_FAILURE).
  *  Upon receiving of this error, user can decide what to do:
  *  1. Do nothing - stack will be reset immediately,
  *  all not corrupted datasets will be copied to another page.
@@ -1143,10 +1483,10 @@ typedef enum zb_nvram_dataset_types_e
  */
 typedef struct zb_nvram_failure_report_s
 {
+  zb_uint32_t pos;            /*!< Position of dataset payload that haven't been written */
   zb_uint16_t ds_type;        /*!< Dataset type @see zb_nvram_dataset_types_t */
-  zb_uint16_t pos;            /*!< Position of dataset payload that haven't been written */
   zb_uint8_t page;            /*!< Page of dataset payload that haven't been written */
-  zb_uint8_t reserved[3];     /*!< Reserved for future use */
+  zb_uint8_t reserved[1];     /*!< Reserved for future use */
 } zb_nvram_failure_report_t;
 
 /**
@@ -1154,7 +1494,7 @@ typedef struct zb_nvram_failure_report_s
  *
  * @param page - page in NVRAM from data will be read
  * @param pos - offset in page
- * @param payload_length - number of bytes to read
+ * @param payload_length - number of bytes to read (aligned to 4)
  */
 typedef void (*zb_nvram_read_app_data_t)(zb_uint8_t page, zb_uint32_t pos, zb_uint16_t payload_length);
 
@@ -1256,7 +1596,7 @@ zb_ret_t zb_nvram_write_dataset(zb_nvram_dataset_types_t t);
 
 /** @cond DOXYGEN_INTERNAL_DOC */
 /**
- * Clears all datasets except @ref ZB_IB_COUNTERS and application datasets.
+ * Clears all datasets except @ref ZB_NVRAM_IB_COUNTERS and application datasets.
  */
 void zb_nvram_clear(void);
 
@@ -1352,25 +1692,63 @@ typedef ZB_PACKED_PRE struct zb_production_config_ver_1_s
 }
 ZB_PACKED_STRUCT zb_production_config_ver_1_t;
 
-/* NOTE: ZB_PROD_CFG_APS_CHANNEL_LIST_SIZE must be used with prod. config v2 only! */
-#define ZB_PROD_CFG_APS_CHANNEL_LIST_SIZE   5U
+/* NOTE: ZB_PROD_CFG_V2_APS_CHANNEL_LIST_SIZE support only 4 subghz pages 28-31 and 2.4. */
+#define ZB_PROD_CFG_V2_APS_CHANNEL_LIST_SIZE  5U
+/* NOTE: ZB_PROD_CFG_V3_APS_CHANNEL_LIST_SIZE for prod config with support 9 subghz pages 23-31 and 2.4. */
+#define ZB_PROD_CFG_V3_APS_CHANNEL_LIST_SIZE  (ZB_PROD_CFG_V2_APS_CHANNEL_LIST_SIZE + 5U)
+/* NOTE: ZB_PROD_CFG_V4_APS_CHANNEL_LIST_SIZE for prod config with support 9 subghz pages 23-31 and 2.4. */
+#define ZB_PROD_CFG_V4_APS_CHANNEL_LIST_SIZE  ZB_PROD_CFG_V3_APS_CHANNEL_LIST_SIZE
+
 #define ZB_PROD_CFG_MAC_TX_POWER_CHANNEL_N 27U
 
 #define ZB_PROD_CFG_OPTIONS_IC_TYPE_MASK      0x03U
+#define ZB_PROD_CFG_OPTIONS_PASSCODE_PRESENT_MASK 0x40U
 #define ZB_PROD_CFG_OPTIONS_CERT_PRESENT_MASK 0x80U
 
 typedef ZB_PACKED_PRE struct zb_production_config_ver_2_s
 {
   zb_production_config_hdr_t hdr; /*!< Header */
-  zb_channel_page_t aps_channel_mask_list[ZB_PROD_CFG_APS_CHANNEL_LIST_SIZE]; /*!< Channel mask for device to operate on */
+  zb_channel_page_t aps_channel_mask_list[ZB_PROD_CFG_V2_APS_CHANNEL_LIST_SIZE]; /*!< Channel mask for device to operate on */
   zb_64bit_addr_t extended_address; /*!< IEEE address */
-  zb_int8_t mac_tx_power[ZB_PROD_CFG_APS_CHANNEL_LIST_SIZE][ZB_PROD_CFG_MAC_TX_POWER_CHANNEL_N]; /*! < Tx power specified for every possible channel */
+  zb_int8_t mac_tx_power[ZB_PROD_CFG_V2_APS_CHANNEL_LIST_SIZE][ZB_PROD_CFG_MAC_TX_POWER_CHANNEL_N]; /*! < Tx power specified for every possible channel */
   zb_uint8_t options;/*low 2 bits - ic_type field *//*7th bit - certificates block presents*/
   zb_uint8_t install_code[ZB_CCM_KEY_SIZE+ZB_CCM_KEY_CRC_SIZE]; /*!< Installation code + its own crc */
 }
 ZB_PACKED_STRUCT zb_production_config_ver_2_t;
 
-typedef zb_production_config_ver_2_t zb_production_config_t;
+typedef ZB_PACKED_PRE struct zb_production_config_ver_3_s
+{
+  zb_production_config_hdr_t hdr; /*!< Header */
+  zb_channel_page_t aps_channel_mask_list[ZB_PROD_CFG_V3_APS_CHANNEL_LIST_SIZE]; /*!< Channel mask for device to operate on */
+  zb_64bit_addr_t extended_address; /*!< IEEE address */
+  zb_int8_t mac_tx_power[ZB_PROD_CFG_V3_APS_CHANNEL_LIST_SIZE][ZB_PROD_CFG_MAC_TX_POWER_CHANNEL_N]; /*! < Tx power specified for every possible channel */
+  zb_uint8_t options;/*low 2 bits - ic_type field *//*7th bit - certificates block presents*/
+  zb_uint8_t install_code[ZB_CCM_KEY_SIZE+ZB_CCM_KEY_CRC_SIZE]; /*!< Installation code + its own crc */
+}
+ZB_PACKED_STRUCT zb_production_config_ver_3_t;
+
+typedef ZB_PACKED_PRE struct zb_production_config_ver_4_s
+{
+  zb_production_config_hdr_t hdr; /*!< Header */
+  zb_channel_page_t aps_channel_mask_list[ZB_PROD_CFG_V4_APS_CHANNEL_LIST_SIZE]; /*!< Channel mask for device to operate on */
+  zb_64bit_addr_t extended_address; /*!< IEEE address */
+  zb_int8_t mac_tx_power[ZB_PROD_CFG_V4_APS_CHANNEL_LIST_SIZE][ZB_PROD_CFG_MAC_TX_POWER_CHANNEL_N]; /*! < Tx power specified for every possible channel */
+  /*
+   * low 2 bits - ic_type field
+   * 6th bit - determines if passcode is presented or not
+   * 7th bit - certificates block presents
+   * */
+  zb_uint8_t options;
+  zb_uint8_t install_code[ZB_CCM_KEY_SIZE+ZB_CCM_KEY_CRC_SIZE]; /*!< Installation code + its own crc */
+  zb_uint8_t passcode[ZB_PAKE_PASSCODE_LENGTH]; /*!< PAKE (Password Authenticated Key) passcode value */
+}
+ZB_PACKED_STRUCT zb_production_config_ver_4_t;
+typedef union zb_production_config_e
+{
+  zb_production_config_ver_2_t v2;
+  zb_production_config_ver_3_t v3;
+  zb_production_config_ver_4_t v4;
+} zb_production_config_t;
 
 #define ZB_CS1_PUBLISHER_PUBLIC_KEY_SIZE 22
 #define ZB_CS1_CERTIFICATE_SIZE 48
@@ -1399,7 +1777,9 @@ typedef ZB_PACKED_PRE struct zb_cs_key_material_header_s
   zb_uint16_t certificate_mask;
 } ZB_PACKED_STRUCT zb_cs_key_material_header_t;
 
-#define ZB_PROD_CFG_IS_PRESENT_CERT_ANY(v) ((v->options) & 0x80U)
+#define ZB_PROD_CFG_IS_PRESENT_CERT_ANY(v) ((v->options) & ZB_PROD_CFG_OPTIONS_CERT_PRESENT_MASK)
+#define ZB_PROD_CFG_IS_PRESENT_PASSCODE(v) ((v->options) & ZB_PROD_CFG_OPTIONS_PASSCODE_PRESENT_MASK)
+
 /** @endcond */ /* DOXYGEN_INTERNAL_DOC */
 
 /**
@@ -1753,7 +2133,7 @@ void zb_ieee_joining_list_request(zb_uint8_t param);
 
 #endif /* defined ZB_JOINING_LIST_SUPPORT */
 
-#ifdef ZB_SECURITY_INSTALLCODES
+#if defined ZB_SECURITY_INSTALLCODES || defined DOXYGEN
 /**
   Set using of install codes by TC
 
@@ -1762,7 +2142,7 @@ void zb_ieee_joining_list_request(zb_uint8_t param);
 void zb_tc_set_use_installcode(zb_uint8_t use_ic);
 #endif /* ZB_SECURITY_INSTALLCODES */
 
-#if defined ZB_ED_FUNC && defined ZB_CONTROL4_NETWORK_SUPPORT
+#if (defined ZB_ED_FUNC && defined ZB_CONTROL4_NETWORK_SUPPORT) || defined DOXYGEN
 /**
   Permit joining Control4 Network
 */
@@ -1781,5 +2161,27 @@ zb_bool_t zb_control4_network_permitted(void);
  * @param ms - value in milliseconds
  */
 void zb_set_mac_transaction_persistence_time(zb_uint16_t ms);
+
+#ifdef ZB_ALLOW_PROVISIONAL_KEY_AS_TCLK
+/**
+ * @brief Allow joining to trust centers that claim revision r21 or higher
+ *        but sends provisional key as a trust center link key
+ *
+ * @note That behaviour is against specification and disabled by default
+ */
+void zb_allow_provisional_key_as_tclk(void);
+
+/**
+ * @brief Disallow joining to trust centers that claim revision r21 or higher
+ *        but sends provisional key as a trust center link key
+ *
+ * @note That behaviour is against specification and disabled by default
+ */
+void zb_disallow_provisional_key_as_tclk(void);
+#endif /* ZB_ALLOW_PROVISIONAL_KEY_AS_TCLK */
+
+#ifdef ZB_DIRECT_ENABLED
+#include "zboss_api_direct.h"
+#endif /* ZB_DIRECT_ENABLED */
 
 #endif /*ZBOSS_API_H*/
