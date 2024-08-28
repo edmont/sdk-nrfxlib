@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -184,7 +184,7 @@ static zb_bool_t check_cie_authorization(zb_uint8_t endpoint, zb_uint16_t short_
     ZB_ZCL_CLUSTER_ID_IAS_ZONE, ZB_ZCL_CLUSTER_SERVER_ROLE, ZB_ZCL_ATTR_IAS_ZONE_IAS_CIE_ADDRESS_ID);
   ZB_ASSERT(attr_desc);
 
-  /* AN: We have already put entry in adress table during step 2 of each commissioning method. */
+  /* AN: We have already put entry in address table during step 2 of each commissioning method. */
   cie_short_addr = zb_address_short_by_ieee(attr_desc->data_p);
 
   attr_desc = zb_zcl_get_attr_desc_a(endpoint,
@@ -345,7 +345,7 @@ static zb_ret_t zb_zcl_ias_zone_init_normal_mode_handler(zb_uint8_t param)
 
       int_ctx = (zb_zcl_ias_zone_int_ctx_t*)attr_desc_int_ctx->data_p;
 
-            ZB_SCHEDULE_ALARM_CANCEL_AND_GET_BUF(zb_zcl_ias_zone_restore_normal_mode, ZB_ALARM_ANY_PARAM, &alarm_buf_param);
+      ZB_SCHEDULE_ALARM_CANCEL_AND_GET_BUF(zb_zcl_ias_zone_restore_normal_mode, ZB_ALARM_ANY_PARAM, &alarm_buf_param);
 
       if (alarm_buf_param)
       {
@@ -403,10 +403,12 @@ void zb_zcl_ias_zone_enroll_response_invoke_user_app(zb_uint8_t param)
   }
   else
   {
-    result = RET_NOT_IMPLEMENTED;
+    result = RET_ERROR;
   }
 
-  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, zb_zcl_get_zcl_status_from_ret(result));
+  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, result==RET_OK ? ZB_ZCL_STATUS_SUCCESS :
+                               (zb_zcl_get_backward_compatible_statuses_mode() == ZB_ZCL_STATUSES_ZCL8_MODE) ?
+                                ZB_ZCL_STATUS_FAIL : ZB_ZCL_STATUS_HW_FAIL);
 
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_ias_zone_enroll_response_invoke_user_app", (FMT__0));
 }
@@ -934,6 +936,9 @@ void zb_zcl_ias_zone_write_attr_hook_server(zb_uint8_t endpoint, zb_uint16_t att
   zb_zcl_attr_t* attr_desc;
   zb_zcl_ias_zone_int_ctx_t  *int_ctx;
 
+  /* Unused without trace. */
+  ZVUNUSED(manuf_code);
+
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_ias_zone_write_attr_hook endpoint %hx attr_id 0x%x, manuf_code 0x%x",
             (FMT__H_D_D, endpoint, attr_id, manuf_code));
 
@@ -999,7 +1004,7 @@ void zb_zcl_ias_set_attr_val_post_process(zb_zcl_parsed_hdr_t *cmd_info, zb_uint
   if (attr_id == ZB_ZCL_ATTR_IAS_ZONE_IAS_CIE_ADDRESS_ID)
   {
     /* ZCL 8.2.2.2.3 (Trip-to-Pair, Auto-Enroll-Response, Auto-Enroll-Request):
-     * "The IAS Zone server MAY configure a binding table entry for the IAS CIE’s
+     * "The IAS Zone server MAY configure a binding table entry for the IAS CIE's
      * address because all of its communication will be directed to the IAS CIE." */
     zb_zdo_bind_req_param_t *zdo_bind_req;
     zb_aps_check_binding_req_t *check_binding_req;

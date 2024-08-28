@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -56,7 +56,7 @@
 /*
  * C standard being used during compilation.
  * The preferred standard is C99 and it should be used whenever possible.
- * However, C90 compatibility should be maintained. Macroses ZB_STDC_* can be
+ * However, C90 compatibility should be maintained. Macros ZB_STDC_* can be
  * used for conditional compilation based on C standard. Note: __STDC__ and
  * __STDC_VERSION__ are expected to be supported by all compilers in use.
  */
@@ -77,11 +77,13 @@
 #endif
 #endif
 
-#if defined ZB8051
-#define ZB_8BIT_WORD
-#elif defined ZB_PLATFORM_XAP5
-#define ZB_16BIT_WORD
-#else
+#if ((defined(ZB_8BIT_WORD) && defined(ZB_16BIT_WORD))          \
+     || (defined(ZB_8BIT_WORD) && defined(ZB_32BIT_WORD))       \
+     || (defined(ZB_16BIT_WORD) && defined(ZB_32BIT_WORD)))
+ZB_ASSERT_COMPILE_DECL(0);
+#endif
+
+#if !defined(ZB_8BIT_WORD) && !defined(ZB_16BIT_WORD) && !defined(ZB_32BIT_WORD)
 #define ZB_32BIT_WORD
 #endif
 
@@ -89,11 +91,7 @@
 #ifdef ZB_IAR
 #define ZB_XDATA
 #define ZB_CODE
-#ifdef ZB8051
-#define ZB_IAR_CODE  __code
-#else
 #define ZB_IAR_CODE
-#endif
 #elif defined __LINT__
 #define ZB_XDATA
 #define ZB_CODE
@@ -105,11 +103,7 @@
 #else
 #define ZB_XDATA
 #define ZB_CODE
-#ifdef ZB8051
-#define ZB_IAR_CODE code
-#else
 #define ZB_IAR_CODE
-#endif
 #endif
 
 /* register modifier for variables. Can be defined to "register". Will it help to the compiler? */
@@ -176,27 +170,8 @@ typedef signed char        zb_int8_t;
 typedef unsigned short     zb_uint16_t;
 
 typedef signed short       zb_int16_t;
-#if defined ZB8051
-typedef unsigned long      zb_uint32_t;
 
-typedef signed long        zb_int32_t;
-
-typedef zb_uint16_t        zb_bitfield_t;
-typedef zb_uint16_t        zb_lbitfield_t;
-
-typedef zb_int16_t         zb_sbitfield_t;
-
-typedef zb_uint16_t        zb_size_t;
-
-#ifdef ZB_CC25XX
-
-/* Warning: just for an alignment in the macsplit!
-   long long arithmetic won't work */
-typedef zb_uint32_t zb_uint64_t[2];
-
-#endif
-
-#elif defined ZB_16BIT_WORD
+#if defined ZB_16BIT_WORD
 
 typedef unsigned long      zb_uint32_t;
 
@@ -213,7 +188,7 @@ typedef zb_uint32_t        zb_size_t;
 typedef long long          zb_int64_t;
 typedef unsigned long long zb_uint64_t;
 
-#else /* defined ZB8051 */
+#else /* defined ZB_16BIT_WORD */
 /*
    project-local 4-byte unsigned int type
 */
@@ -246,7 +221,7 @@ typedef zb_uint32_t        zb_size_t;
 typedef long long          zb_int64_t;
 typedef unsigned long long zb_uint64_t;
 
-#endif /* defined ZB8051 */
+#endif /* defined ZB_16BIT_WORD */
 
 
 #else  /* ! defined  UNIX || ZB_WINDOWS */
@@ -379,7 +354,7 @@ typedef zb_uint_t          zb_ulong_t;
 
 /** @brief General purpose boolean type.
  * For C90, 'zb_bool_t' is an alias of 'zb_uint8_t'.
- * For C99, the availabilty of the 'stdbool.h' standard header is expected and 'zb_bool_t' is an
+ * For C99, the availability of the 'stdbool.h' standard header is expected and 'zb_bool_t' is an
  * alias of 'bool'.
  * ZB_FALSE and ZB_TRUE are defined as macros for both standards.
  *
@@ -492,7 +467,7 @@ typedef bool zb_bitbool_t;
 #endif
 
 /* IAR or Keil ARM CPU */
-#if (defined __IAR_SYSTEMS_ICC__ || defined __ARMCC_VERSION) && !defined ZB8051
+#if (defined __IAR_SYSTEMS_ICC__ || defined __ARMCC_VERSION)
 #define ZB_PACKED_PRE __packed
 #define ZB_WEAK_PRE __weak
 #else
@@ -506,7 +481,7 @@ typedef bool zb_bitbool_t;
 #define ZB_WEAK
 #endif
 
-#if (defined __ARMCC_VERSION) && !defined ZB8051
+#if (defined __ARMCC_VERSION)
 #define ZB_ALIGNED_PRE __attribute__((aligned))
 #endif
 
@@ -518,6 +493,12 @@ typedef bool zb_bitbool_t;
   #define ZB_DEPRECATED __attribute__((deprecated))
 #else
   #define ZB_DEPRECATED
+#endif /* __GNUC__ */
+
+#if defined __GNUC__
+  #define ZB_NORETURN __attribute__((noreturn))
+#else
+  #define ZB_NORETURN
 #endif /* __GNUC__ */
 
 /*
@@ -773,15 +754,15 @@ void zb_htole32(zb_uint8_t ZB_XDATA *ptr, zb_uint8_t ZB_XDATA *val);
 void* zb_put_next_htole16(zb_uint8_t *dst, zb_uint16_t val);
 
 #ifdef ZB_LITTLE_ENDIAN
-#define ZB_PUT_NEXT_HTOLE16(ptr, val)                \
-{                                                    \
+#define ZB_PUT_NEXT_HTOLE16(ptr, val)  \
+{                                               \
   *((ptr)++) = (zb_uint8_t)((val) & 0xffU);          \
   *((ptr)++) = (zb_uint8_t)(((val) >> 8U) & 0xffU);  \
 }
 
 #else
 #define ZB_PUT_NEXT_HTOLE16(ptr, val)  \
-{                                                   \
+{                                               \
   *((ptr)++) = (zb_uint8_t)(((val) >> 8U) & 0xffU); \
   *((ptr)++) = (zb_uint8_t)((val) & 0xffU);         \
 }
@@ -792,19 +773,22 @@ void* zb_put_next_htole32(zb_uint8_t *dst, zb_uint32_t val1);
 #define ZB_PUT_NEXT_HTOLE32(ptr, val) (ptr) = zb_put_next_htole32((ptr), (val))
 
 #ifndef ZB_IAR
-void zb_get_next_letoh16(zb_uint16_t *dst, zb_uint8_t **src);
+void zb_get_next_letoh16(zb_uint16_t *dst, const zb_uint8_t **src);
 #else
 /* for IAR define as macro due to problems with packet structs */
 #define zb_get_next_letoh16(dst, src)           \
 {                                               \
   ZB_LETOH16((dst), *(src));                    \
-  (*(src)) = (void *)(((char *)(*(src))) + 2U);  \
+  (*(src)) = (((const char *)(*(src))) + 2U);  \
 }
 #endif
 
 void* zb_put_next_2_htole16(zb_uint8_t *dst, zb_uint16_t val1, zb_uint16_t val2);
 void* zb_put_next_2_htole32(zb_uint8_t *dst, zb_uint32_t val1, zb_uint32_t val2);
 #define ZB_LETOH64(dst, src) zb_memcpy8((zb_uint8_t*)dst, (zb_uint8_t*)src)
+
+void* zb_put_next_ieee(zb_uint8_t *dst, zb_ieee_addr_t src);
+#define ZB_PUT_NEXT_IEEE(dst, src) (dst) = zb_put_next_ieee((dst), (src));
 
 /**
    Convert 16-bits integer from the little endian to the host endian
@@ -932,6 +916,9 @@ void* zb_put_next_2_htole32(zb_uint8_t *dst, zb_uint32_t val1, zb_uint32_t val2)
  *
  *    @typedef zb_bitbool_t
  *    @brief Type to be used for boolean bit fields inside structure.
+ *
+ *    @typedef zb_single_t
+ *    @brief Project-local single precision float type.
  *  @}
  */
 
@@ -974,13 +961,13 @@ void* zb_put_next_2_htole32(zb_uint8_t *dst, zb_uint32_t val1, zb_uint32_t val2)
 
 /* FIXME: which value to prefer? Because 0x800000 is reserved in ZCL */
 /* IAR C-STAT generates falsepositive for hexadecimal value */
-#define MIN_SIGNED_24BIT_VAL    (-8388607LL) /* (0xFF800001LL) */
-#define MAX_SIGNED_24BIT_VAL    (0x7FFFFF)
+#define MIN_SIGNED_24BIT_VAL (-8388607LL) /* (0xFF800001LL) */
+#define MAX_SIGNED_24BIT_VAL (0x7FFFFF)
 #define MAX_UNSIGNED_24BIT_VAL  (0xFFFFFFU)
 
 /* IAR C-STAT generates falsepositive for hexadecimal value */
-#define MIN_SIGNED_48BIT_VAL   (-140737488355327LL) /* (0xFFFF800000000001LL) */
-#define MAX_SIGNED_48BIT_VAL   (0x7FFFFFFFFFFF)
+#define MIN_SIGNED_48BIT_VAL (-140737488355327LL) /* (0xFFFF800000000001LL) */
+#define MAX_SIGNED_48BIT_VAL (0x7FFFFFFFFFFF)
 #define MAX_UNSIGNED_48BIT_VAL (0xFFFFFFFFFFFFU)
 
 #define ZB_S64_FROM_S48(x) ((x & 0xFFFFFFFFFFFF) | ((x & 0x800000000000) ? 0xFFFF000000000000 : 0x0))
@@ -1068,15 +1055,15 @@ typedef ZB_PACKED_PRE struct zb_int48_s
 }
 
 #define ZB_GET_INT32_FROM_INT24(int24_val)                                                        \
-  (zb_int32_t)                                                                                    \
+  (zb_int32_t)                                                         \
   (                                                                                               \
    ((ZB_INT24_IS_NEGATIVE(int24_val))? ((zb_uint32_t)0xFFU << 24U): 0U) |                         \
    ((zb_uint32_t)(int24_val).high << 16U)                             |                           \
    (int24_val).low                                                                                \
   )
 
-#define ZB_ASSIGN_UINT24_FROM_UINT32(uint32_val)   \
-{                                                  \
+#define ZB_ASSIGN_UINT24_FROM_UINT32(uint32_val)  \
+{                                                 \
   .low = (zb_uint16_t)((uint32_val) & 0xFFFFU),    \
     .high = (zb_uint8_t)((uint32_val) >> 16U)      \
 }
@@ -1612,5 +1599,15 @@ typedef zb_uint32_t           zb_uint24_t;
 #endif /* ZB_UINT24_48_SUPPORT */
 
 /** @} */
+
+/**
+ * @addtogroup float_types
+ * @{
+ */
+
+typedef float zb_single_t;
+
+/** @} */
+
 
 #endif /* ZB_TYPES_H */

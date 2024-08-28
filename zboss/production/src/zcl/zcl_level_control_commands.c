@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -38,7 +38,7 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* PURPOSE: ZCL Level Contol cluster specific commands handling
+/* PURPOSE: ZCL Level Control cluster specific commands handling
 */
 
 #define ZB_TRACE_FILE_ID 2072
@@ -82,6 +82,8 @@ static void level_control_stop_internal(zb_uint8_t endpoint);
 static zb_ret_t check_value_level_control_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_uint8_t *value);
 static zb_ret_t check_value_level_control_client(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_uint8_t *value);
 
+static void level_control_default_resp(zb_uint8_t param, zb_bool_t status);
+
 zb_bool_t zb_zcl_process_level_specific_commands_srv(zb_uint8_t param);
 zb_bool_t zb_zcl_process_level_specific_commands_cli(zb_uint8_t param);
 
@@ -118,7 +120,6 @@ static zb_ret_t check_value_level_control_server(zb_uint16_t attr_id, zb_uint8_t
       }
       break;
     default:
-      ret = RET_OK;
       break;
   }
 
@@ -140,7 +141,6 @@ static zb_ret_t check_value_level_control_client(zb_uint16_t attr_id, zb_uint8_t
       }
       break;
     default:
-      ret = RET_OK;
       break;
   }
 
@@ -254,10 +254,10 @@ static zb_bool_t level_control_check_req_options(zb_uint8_t param, zb_uint8_t en
                                  ZB_ZCL_LEVEL_CONTROL_OPTIONS_EXECUTE_IF_OFF);
       }
     }
-  
+
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_ON_OFF
     /* ZCL8, 3.10.2.2.8.1 ExecuteIfOff Options Bit
-       Command execution SHALL NOT continue beyond the Options procedding if all of thee criteria
+       Command execution SHALL NOT continue beyond the Options proceeding if all of thee criteria
        are true:
        - The command is on of the "without On/Off" commands
        - The On/Off cluster exists on the same endpoint as this cluster
@@ -295,27 +295,12 @@ static zb_bool_t level_control_check_req_options(zb_uint8_t param, zb_uint8_t en
   return res;
 }
 
-void level_control_default_resp(zb_uint8_t param, zb_uint16_t user_param)
+static void level_control_default_resp(zb_uint8_t param, zb_bool_t status)
 {
-  zb_zcl_level_control_move_variables_t* move_variables;
-  zb_uint8_t endpoint = ZB_GET_HI_BYTE(user_param);
-  zb_uint8_t status = ZB_GET_LOW_BYTE(user_param);
-
-  TRACE_MSG(TRACE_ZCL1, "level_control_default_resp param %hd user_param %hd %hd", (FMT__H_H_H, param, endpoint, status));
-
-  move_variables = level_control_get_move_variables(endpoint);
-  ZB_ASSERT(move_variables);
-
-  ZB_ZCL_SEND_DEFAULT_RESP(param,
-                           move_variables->addr.src_addr,
-                           ZB_APS_ADDR_MODE_16_ENDP_PRESENT,
-                           move_variables->addr.src_endpoint,
-                           move_variables->addr.dst_endpoint,
-                           move_variables->addr.profile_id,
-                           ZB_ZCL_CLUSTER_ID_LEVEL_CONTROL,
-                           move_variables->addr.seq_number,
-                           move_variables->addr.cmd_id,
-                           (status ? ZB_ZCL_STATUS_SUCCESS : ZB_ZCL_STATUS_FAIL));
+  zb_zcl_parsed_hdr_t cmd_info;
+  TRACE_MSG(TRACE_ZCL1, "level_control_default_resp param %hd, status %hd", (FMT__H_H, param, status));
+  ZB_ZCL_COPY_PARSED_HEADER(param, &cmd_info);
+  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, (status ? ZB_ZCL_STATUS_SUCCESS : ZB_ZCL_STATUS_FAIL));
 }
 
 zb_bool_t level_control_calculate_and_start_cvc(zb_zcl_cvc_input_variables_t *input_var, zb_bool_t is_onoff, zb_uint8_t endpoint)
@@ -454,10 +439,7 @@ static void move_to_level_handler(
 
   if (!(status && move_variables->addr.disable_default_response))
   {
-    zb_uint16_t user_param = status;
-
-    ZB_SET_HI_BYTE(user_param, move_variables->addr.dst_endpoint);
-    level_control_default_resp(param, user_param);
+    level_control_default_resp(param, status);
   }
   else if (param != 0)
   {
@@ -601,10 +583,7 @@ static void move_handler(zb_uint8_t param, zb_bool_t is_onoff, zb_uint8_t endpoi
 
   if (!(status && move_variables->addr.disable_default_response))
   {
-    zb_uint16_t user_param = status;
-
-    ZB_SET_HI_BYTE(user_param, move_variables->addr.dst_endpoint);
-    level_control_default_resp(param, user_param);
+    level_control_default_resp(param, status);
   }
   else if (param != 0)
   {
@@ -725,10 +704,7 @@ static void step_handler(
 
   if (!(status && move_variables->addr.disable_default_response))
   {
-    zb_uint16_t user_param = status;
-
-    ZB_SET_HI_BYTE(user_param, move_variables->addr.dst_endpoint);
-    level_control_default_resp(param, user_param);
+    level_control_default_resp(param, status);
   }
   else if (param != 0)
   {
@@ -775,10 +751,9 @@ static void level_control_stop_internal(zb_uint8_t endpoint)
 
 static void stop_handler(zb_uint8_t param, zb_uint8_t endpoint)
 {
-
   zb_zcl_parsed_hdr_t cmd_info;
   zb_zcl_level_control_move_variables_t* move_variables;
-  zb_uint8_t status = ZB_TRUE;
+  zb_bool_t status = ZB_TRUE;
 
   TRACE_MSG(TRACE_ZCL1, "> stop_handler param %i", (FMT__H, param));
 
@@ -800,10 +775,7 @@ static void stop_handler(zb_uint8_t param, zb_uint8_t endpoint)
 
   if (!(status && move_variables->addr.disable_default_response))
   {
-    zb_uint16_t user_param = status;
-
-    ZB_SET_HI_BYTE(user_param, move_variables->addr.dst_endpoint);
-    level_control_default_resp(param, user_param);
+    level_control_default_resp(param, status);
   }
   else if (param != 0)
   {
@@ -899,12 +871,7 @@ zb_bool_t zb_zcl_process_level_control_specific_commands(zb_uint8_t param)
     case ZB_ZCL_CMD_LEVEL_CONTROL_STOP:
     case ZB_ZCL_CMD_LEVEL_CONTROL_STOP_WITH_ON_OFF:
     {
-      zb_zcl_level_control_move_addr_t *addr =
-        ZB_BUF_GET_PARAM(param, zb_zcl_level_control_move_addr_t);
-
-      ZB_MEMCPY(addr, &main_addr, sizeof(zb_zcl_level_control_move_addr_t));
       stop_handler(param, main_addr.dst_endpoint);
-
       TRACE_MSG(TRACE_ZCL3, "STOP command processed", (FMT__0));
     }
     break;

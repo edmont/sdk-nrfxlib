@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -95,7 +95,7 @@ typedef ZB_PACKED_PRE struct zb_aps_command_pkt_header_s
   *
   * This data structure passed to @ref zb_apsde_data_request() in the packet buffer (in its tail).
   */
-typedef struct zb_apsde_data_req_s
+typedef ZB_PACKED_PRE struct zb_apsde_data_req_s
 {
   zb_addr_u dst_addr;  /*!< Destination address */
   zb_uint16_t  profileid;    /*!< The identifier of the profile for which this
@@ -121,29 +121,42 @@ typedef struct zb_apsde_data_req_s
                                   See @ref apsde_tx_opt          */
   /*2.2.4.1.1.1 spec r21*/
   zb_uint8_t   use_alias;    /*!< The next higher layer may use the UseAlias parameter
-			          to request alias usage by NWK layer for the current frame.
-				  If the UseAlias parameter has a value of FALSE,
-				  meaning no alias usage, then the parameters
-				  AliasSrcAddr and AliasSeqNumb will be ignored.
-				  Otherwise, a value of TRUE denotes that the values supplied in
-				  AliasSrcAddr and AliasSeqNumb are to be used
-				  Values: TRUE or FALSE */
-  zb_uint16_t   alias_src_addr;/*!< The source address to be used for this NSDU.
-				    If the UseAlias parameter has a value of FALSE,
-				    the AliasSrcAddr parameter is ignored.
-				    Values: Any valid device address except broadcast address */
-  zb_uint8_t    alias_seq_num; /*!< The sequence number to be used for this NSDU.
-				    If the UseAlias parameter has a value of FALSE,
-				    the AliasSeqNumb parameter is ignored.
-				    Values: 0x00-0xff */
+                                  to request alias usage by NWK layer for the current frame.
+                                  If the UseAlias parameter has a value of FALSE,
+                                  meaning no alias usage, then the parameters
+                                  AliasSrcAddr and AliasSeqNumb will be ignored.
+                                  Otherwise, a value of TRUE denotes that the values supplied in
+                                  AliasSrcAddr and AliasSeqNumb are to be used
+                                  Values: TRUE or FALSE */
+  zb_uint16_t  alias_src_addr;/*!< The source address to be used for this NSDU.
+                                   If the UseAlias parameter has a value of FALSE,
+                                   the AliasSrcAddr parameter is ignored.
+                                   Values: Any valid device address except broadcast address */
+  zb_uint8_t   alias_seq_num; /*!< The sequence number to be used for this NSDU.
+                                   If the UseAlias parameter has a value of FALSE,
+                                   the AliasSeqNumb parameter is ignored.
+                                   Values: 0x00-0xff */
+
+  zb_uint16_t  relay_via; /*!< The short address of the router through which the relay frame will be delivered.
+                               Used only if the ZB_APSDE_TX_OPT_USE_RELAY option is enabled */
+  zb_uint16_t  nwk_broadcast_addr; /*!< The broadcast address to which the frame will be sent
+                                        if the address mode == ZB_APS_ADDR_MODE_16_GROUP_ENDP_NOT_PRESENT.
+                                        If not set, it defaults to 0xFFFD */
+
+  zb_uint8_t    ext_tx_options; /* !< Additional non-standard TX options. See @ref apsde_tx_opt */
+  /* Keep NCP protocol compatibility - do not include ext tx options. We need it only for one customer indeed.. */
+#define NCP_APSDE_PARAM_SIZE ZB_OFFSETOF(zb_apsde_data_req_t, relay_via)
+
 #ifdef APS_FRAGMENTATION
-#define NCP_APSDE_PARAM_SIZE ZB_OFFSETOF(zb_apsde_data_req_t, extended_fc)
   zb_uint8_t extended_fc;  /* Extended Frame Control - internal use only */
   zb_uint8_t block_num;    /* Fragmentation: for the first segment - total payload len */
-#else
-#define NCP_APSDE_PARAM_SIZE sizeof(zb_apsde_data_req_t)
 #endif
-} zb_apsde_data_req_t;
+  zb_address_ieee_ref_t dst_addr_ref; /* Dst addr ref will be set in zb_apsde_data_request function
+                                           by stack if address is present
+                                           (addr_mode is equal to ZB_APS_ADDR_MODE_16_ENDP_PRESENT
+                                             or ZB_APS_ADDR_MODE_64_ENDP_PRESENT).
+                                         Used in zb_apsde_data_request_main. */
+} ZB_PACKED_STRUCT zb_apsde_data_req_t;
 
 /** @brief Parameters of the APSDE-DATA.confirm primitive. */
 typedef ZB_PACKED_PRE struct zb_apsde_data_confirm_s
@@ -159,6 +172,11 @@ typedef ZB_PACKED_PRE struct zb_apsde_data_confirm_s
 #define FIRST_INTERNAL_APSDE_CONF_FIELD status
   zb_ret_t       status;          /*!< The status of corresponding request. */
   zb_bool_t      need_unlock;
+  zb_address_ieee_ref_t dst_addr_ref; /*!< Dst addr ref if address is present.
+                                            Valid only for unicasts.
+                                            Used by stack internally to unlock address
+                                              (if apsde_data_req have been called with ACK req bit set)
+                                              upon confirmation in zb_apsde_data_confirm. */
 } ZB_PACKED_STRUCT zb_apsde_data_confirm_t;
 
 /**
@@ -167,21 +185,30 @@ typedef ZB_PACKED_PRE struct zb_apsde_data_confirm_s
  *
  * Note: These values were members of `enum zb_apsde_tx_opt_e` type but were converted to a
  * set of macros due to MISRA violations.
- *
- * These are a bitwise OR of one or more.
+  *
+  * These are a bitwise OR of one or more.
  * @anchor apsde_tx_opt
- */
+  */
 /** @{ */
 #define ZB_APSDE_TX_OPT_SECURITY_ENABLED         0x01U /*!< Security enabled transmission */
-#define ZB_APSDE_TX_OPT_USE_NWK_KEY_R21OBSOLETE  0x02U /*!< Use NWK key */
+#define ZB_APSDE_TX_OPT_USE_NWK_KEY_R21OBSOLETE  0x02U /*!< Use NWK key (obsolete) */
+#define ZB_APSDE_TX_OPT_NO_LONG_ADDR             0x02U /*!< Extension: do not include long src/dst addresses into NWK hdr  */
 #define ZB_APSDE_TX_OPT_ACK_TX                   0x04U /*!< Acknowledged transmission */
 #define ZB_APSDE_TX_OPT_FRAG_PERMITTED           0x08U /*!< Fragmentation permitted */
 #define ZB_APSDE_TX_OPT_INC_EXT_NONCE            0x10U /*!< Include extended nonce in APS security frame */
 
 #ifdef ZB_APSDE_REQ_ROUTING_FEATURES
-#define ZB_APSDE_TX_OPT_FORCE_MESH_ROUTE_DISC    0x20U /* Non-spec extension: Force mesh route discovery */
-#define ZB_APSDE_TX_OPT_FORCE_SEND_ROUTE_REC     0x40U /* Non-spec extension: Force send route record */
+#define ZB_APSDE_TX_OPT_FORCE_MESH_ROUTE_DISC    0x20U /*!< Non-spec extension: Force mesh route discovery */
+#define ZB_APSDE_TX_OPT_FORCE_SEND_ROUTE_REC     0x40U /*!< Non-spec extension: Force send route record */
+#define ZB_APSDE_TX_OPT_HAVE_EXT_OPTIONS         0x80U /*!< Additional TX options are in ext_tx_options field  */
+
+#define ZB_APSDE_EXT_TX_OPT_INC_EXT_SRC          0x01u /*!< Include long src addr into nwk hdr. If used with ZB_APSDE_TX_OPT_NO_LONG_ADDR, long dst is not included */
+#define ZB_APSDE_EXT_TX_OPT_INC_EXT_DST          0x02u /*!< Include long dst addr into nwk hdr. If used with ZB_APSDE_TX_OPT_NO_LONG_ADDR, long src is not included */
+#define ZB_APSDE_EXT_TX_OPT_NO_ROUTE_DISC        0x04u /*!< Do not use route discovery (spec violation!) */
+#define ZB_APSDE_EXT_TX_OPT_NO_ADDR_DISC         0x08u /*!< Do not discover short address of destination if addr mode is "long" and address is unknown */
 #endif /* ZB_APSDE_REQ_ROUTING_FEATURES */
+
+#define ZB_APSDE_TX_OPT_USE_RELAY                0x80U /*!< Use relay*/
 
 /** @} */
 
@@ -259,10 +286,6 @@ void zb_apsde_data_indication(zb_uint8_t param);
    @param packet - APS packet
    @param ptr - (out) pointer to the APS data begin
 
-   @par Example
-   @snippet tp_aps_bv_19_i_zr1.c data_indication
-   @par
-
  */
 #define ZB_APS_HDR_CUT_P(packet, ptr)                   \
   ptr = zb_buf_cut_left(packet, zb_aps_full_hdr_size(zb_buf_begin(packet)))
@@ -302,6 +325,8 @@ typedef ZB_PACKED_PRE struct zb_apsme_get_group_membership_req_s
 {
   zb_callback_t  confirm_cb;    /*!< The callback to be called when the operation is completed. */
   zb_ushort_t    n_groups;      /*!< Group addresses amount. */
+  zb_uint8_t     endpoint;      /*!< The endpoint which the groups are assigned to. */
+  zb_uint8_t     align[1];
   zb_uint16_t    groups[1];     /*!< First element if list with group addresses. */
 } ZB_PACKED_STRUCT zb_apsme_get_group_membership_req_t;
 
@@ -338,12 +363,6 @@ void zb_apsde_data_acknowledged(zb_uint8_t param);
 /** @brief Initialize APS subsystem. */
 void zb_aps_init(void);
 
-
-
-/** @brief APS command codes constants.
-  * @note APS_CMD_TUNNEL should be last one, or you should change logic.
-  */
-
 /**
  * @name APS command codes constants.
  * @note APS_CMD_TUNNEL should be last one, or you should change logic.
@@ -353,22 +372,24 @@ void zb_aps_init(void);
  * set of macros due to MISRA violations.
  */
 /** @{ */
-#define APS_CMD_SKKE_1           0x01U
-#define APS_CMD_SKKE_2           0x02U
-#define APS_CMD_SKKE_3           0x03U
-#define APS_CMD_SKKE_4           0x04U
-#define APS_CMD_TRANSPORT_KEY    0x05U
-#define APS_CMD_UPDATE_DEVICE    0x06U
-#define APS_CMD_REMOVE_DEVICE    0x07U
-#define APS_CMD_REQUEST_KEY      0x08U
-#define APS_CMD_SWITCH_KEY       0x09U
-#define APS_CMD_EA_INIT_CHLNG    0x0AU
-#define APS_CMD_EA_RSP_CHLNG     0x0BU
-#define APS_CMD_EA_INIT_MAC_DATA 0x0CU
-#define APS_CMD_EA_RSP_MAC_DATA  0x0DU
-#define APS_CMD_TUNNEL           0x0EU
-#define APS_CMD_VERIFY_KEY       0x0FU
-#define APS_CMD_CONFIRM_KEY      0x10U
+#define APS_CMD_SKKE_1                   0x01U
+#define APS_CMD_SKKE_2                   0x02U
+#define APS_CMD_SKKE_3                   0x03U
+#define APS_CMD_SKKE_4                   0x04U
+#define APS_CMD_TRANSPORT_KEY            0x05U
+#define APS_CMD_UPDATE_DEVICE            0x06U
+#define APS_CMD_REMOVE_DEVICE            0x07U
+#define APS_CMD_REQUEST_KEY              0x08U
+#define APS_CMD_SWITCH_KEY               0x09U
+#define APS_CMD_EA_INIT_CHLNG            0x0AU
+#define APS_CMD_EA_RSP_CHLNG             0x0BU
+#define APS_CMD_EA_INIT_MAC_DATA         0x0CU
+#define APS_CMD_EA_RSP_MAC_DATA          0x0DU
+#define APS_CMD_TUNNEL                   0x0EU
+#define APS_CMD_VERIFY_KEY               0x0FU
+#define APS_CMD_CONFIRM_KEY              0x10U
+#define APS_CMD_RELAY_MESSAGE_DOWNSTREAM 0x11U
+#define APS_CMD_RELAY_MESSAGE_UPSTREAM   0x12U
 /** @} */
 
 zb_uint8_t aps_find_src_ref(
@@ -390,10 +411,16 @@ void zb_apsme_update_device_indication(zb_uint8_t param);
   * @param command - command id.
   * @param secure  - if true, secure transfer at NWK level.
   */
-void zb_aps_send_command(zb_uint8_t param, zb_uint16_t dest_addr, zb_uint8_t command, zb_bool_t secure
-    /** @param secure_aps_i - if true, secure APS level.*/
-    , zb_uint8_t secure_aps_i
-  );
+void zb_aps_send_command(zb_uint8_t param, zb_uint16_t dest_addr, zb_uint8_t command, zb_bool_t secure_nwk
+    /** @param secure_aps - if true, secure APS level.*/
+    , zb_secur_key_id_t secure_aps_i, zb_bool_t need_ack);
+
+void zb_apsde_data_request_relay(zb_uint8_t param, zb_uint16_t relay_via, zb_ieee_addr_t joiner_ieee, zb_bool_t nwk_secure, zb_bool_t aps_secure);
+
+void zb_aps_send_command_with_relay(zb_uint8_t param, zb_uint16_t dest_addr, zb_uint8_t command, zb_secur_key_id_t secure_aps_i,
+                                    zb_bool_t need_ack, zb_uint16_t relay_via, zb_ieee_addr_t joiner_ieee);
+
+zb_ret_t zb_aps_command_confirm(zb_uint8_t param);
 
 /** \par Macros for APS FC parse-compose */
 
@@ -416,6 +443,8 @@ void zb_aps_send_command(zb_uint8_t param, zb_uint16_t dest_addr, zb_uint8_t com
 #define ZB_APS_FC_GET_EXT_HDR_PRESENT(fc) (((fc)>>7U) & 1U)
 #define ZB_APS_FC_SET_EXT_HDR_PRESENT(fc, f) ((fc) |= ((f) << 7U))
 
+#define ZB_APS_FRAME_IS_FRAG_ACK(fc) ((ZB_APS_FC_GET_FRAME_TYPE(fc) == ZB_APS_FRAME_ACK) && ZB_U2B(ZB_APS_FC_GET_EXT_HDR_PRESENT(fc)))
+
 #define ZB_APS_FIRST_FRAGMENT 0x01U
 #define ZB_APS_NOT_FIRST_FRAGMENT 0x02U
 /* Limit to 4 fragments as maximum available.
@@ -427,7 +456,7 @@ void zb_aps_send_command(zb_uint8_t param, zb_uint16_t dest_addr, zb_uint8_t com
 /** @brief Setup FC for APS command: frame type, ack request, ack format. */
 #define ZB_APS_FC_SET_COMMAND(fc, need_ack)      \
   (fc) |= (   /*frame type*/ZB_APS_FRAME_COMMAND \
-           |  /*ack req*/(((need_ack)) << 6U)     \
+           |  /*ack req*/((need_ack) << 6U)      \
            | /*ack format*/(1U << 4U))
 
 /**
@@ -452,7 +481,7 @@ void zb_aps_send_command(zb_uint8_t param, zb_uint16_t dest_addr, zb_uint8_t com
  */
 /** @{ */
 #define ZB_APS_DELIVERY_UNICAST   0U /*!< Unicast frame delivery. */
-/*! Reserved value, see Zigbee spec, subclause 2.2.5.1.1.2 */
+  /*! Reserved value, see Zigbee spec, subclause 2.2.5.1.1.2 */
 #define ZB_APS_DELIVERY_RESERVED  1U
 #define ZB_APS_DELIVERY_BROADCAST 2U /*!< Broadcast frame delivery. */
 #define ZB_APS_DELIVERY_GROUP     3U /*!< Group frame delivery. */
@@ -508,18 +537,24 @@ void zb_apsme_get_group_membership_request(zb_uint8_t param);
 /** @internal
  * @brief Parse APS header
  *
+ * @param packet_apshdr - pointer to APS header in a buffer with the packet
+ * @param aps_hdr - APS header see @ref zb_aps_hdr_s
+ * */
+void zb_aps_hdr_parse_with_absent_nwk_hdr(const zb_uint8_t* packet_apshdr, zb_aps_hdr_t *aps_hdr);
+
+/** @internal
+ * @brief Parse APS header
+ *
  * @param packet - buffer with APS command
  * @param aps_hdr - APS header see @ref zb_aps_hdr_s
  * @param cut_nwk_hdr - flag "cut HWK header before parse"
  * */
 void zb_aps_hdr_parse(zb_bufid_t packet, zb_aps_hdr_t *aps_hdr, zb_bool_t cut_nwk_hdr);
 
+
 /** @internal
  * @brief Check element in the group array by GroupID.
  *
- * @par Example
- * @snippet tp_pro_bv-52_zr1.c tp_pro_bv-52_zr1
- * @par
  * */
 zb_bool_t zb_aps_is_in_group(zb_uint16_t grp_id);
 
@@ -533,7 +568,7 @@ zb_aps_group_table_ent_t* zb_aps_get_group_table_entry(zb_uint16_t group_addr);
 void fill_nldereq(zb_uint8_t param, zb_uint16_t addr, zb_uint8_t secure);
 
 /** @brief Set predefined TC key. */
-void zb_aps_set_preconfigure_security_key(zb_uint8_t *key);
+void zb_aps_set_preconfigure_security_key(const zb_uint8_t *key);
 
 zb_ret_t zb_aps_get_ieee_source_from_cmd_frame(zb_uint8_t cmd_id, zb_uint8_t cmd_buf_param, zb_ieee_addr_t ieee_addr);
 
@@ -550,15 +585,20 @@ void aps_send_fail_confirm(zb_uint8_t param, zb_ret_t status);
 
 void zb_apsme_unbind_by_ref(zb_address_ieee_ref_t addr_ref);
 
+void zb_apsme_clear_all_bind_by_ieee(zb_ieee_addr_t ieee_addr);
+
 zb_ret_t zb_check_binding_table_whitelist(zb_apsme_binding_req_t *apsreq);
 
 /* Functions for accessing and modifying a group table */
 zb_ret_t zb_aps_group_table_add(zb_aps_group_table_t *table, zb_uint16_t group, zb_uint8_t ep);
 zb_ret_t zb_aps_group_table_remove(zb_aps_group_table_t *table, zb_uint16_t group, zb_uint8_t ep);
+void zb_aps_group_table_get_groups_by_ep(zb_aps_group_table_t *table,
+                                         zb_ushort_t groups_len, zb_uint16_t *groups,
+                                         zb_ushort_t *out_group_cnt, zb_uint8_t ep);
 void zb_aps_group_table_remove_all(zb_aps_group_table_t *table);
 zb_bool_t zb_aps_group_table_is_endpoint_in_group(zb_aps_group_table_t *table,
-                                                  zb_uint16_t group_id,
-                                                  zb_uint8_t endpoint);
+                                                   zb_uint16_t group_id,
+                                                   zb_uint8_t endpoint);
 void zb_apsme_internal_get_group_membership_request(zb_aps_group_table_t *table, zb_uint8_t param);
 
 
@@ -571,6 +611,51 @@ zb_ret_t zb_apsme_add_group_internal(zb_uint16_t group, zb_uint8_t ep);
  * called from zb_apsme_remove_group_request or elsewhere from any layer
  */
 zb_ret_t zb_apsme_remove_group_internal(zb_uint16_t group, zb_uint8_t ep);
+
+/*
+ * Return True if frame is Relay Command and joiner_ieee is valid
+ */
+zb_bool_t zb_aps_is_relay_for_dlk(zb_uint8_t *apsdu);
+
+/*
+ * Internal function for finding a list of groups that an endpoint is a member of
+ */
+void zb_apsme_get_groups_by_ep(zb_ushort_t groups_len, zb_uint16_t *groups,
+                               zb_ushort_t *out_group_cnt, zb_uint8_t ep);
+
+/**
+ * @brief This function clears
+ *   "ZB_AIB().aps_device_key_pair_storage" structure
+ *   in a way compatible with both
+ *   static and configurable memory builds.
+ *
+ *   It doesn't changes pointers to configurable memory if it is enabled.
+ */
+void zb_reinit_aps_device_key_pair_storage(void);
+
+/**
+ * @brief This function clears
+ *   "ZG->aps.binding" structure
+ *   in a way compatible with both
+ *   static and configurable memory builds.
+ *
+ *   It doesn't changes pointers to configurable memory if it is enabled.
+ *
+ */
+void zb_reinit_aps_binding(void);
+
+/**
+ * @brief This function clears
+ *   "ZG->aps.binding.dst_table" entry by its index
+ *   in a way compatible with both
+ *   static and configurable memory builds.
+ *
+ *   It doesn't changes pointers to configurable memory if it is enabled.
+ *
+ * @param idx index of entry in destination table.
+ */
+void zb_reinit_aps_binding_dst_table_entry_by_index(zb_uint8_t idx);
+
 
 /** @endcond */ /* internals_doc */
 
@@ -592,6 +677,24 @@ void zb_apsme_get_request(zb_uint8_t param);
   *
   */
 void zb_apsme_set_request(zb_uint8_t param);
+
+/**
+ * @brief Increases specified APS outgoing frame counter
+ * @param aps_key_idx APS Link Key Pair index
+ *
+ * @return counter value before increment
+ */
+zb_uint32_t zb_increase_aps_outgoing_frame_counter(zb_uint8_t aps_key_idx);
+
+void aps_force_retx(zb_uint8_t addr_ref);
+
+zb_bool_t aps_is_frame_relayed(zb_uint8_t *apsdu);
+
+void aps_cut_relay_hdr(zb_uint8_t param);
+
+zb_uint8_t * aps_parse_relay_for_secur(zb_uint8_t *apsdu, zb_uint8_t tlv_len, zb_uint8_t *dest_addr);
+
+void aps_upd_secured_relayed_frm(zb_uint8_t *apsdu, zb_uint8_t tlv_len);
 
 /*!
  * @brief Add entry to binding whitelist table

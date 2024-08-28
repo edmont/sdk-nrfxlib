@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -72,6 +72,11 @@ void zb_nvram_read_ha_dataset(
   {
     zb_uint8_t endpoint;
     zb_zcl_attr_t *attr_desc;
+
+#if !defined ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE || !defined ZB_ZCL_SUPPORT_CLUSTER_POLL_CONTROL
+  ZVUNUSED(endpoint);
+  ZVUNUSED(attr_desc);
+#endif /* !ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE ||  !ZB_ZCL_SUPPORT_CLUSTER_POLL_CONTROL */
 
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE
     /********** IAS Zone Data set *************/
@@ -199,6 +204,11 @@ zb_ret_t zb_nvram_write_ha_dataset(zb_uint8_t page, zb_uint32_t pos)
       (FMT__H_L, page, pos));
 
   ZB_BZERO(&ds, sizeof(ds));
+
+#if !defined ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE || !defined ZB_ZCL_SUPPORT_CLUSTER_POLL_CONTROL
+  ZVUNUSED(endpoint);
+  ZVUNUSED(attr_desc);
+#endif /* !ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE ||  !ZB_ZCL_SUPPORT_CLUSTER_POLL_CONTROL */
 
   /********** IAS Zone Data set *************/
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_IAS_ZONE
@@ -341,6 +351,13 @@ zb_uint16_t zb_nvram_zcl_reporting_dataset_length(void)
         }
       }
     }
+  }
+
+  if (counter == 0)
+  {
+    /* If we have no data we will store one empty entry.
+       See the code next to "store empty entry" trace */
+    counter = 1;
   }
 
   counter *= sizeof(zb_zcl_reporting_info_nvram_t);

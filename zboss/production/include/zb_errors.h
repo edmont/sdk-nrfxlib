@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -70,6 +70,7 @@ typedef zb_int32_t zb_ret_t;
 #define   ERROR_CATEGORY_NVRAM    9
 #define   ERROR_CATEGORY_MACSPLIT 10
 #define   ERROR_CATEGORY_NCP      11
+#define   ERROR_CATEGORY_EXTMAC   12
 
 /* Let's always return 0 for RET_OK - in any category. */
 #define ERROR_CODE(category, code) ((zb_ret_t)(((zb_ret_t)code) != 0 ? -(((category) * ERROR_CATEGORY_INTERVAL) + ((zb_ret_t)code)) : 0))
@@ -144,6 +145,7 @@ typedef zb_int32_t zb_ret_t;
 #define  RET_DEVICE_NOT_FOUND                    ERROR_CODE(ERROR_CATEGORY_GENERIC, 71)
 #define  RET_OBSOLETE                            ERROR_CODE(ERROR_CATEGORY_GENERIC, 72)
 #define  RET_INTERRUPTED                         ERROR_CODE(ERROR_CATEGORY_GENERIC, 73)
+#define  RET_NULL_POINTER                        ERROR_CODE(ERROR_CATEGORY_GENERIC, 74)
 
 /** @} */ /* Error codes */
 

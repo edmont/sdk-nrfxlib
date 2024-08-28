@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2020 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -41,7 +41,7 @@
 /* PURPOSE: SERVER: Messaging cluster handlers
 */
 
-#define ZB_TRACE_FILE_ID 68
+#define ZB_TRACE_FILE_ID 1278
 
 #include "zb_common.h"
 

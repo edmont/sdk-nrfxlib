@@ -567,7 +567,6 @@ void zb_drlc_server_send_cancel_all_load_control_events(zb_uint8_t param,
   zb_addr_u *dst_addr, zb_aps_addr_mode_t dst_addr_mode, zb_uint8_t dst_ep,
   zb_uint8_t src_ep, zb_uint8_t *payload, zb_callback_t cb);
 
-
 /** Function for send @ref  ZB_ZCL_DRLC_CLI_CMD_REPORT_EVENT_STATUS "ReportEventStatus" command.
  * On sender's side callback ZCL device callback @ref ZB_ZCL_REGISTER_DEVICE_CB will be called with one of @ref ZB_ZCL_DRLC_LOAD_CONTROL_EVENT_CB_ID,
  * @ref ZB_ZCL_DRLC_CANCEL_LOAD_CONTROL_EVENT_CB_ID, @ref ZB_ZCL_DRLC_CANCEL_ALL_LOAD_CONTROL_EVENTS_CB_ID
@@ -592,6 +591,33 @@ void zb_drlc_server_send_cancel_all_load_control_events(zb_uint8_t param,
 void zb_drlc_client_send_report_event_status(zb_uint8_t param,
   zb_addr_u *dst_addr, zb_aps_addr_mode_t dst_addr_mode, zb_uint8_t dst_ep,
   zb_uint8_t src_ep, zb_zcl_drlc_report_event_status_payload_t *payload, zb_callback_t cb);
+
+/** Function for send @ref  ZB_ZCL_DRLC_SEND_CMD_REPORT_EVENT_STATUS_TSN "ReportEventStatus" command.
+ * On sender's side callback ZCL device callback @ref ZB_ZCL_REGISTER_DEVICE_CB will be called with one of @ref ZB_ZCL_DRLC_LOAD_CONTROL_EVENT_CB_ID,
+ * @ref ZB_ZCL_DRLC_CANCEL_LOAD_CONTROL_EVENT_CB_ID, @ref ZB_ZCL_DRLC_CANCEL_ALL_LOAD_CONTROL_EVENTS_CB_ID
+ * callback ids on reception of @ref ZB_ZCL_DRLC_SRV_CMD_LOAD_CONTROL_EVENT "LoadControlEvent",
+ * @ref ZB_ZCL_DRLC_SRV_CMD_CANCEL_LOAD_CONTROL_EVENT "CancelLoadControlEvent",
+ * @ref ZB_ZCL_DRLC_SRV_CMD_CANCEL_ALL_LOAD_CONTROL_EVENTS "CancellAllLoadControlEvents" commands respectively.
+ * @n On receiver's side callback ZCL device callback @ref ZB_ZCL_REGISTER_DEVICE_CB will be called with
+ * @ref ZB_ZCL_DRLC_REPORT_EVENT_STATUS_CB_ID callback id.
+ * @param param - Reference to buffer.
+ * @param dst_addr - Address of the device to send command to.
+ * @param dst_addr_mode - Address mode for dst_addr.
+ * @param dst_ep - Destination endpoint.
+ * @param src_ep - Current endpoint.
+ * @param payload - Packet payload (@ref zb_zcl_drlc_report_event_status_payload_t).
+ * @param tsn - transaction sequence number of response
+ * @param cb - Callback which should be called when the ZCL stack receives APS ack.
+ * @par Usage
+ * @n Handle @ref ZB_ZCL_DRLC_SRV_CMD_CANCEL_ALL_LOAD_CONTROL_EVENTS "CancellAllLoadControlEvents" command
+ * @snippet se/in_home_display/se_ihd_zr.c ihd_handle_cancel_all_load_control_events
+ * @n Example of sending @ref ZB_ZCL_DRLC_SEND_CMD_REPORT_EVENT_STATUS_TSN "ReportEventStatus" command
+ * @snippet se/in_home_display/se_ihd_zr.c ihd_send_report_event_status
+ */
+void zb_drlc_client_send_report_event_status_tsn(zb_uint8_t param,
+  zb_addr_u *dst_addr, zb_aps_addr_mode_t dst_addr_mode, zb_uint8_t dst_ep,
+  zb_uint8_t src_ep, zb_zcl_drlc_report_event_status_payload_t *payload, zb_uint8_t tsn, zb_callback_t cb);
+
 
 
 /** Function for send @ref ZB_ZCL_DRLC_CLI_CMD_GET_SCHEDULED_EVENTS "GetScheduledEvents" command.
@@ -647,6 +673,12 @@ void zb_drlc_client_send_get_scheduled_events(zb_uint8_t param,
   zb_drlc_client_send_report_event_status(_param, \
     _dst_addr, _dst_addr_mode, _dst_ep, _src_ep, _payload, NULL)
 
+/** Macro for call @ref zb_drlc_client_send_report_event_status_tsn function
+ */
+#define ZB_ZCL_DRLC_SEND_CMD_REPORT_EVENT_STATUS_TSN( _param, \
+  _dst_addr, _dst_addr_mode, _dst_ep, _src_ep, _payload, _tsn ) \
+  zb_drlc_client_send_report_event_status_tsn(_param, \
+    _dst_addr, _dst_addr_mode, _dst_ep, _src_ep, _payload, _tsn, NULL)
 
 /** @} */ /* ZB_ZCL_DRLC_COMMANDS_STRUCTURES_AND_DEFINITIONS */
 

@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -447,13 +447,6 @@ typedef struct zb_zcl_identify_attrs_s
 #define ZB_ZCL_DECLARE_IDENTIFY_ATTR_LIST(attr_list, attrs)   \
   ZB_ZCL_DECLARE_IDENTIFY_ATTRIB_LIST(attr_list, &attrs.identify_time)
 
-
-
-#if defined ZB_ENABLE_HA
-
-zb_uint8_t zb_zcl_get_cmd_list_identify(zb_bool_t is_client_generated, zb_uint8_t **cmd_list);
-
-#endif /* defined ZB_ENABLE_HA */
 
 /** @endcond */ /* DOXYGEN_ZCL_SECTION */
 

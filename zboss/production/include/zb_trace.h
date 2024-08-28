@@ -140,7 +140,9 @@ extern zb_uint_t g_trace_inside_intr;
 #define TRACE_SUBSYSTEM_ZLL       0x0200U  /**< ZLL/Touchlink subsystem. */
 /** @endcond */ /* DOXYGEN_TOUCHLINK_FEATURE */
 /** @cond DOXYGEN_INTERNAL_DOC */
-#define TRACE_SUBSYSTEM_SSL       0x0400U  /**< SSL subsystem */
+#define TRACE_SUBSYSTEM_SSL       0x0400U  /**< SSL subsystem - not really used */
+#define TRACE_SUBSYSTEM_NCP_TRANSPORT  TRACE_SUBSYSTEM_SSL
+#define TRACE_SUBSYSTEM_MACSPLIT  TRACE_SUBSYSTEM_NCP_TRANSPORT
 /** @endcond */ /* DOXYGEN_INTERNAL_DOC */
 /** @endcond */ /* DSR_TRACE */
 #define TRACE_SUBSYSTEM_APP       0x0800U  /**< User Application */
@@ -164,6 +166,9 @@ extern zb_uint_t g_trace_inside_intr;
 #define TRACE_SUBSYSTEM_HTTP      0x2000000U /**< HTTP subsystem */
 #define TRACE_SUBSYSTEM_CLOUD     0x4000000U /**< Interface to the Cloud */
 #define TRACE_SUBSYSTEM_ZBDIRECT  0x8000000U /**< Zigbee Direct subsystem */
+#define TRACE_SUBSYSTEM_DIAGNOSTIC  0x10000000U /**< Diagnostic subsystem */
+#define TRACE_SUBSYSTEM_NS          0x20000000U /**< Network simulator subsystem */
+#define TRACE_SUBSYSTEM_TEST        0x40000000U /**< Subsystem for tests and CI */
 /** @endcond */ /* DOXYGEN_INTERNAL_DOC */
 
 #define TRACE_SUBSYSTEM_INFO      ((zb_uint_t)-1)  /**< Common subsystem */
@@ -253,8 +258,13 @@ void zb_trace_str(const zb_char_t *str);
  */
 void zb_trace_init_file(zb_char_t *name);
 void zb_trace_deinit_file(void);
-void zb_file_trace_commit(void);
+void zb_trace_file_commit(void);
 void zb_trace_disable_deinit(void);
+zb_bool_t zb_trace_is_disable_deinit(void);
+void zb_trace_file_flush(void);
+#ifdef ZB_USE_LOGFILE_ROTATE
+void zb_trace_check_rotate(void);
+#endif
 
 /**
 
@@ -404,7 +414,7 @@ Define readable constants like
 #elif ! defined ZB_SERIAL_FOR_TRACE || defined ZB_TRACE_OVER_JTAG
 #define TRACE_INIT(name)
 #else
-#define TRACE_INIT(name) zb_osif_serial_init()
+#define TRACE_INIT(name) zb_serial_trace_init(name)
 #endif /* defined ZB_TRACE_OVER_SIF */
 
 /* No trace deinit */
@@ -506,7 +516,7 @@ void zb_trace_msg_port_vl(
 /**
  Trace format for 128-bit number (key etc).
 
- @snippet se/energy_service_interface/se_esi_zc.c TRACE_128
+ @snippet ic_sample/ic_zc.c TRACE_128
 */
 #define TRACE_FORMAT_128 "%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx:%02hx"
 
@@ -519,9 +529,9 @@ void zb_trace_msg_port_vl(
 #define TRACE_ARG_64(a) (zb_uint8_t)((a)[7]),(zb_uint8_t)((a)[6]),(zb_uint8_t)((a)[5]),(zb_uint8_t)((a)[4]),(zb_uint8_t)((a)[3]),(zb_uint8_t)((a)[2]),(zb_uint8_t)((a)[1]),(zb_uint8_t)((a)[0])
 
 /**
-   Trace format arguments for 128-bit numver.
+   Trace format arguments for 128-bit number.
 
-   @snippet se/energy_service_interface/se_esi_zc.c TRACE_128
+   @snippet ic_sample/ic_zc.c TRACE_128
 */
 #define TRACE_ARG_128(a) (zb_uint8_t)((a)[0]),(zb_uint8_t)((a)[1]),(zb_uint8_t)((a)[2]),(zb_uint8_t)((a)[3]),(zb_uint8_t)((a)[4]),(zb_uint8_t)((a)[5]),(zb_uint8_t)((a)[6]),(zb_uint8_t)((a)[7]),(zb_uint8_t)((a)[8]),(zb_uint8_t)((a)[9]),(zb_uint8_t)((a)[10]),(zb_uint8_t)((a)[11]),(zb_uint8_t)((a)[12]),(zb_uint8_t)((a)[13]),(zb_uint8_t)((a)[14]),(zb_uint8_t)((a)[15])
 
@@ -574,18 +584,7 @@ typedef struct zb_byte128_struct_s
 
 #ifdef ZB_TRACE_LEVEL
 #ifndef ZB_TRACE_MASK
-#if   defined ZB_UZ2410
 #define ZB_TRACE_MASK ((zb_uint_t)-1)
-/* 1fb == all but MAC */
-//#define ZB_TRACE_MASK 0x1FB
-//#define ZB_TRACE_MASK 0xffff & (~(TRACE_SUBSYSTEM_SECUR|TRACE_SUBSYSTEM_ZCL))
-#elif defined C8051F120
-
-//#define ZB_TRACE_MASK 0xffff & (~(TRACE_SUBSYSTEM_SECUR|TRACE_SUBSYSTEM_ZCL))
-#define ZB_TRACE_MASK ((zb_uint_t)-1)
-#else
-#define ZB_TRACE_MASK ((zb_uint_t)-1)
-#endif  /* uz2410... */
 #endif  /* if not defined trace_mask */
 #endif  /* if defined trace level */
 
@@ -620,16 +619,6 @@ typedef struct zb_byte128_struct_s
 #define TRACE_ARG_SIZE(n_h, n_d, n_l, n_p, n_a) ZB_TRACE_FILE_ID,__LINE__, (n_h + n_d*2 + n_l*4 + n_p*3 + n_a*8)
 #endif
 
-#elif defined ZB_IAR && defined ZB8051
-
-/* IAR for 8051 passes 1-byte arguments as 2-bytes to vararg functions. Keil uses
- * 3-bytes pointers while IAR - 2-bytes pointers */
-#ifndef ZB_BINARY_TRACE
-#define TRACE_ARG_SIZE(n_h, n_d, n_l, n_p, n_a) __FILE__,__LINE__, (n_h*2 + n_d*2 + n_l*4 + n_p*2 + n_a*8)
-#else
-#define TRACE_ARG_SIZE(n_h, n_d, n_l, n_p, n_a) ZB_TRACE_FILE_ID,__LINE__, (n_h*2 + n_d*2 + n_l*4 + n_p*2 + n_a*8)
-#endif
-
 #elif defined ZB_PLATFORM_XAP5
 
 #ifndef __XAP5_NEAR__
@@ -647,8 +636,6 @@ typedef struct zb_byte128_struct_s
 #endif
 #endif
 
-
-
 #else  /* IAR & GCC - 32-bit */
 /* IAR for Cortex passes 1-byte abd 2-bytes arguments as 4-bytes to vararg functions.
  * Pointers are 4-bytes. */
@@ -665,13 +652,15 @@ typedef struct zb_byte128_struct_s
 
 #endif
 
-
 #define FMT__0                                          TRACE_ARG_SIZE(0,0,0,0,0)
 #define FMT__A                                          TRACE_ARG_SIZE(0,0,0,0,1)
 #define FMT__A_A                                        TRACE_ARG_SIZE(0,0,0,0,2)
+#define FMT__A_A_A                                      TRACE_ARG_SIZE(0,0,0,0,3)
 #define FMT__A_A_A_A                                    TRACE_ARG_SIZE(0,0,0,0,4)
+#define FMT__A_A_A_A_A_A                                TRACE_ARG_SIZE(0,0,0,0,6)
 #define FMT__A_D_A_P                                    TRACE_ARG_SIZE(0,1,0,1,2)
 #define FMT__A_D_D                                      TRACE_ARG_SIZE(0,2,0,0,1)
+#define FMT__A_D_D_D                                    TRACE_ARG_SIZE(0,3,0,0,1)
 #define FMT__A_D_D_P_H                                  TRACE_ARG_SIZE(1,2,0,1,1)
 #define FMT__A_D_H                                      TRACE_ARG_SIZE(1,1,0,0,1)
 #define FMT__A_D_H_H                                    TRACE_ARG_SIZE(2,1,0,0,1)
@@ -679,6 +668,9 @@ typedef struct zb_byte128_struct_s
 #define FMT__A_H                                        TRACE_ARG_SIZE(1,0,0,0,1)
 #define FMT__A_H_H                                      TRACE_ARG_SIZE(2,0,0,0,1)
 #define FMT__A_H_H_H                                    TRACE_ARG_SIZE(3,0,0,0,1)
+#define FMT__A_H_H_H_H                                  TRACE_ARG_SIZE(4,0,0,0,1)
+#define FMT__A_A_H_H_H                                  TRACE_ARG_SIZE(3,0,0,0,2)
+#define FMT__A_A_H_H_H_L                                TRACE_ARG_SIZE(3,0,1,0,2)
 #define FMT__A_D_H_H_H                                  TRACE_ARG_SIZE(3,1,0,0,1)
 #define FMT__A_P                                        TRACE_ARG_SIZE(0,0,0,1,1)
 #define FMT__AA                                         TRACE_ARG_SIZE(0,0,0,0,2)
@@ -695,6 +687,7 @@ typedef struct zb_byte128_struct_s
 #define FMT__D_A_D_D_D_D_D_D_D_D                        TRACE_ARG_SIZE(0,9,0,0,1)
 #define FMT__D_A_D_P_H_H_H                              TRACE_ARG_SIZE(3,2,0,1,1)
 #define FMT__D_A_H_H                                    TRACE_ARG_SIZE(2,1,0,0,1)
+#define FMT__D_A_H_H_H_H                                TRACE_ARG_SIZE(4,1,0,0,1)
 #define FMT__D_A_P                                      TRACE_ARG_SIZE(0,1,0,1,1)
 #define FMT__D_C                                        TRACE_ARG_SIZE(1,1,0,0,0)
 #define FMT__D_D                                        TRACE_ARG_SIZE(0,2,0,0,0)
@@ -711,6 +704,7 @@ typedef struct zb_byte128_struct_s
 #define FMT__D_D_D_D_D_D_D_D                            TRACE_ARG_SIZE(0,8,0,0,0)
 #define FMT__D_D_D_D_D_D_D_D_D_D_D                      TRACE_ARG_SIZE(0,11,0,0,0)
 #define FMT__D_D_D_D_D_D_D_D_D_D_D_D_D_D                TRACE_ARG_SIZE(0,14,0,0,0)
+#define FMT__D_D_D_D_D_D_D_D_D_D_D_D_D_D_D              TRACE_ARG_SIZE(0,15,0,0,0)
 #define FMT__D_D_D_D_D_D_D_D_D_D_D_D_D_D_D_D_D          TRACE_ARG_SIZE(0,17,0,0,0)
 #define FMT__D_D_D_D_D_D_P                              TRACE_ARG_SIZE(0,6,0,1,0)
 #define FMT__D_D_D_D_H                                  TRACE_ARG_SIZE(1,4,0,0,0)
@@ -735,6 +729,7 @@ typedef struct zb_byte128_struct_s
 #define FMT__D_D_P_H_H_H                                TRACE_ARG_SIZE(3,2,0,1,0)
 #define FMT__D_D_P_P_P                                  TRACE_ARG_SIZE(0,2,0,3,0)
 #define FMT__D_H                                        TRACE_ARG_SIZE(1,1,0,0,0)
+#define FMT__D_H_A_D_D_D_H                              TRACE_ARG_SIZE(2,4,0,0,1)
 #define FMT__D_H_D                                      TRACE_ARG_SIZE(1,2,0,0,0)
 #define FMT__D_H_D_D                                    TRACE_ARG_SIZE(1,3,0,0,0)
 #define FMT__D_H_D_D_H                                  TRACE_ARG_SIZE(2,3,0,0,0)
@@ -775,6 +770,7 @@ typedef struct zb_byte128_struct_s
 #define FMT__D_P_P_H                                    TRACE_ARG_SIZE(1,1,0,2,0)
 #define FMT__H                                          TRACE_ARG_SIZE(1,0,0,0,0)
 #define FMT__H_A                                        TRACE_ARG_SIZE(1,0,0,0,1)
+#define FMT__H_B                                        TRACE_ARG_SIZE(1,0,0,0,2)
 #define FMT__H_A_A                                      TRACE_ARG_SIZE(1,0,0,0,2)
 #define FMT__H_A_A_H_H                                  TRACE_ARG_SIZE(3,0,0,0,2)
 #define FMT__H_A_H                                      TRACE_ARG_SIZE(2,0,0,0,1)
@@ -808,6 +804,7 @@ typedef struct zb_byte128_struct_s
 #define FMT__H_D_H_D_H_H                                TRACE_ARG_SIZE(4,2,0,0,0)
 #define FMT__H_D_H_A                                    TRACE_ARG_SIZE(2,1,0,0,1)
 #define FMT__H_D_H_H                                    TRACE_ARG_SIZE(3,1,0,0,0)
+#define FMT__H_D_H_P_D                                  TRACE_ARG_SIZE(2,2,0,1,0)
 #define FMT__H_D_H_H_H                                  TRACE_ARG_SIZE(4,1,0,0,0)
 #define FMT__H_D_H_H_H_H                                TRACE_ARG_SIZE(5,1,0,0,0)
 #define FMT__H_D_H_H_H_H_H_H                            TRACE_ARG_SIZE(7,1,0,0,0)
@@ -816,8 +813,10 @@ typedef struct zb_byte128_struct_s
 #define FMT__H_D_P_P_P                                  TRACE_ARG_SIZE(1,1,0,3,0)
 #define FMT__H_H                                        TRACE_ARG_SIZE(2,0,0,0,0)
 #define FMT__H_H_A                                      TRACE_ARG_SIZE(2,0,0,0,1)
+#define FMT__H_H_H_A                                    TRACE_ARG_SIZE(3,0,0,0,1)
 #define FMT__H_H_A_A                                    TRACE_ARG_SIZE(2,0,0,0,2)
 #define FMT__H_H_D                                      TRACE_ARG_SIZE(2,1,0,0,0)
+#define FMT__H_H_D_A                                    TRACE_ARG_SIZE(2,1,0,0,1)
 #define FMT__H_H_D_D                                    TRACE_ARG_SIZE(2,2,0,0,0)
 #define FMT__H_H_D_D_D                                  TRACE_ARG_SIZE(2,3,0,0,0)
 #define FMT__H_H_D_H                                    TRACE_ARG_SIZE(3,1,0,0,0)
@@ -872,9 +871,13 @@ typedef struct zb_byte128_struct_s
 #define FMT__H_L_H_H_P                                  TRACE_ARG_SIZE(3,0,1,4,0)
 #define FMT__H_L_L_H_A                                  TRACE_ARG_SIZE(2,0,2,0,1)
 #define FMT__H_L_D_D_H                                  TRACE_ARG_SIZE(2,2,1,0,0)
+#define FMT__H_P_D_P                                    TRACE_ARG_SIZE(1,1,0,2,0)
+#define FMT__H_P_P_D_P                                  TRACE_ARG_SIZE(1,1,0,3,0)
+#define FMT__H_P_D_D_H                                  TRACE_ARG_SIZE(2,2,0,1,0)
 #define FMT__H_P                                        TRACE_ARG_SIZE(1,0,0,1,0)
 #define FMT__H_P_D                                      TRACE_ARG_SIZE(1,1,0,1,0)
 #define FMT__H_P_D_D_H_P                                TRACE_ARG_SIZE(2,2,0,2,0)
+#define FMT__H_P_D_D_P                                  TRACE_ARG_SIZE(1,2,0,2,0)
 #define FMT__H_P_H                                      TRACE_ARG_SIZE(2,0,0,1,0)
 #define FMT__H_P_H_D                                    TRACE_ARG_SIZE(2,1,0,1,0)
 #define FMT__H_P_H_D_H                                  TRACE_ARG_SIZE(3,1,0,1,0)
@@ -933,6 +936,7 @@ typedef struct zb_byte128_struct_s
 #define FMT__P_D_P                                      TRACE_ARG_SIZE(0,1,0,2,0)
 #define FMT__P_D_L                                      TRACE_ARG_SIZE(0,1,1,1,0)
 #define FMT__P_D_P_D                                    TRACE_ARG_SIZE(0,2,0,2,0)
+#define FMT__P_D_P_P                                    TRACE_ARG_SIZE(0,1,0,3,0)
 #define FMT__P_H                                        TRACE_ARG_SIZE(1,0,0,1,0)
 #define FMT__P_H_D                                      TRACE_ARG_SIZE(1,1,0,1,0)
 #define FMT__P_H_D_D                                    TRACE_ARG_SIZE(1,2,0,1,0)
@@ -997,7 +1001,10 @@ typedef struct zb_byte128_struct_s
 #define FMT__P_P_P_D                                    TRACE_ARG_SIZE(0,1,0,3,0)
 #define FMT__P_P_P_D_P                                  TRACE_ARG_SIZE(0,1,0,4,0)
 #define FMT__P_P_P_H_H                                  TRACE_ARG_SIZE(2,0,0,3,0)
+#define FMT__P_P_P_L_H                                  TRACE_ARG_SIZE(1,0,1,3,0)
+#define FMT__P_P_P_L_D_H                                TRACE_ARG_SIZE(1,1,1,3,0)
 #define FMT__P_P_P_P                                    TRACE_ARG_SIZE(0,0,0,4,0)
+#define FMT__P_L_H_H                                    TRACE_ARG_SIZE(2,0,1,1,0)
 #define FMT__P_P_P_P_P                                  TRACE_ARG_SIZE(0,0,0,5,0)
 #define FMT__D_D_L_D                                    TRACE_ARG_SIZE(0,3,1,0,0)
 #define FMT__D_D_L_L                                    TRACE_ARG_SIZE(0,2,2,0,0)
@@ -1009,7 +1016,13 @@ typedef struct zb_byte128_struct_s
 #define FMT__D_A_B_H_H                                  TRACE_ARG_SIZE(2,1,0,0,3)
 #define FMT__A_A_P                                      TRACE_ARG_SIZE(0,0,0,1,2)
 #define FMT__B                                          TRACE_ARG_SIZE(0,0,0,0,2)
+#define FMT__B_H_H                                      TRACE_ARG_SIZE(2,0,0,0,2)
+#define FMT__B_D_H                                      TRACE_ARG_SIZE(1,1,0,0,2)
 #define FMT__B_H_B                                      TRACE_ARG_SIZE(1,0,0,0,4)
+#define FMT__B_B_B                                      TRACE_ARG_SIZE(0,0,0,0,6)
+#define FMT__D_H_D_B                                    TRACE_ARG_SIZE(1,2,0,0,2)
+#define FMT__D_H_H_B                                    TRACE_ARG_SIZE(2,1,0,0,2)
+#define FMT__H_H_A_B                                    TRACE_ARG_SIZE(2,0,0,0,3)
 #define FMT__A_D                                        TRACE_ARG_SIZE(0,1,0,0,1)
 #define FMT__L_D_P_H                                    TRACE_ARG_SIZE(1,1,1,1,0)
 #define FMT__D_D_H_H_H                                  TRACE_ARG_SIZE(3,2,0,0,0)
@@ -1024,6 +1037,7 @@ typedef struct zb_byte128_struct_s
 #define FMT__H_B_A                                      TRACE_ARG_SIZE(1,0,0,0,3)
 #define FMT__D_D_H_H_D_D_D_D                            TRACE_ARG_SIZE(2,6,0,0,0)
 #define FMT__P_D_H_H_H_A                                TRACE_ARG_SIZE(3,1,0,1,1)
+#define FMT__H_A_H_H_H_H                                TRACE_ARG_SIZE(5,0,0,0,1)
 #define FMT__H_A_H_H_H_H_H                              TRACE_ARG_SIZE(6,0,0,0,1)
 #define FMT__H_D_A_H                                    TRACE_ARG_SIZE(2,1,0,0,1)
 #define FMT__D_A_H_D                                    TRACE_ARG_SIZE(1,2,0,0,1)
@@ -1045,6 +1059,7 @@ typedef struct zb_byte128_struct_s
 #define FMT__P_L_L                                      TRACE_ARG_SIZE(0,0,2,1,0)
 #define FMT__P_P_L_L                                    TRACE_ARG_SIZE(0,0,2,2,0)
 #define FMT__D_D_H_D_D_H                                TRACE_ARG_SIZE(2,4,0,0,0)
+/* FIXME: will win_com_dump be able to decoed that? */
 #define FMT__NC(N)                                      TRACE_ARG_SIZE(N,0,0,0,0)
 #define FMT__H_L_H_H                                    TRACE_ARG_SIZE(3,0,1,0,0)
 #define FMT__A_B                                        TRACE_ARG_SIZE(0,0,0,1,1)
@@ -1053,7 +1068,9 @@ typedef struct zb_byte128_struct_s
 #define FMT__L_D_H_H_H_H                                TRACE_ARG_SIZE(4,1,1,0,0)
 #define FMT__P_A_A                                      TRACE_ARG_SIZE(0,0,0,1,2)
 #define FMT__D_D_P_H_H_H_H                              TRACE_ARG_SIZE(4,2,1,0,0)
-#define FMT__P_P_D_D_D                                  TRACE_ARG_SIZE(0,4,2,0,0)
+#define FMT__P_P_D_D_D                                  TRACE_ARG_SIZE(0,3,0,2,0)
+#define FMT__P_P_D_D_D_P                                TRACE_ARG_SIZE(0,3,0,3,0)
+#define FMT__P_P_P_D_D_D_P                              TRACE_ARG_SIZE(0,3,0,4,0)
 #define FMT__D_D_H_H_H_H                                TRACE_ARG_SIZE(2,4,0,0,0)
 #define FMT__P_D_P_D_P_P                                TRACE_ARG_SIZE(4,2,0,0,0)
 #define FMT__D_A_D                                      TRACE_ARG_SIZE(0,2,0,0,1)
@@ -1067,10 +1084,13 @@ typedef struct zb_byte128_struct_s
 #define FMT__H_P_H_H_P                                  TRACE_ARG_SIZE(3,0,0,2,0)
 #define FMT__H_P_P                                      TRACE_ARG_SIZE(1,0,0,2,0)
 #define FMT__H_P_P_H                                    TRACE_ARG_SIZE(2,0,0,2,0)
+#define FMT__D_P_P_H_H                                  TRACE_ARG_SIZE(2,1,0,2,0)
 #define FMT__D_P_D_D_P                                  TRACE_ARG_SIZE(0,3,0,2,0)
 #define FMT__D_D_D_A_A                                  TRACE_ARG_SIZE(0,3,0,0,2)
+#define FMT__P_H_P_H_D                                  TRACE_ARG_SIZE(2,1,0,0,2)
 #define FMT__H_D_A_D_D_D                                TRACE_ARG_SIZE(1,4,0,0,1)
 #define FMT__H_D_A_P                                    TRACE_ARG_SIZE(1,1,0,1,1)
+#define FMT__H_H_H_H_H_H_H_H_H_H                        TRACE_ARG_SIZE(10,0,0,0,0)
 
 /** @} */ /* TRACE_DATA_FORMAT */
 
@@ -1094,6 +1114,11 @@ typedef struct zb_byte128_struct_s
 #define TRACE_MAC2 TRACE_SUBSYSTEM_MAC, 2U
 #define TRACE_MAC3 TRACE_SUBSYSTEM_MAC, 3U
 #define TRACE_MAC4 TRACE_SUBSYSTEM_MAC, 4U
+
+#define TRACE_MACSPLIT1 TRACE_SUBSYSTEM_MACSPLIT, 1U
+#define TRACE_MACSPLIT2 TRACE_SUBSYSTEM_MACSPLIT, 2U
+#define TRACE_MACSPLIT3 TRACE_SUBSYSTEM_MACSPLIT, 3U
+#define TRACE_MACSPLIT4 TRACE_SUBSYSTEM_MACSPLIT, 4U
 
 #define TRACE_MACLL1 TRACE_SUBSYSTEM_MACLL, 1U
 #define TRACE_MACLL2 TRACE_SUBSYSTEM_MACLL, 2U
@@ -1232,6 +1257,26 @@ typedef struct zb_byte128_struct_s
 #define TRACE_ZBDIRECT2 TRACE_SUBSYSTEM_ZBDIRECT, 2U
 #define TRACE_ZBDIRECT3 TRACE_SUBSYSTEM_ZBDIRECT, 3U
 #define TRACE_ZBDIRECT4 TRACE_SUBSYSTEM_ZBDIRECT, 4U
+
+#define TRACE_DIAG1 TRACE_SUBSYSTEM_DIAGNOSTIC, 1U
+#define TRACE_DIAG2 TRACE_SUBSYSTEM_DIAGNOSTIC, 2U
+#define TRACE_DIAG3 TRACE_SUBSYSTEM_DIAGNOSTIC, 3U
+#define TRACE_DIAG4 TRACE_SUBSYSTEM_DIAGNOSTIC, 4U
+
+#define TRACE_NS1 TRACE_SUBSYSTEM_NS, 1U
+#define TRACE_NS2 TRACE_SUBSYSTEM_NS, 2U
+#define TRACE_NS3 TRACE_SUBSYSTEM_NS, 3U
+#define TRACE_NS4 TRACE_SUBSYSTEM_NS, 4U
+
+#define TRACE_NCP_TRANSPORT1 TRACE_SUBSYSTEM_NCP_TRANSPORT, 1U
+#define TRACE_NCP_TRANSPORT2 TRACE_SUBSYSTEM_NCP_TRANSPORT, 2U
+#define TRACE_NCP_TRANSPORT3 TRACE_SUBSYSTEM_NCP_TRANSPORT, 3U
+#define TRACE_NCP_TRANSPORT4 TRACE_SUBSYSTEM_NCP_TRANSPORT, 4U
+
+#define TRACE_TEST1 TRACE_SUBSYSTEM_TEST, 1U
+#define TRACE_TEST2 TRACE_SUBSYSTEM_TEST, 2U
+#define TRACE_TEST3 TRACE_SUBSYSTEM_TEST, 3U
+#define TRACE_TEST4 TRACE_SUBSYSTEM_TEST, 4U
 #endif /* DOXYGEN */
 
 #ifndef ZB_SET_TRACE_LEVEL
@@ -1265,13 +1310,13 @@ static ZB_INLINE zb_uint8_t zb_get_traf_dump_state(void)
 /**
  * Switch Zigbee traffic dump OFF
  */
-#define ZB_SET_TRAF_DUMP_OFF() g_traf_dump = 0U
+#define ZB_SET_TRAF_DUMP_OFF() (g_traf_dump = 0U)
 /**
  * Switch Zigbee traffic dump ON
  *
  * That function works only if traffic dump is enabled at compile time.
  */
-#define ZB_SET_TRAF_DUMP_ON() g_traf_dump = 1U
+#define ZB_SET_TRAF_DUMP_ON() (g_traf_dump = 1U)
 #define ZB_GET_TRAF_DUMP_STATE()  zb_get_traf_dump_state()
 /** @} */ /* DUMP_ON_OFF */
 #else

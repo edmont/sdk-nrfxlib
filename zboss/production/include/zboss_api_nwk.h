@@ -43,14 +43,57 @@
 #ifndef ZB_ZBOSS_API_NWK_H
 #define ZB_ZBOSS_API_NWK_H 1
 
-#include "zboss_api_mm.h"
-
 /** \addtogroup nwk_api */
 /** @{ */
+
+/** @addtogroup nwk_multi_mac Multi-MAC configuration
+ * @{
+ */
+
+/* C-STAT does not allow to assign ZB_MAC_INTERFACE_MAX to ZB_NWK_MAC_IFACE_TBL_SIZE,
+ * so check configurations manually */
+#if defined(ZB_MAC_MONOLITHIC) && defined(ZB_MACSPLIT_HOST)
+  #define ZB_NWK_MAC_IFACE_TBL_SIZE 2U
+#elif defined(ZB_MACSPLIT_HOST) && defined(ZB_MAC_BLE)
+  #define ZB_NWK_MAC_IFACE_TBL_SIZE 2U
+#elif defined(ZB_MAC_MONOLITHIC) && defined(ZB_MAC_BLE)
+  #define ZB_NWK_MAC_IFACE_TBL_SIZE 2U
+#elif defined(ZB_MAC_MONOLITHIC) && !defined(ZB_MACSPLIT_HOST) && !defined(ZB_MAC_BLE) && !defined(ZB_MACSPLIT_DEVICE) && !defined(ZB_MAC_SUBGHZ)
+  #define ZB_NWK_MAC_IFACE_TBL_SIZE 1U
+#elif defined(ZB_MACSPLIT_HOST) && !defined(ZB_MAC_MONOLITHIC) && !defined(ZB_MAC_BLE) && !defined(ZB_MACSPLIT_DEVICE) && !defined(ZB_MAC_SUBGHZ)
+  #define ZB_NWK_MAC_IFACE_TBL_SIZE 1U
+#elif defined(ZB_MACSPLIT_DEVICE) && !defined(ZB_MAC_MONOLITHIC) && !defined(ZB_MAC_BLE) && !defined(ZB_MACSPLIT_HOST) && !defined(ZB_MAC_SUBGHZ)
+  #define ZB_NWK_MAC_IFACE_TBL_SIZE 1U
+  /* MAC-split SoC uses default MAC interface, so for building device with only SoC interface just declare monolithic MAC */
+#elif defined(NCP_MODE_HOST)
+  /* Preserve default table size to keep previous stack behaviour, but
+   * do not use any interfaces in that case */
+  #define ZB_NWK_MAC_IFACE_TBL_SIZE 1U
+#elif defined(ZB_EXTMAC)
+  #define ZB_NWK_MAC_IFACE_TBL_SIZE 1U
+#else
+  #error Multi-MAC configuration is not supported, at least one interface should be enabled
+#endif
+
+#if ZB_NWK_MAC_IFACE_TBL_SIZE > 1U && defined(ZB_MAC_INTERFACE_SINGLE) && !defined(ZB_ZGPD_ROLE)
+  #error ZB_MAC_INTERFACE_SINGLE requires to enable only one interface
+#endif
+
+/**
+ * @brief Flag that is used to perform some action on all interfaces together
+ */
+#define ZB_NWK_MULTIMAC_ALL_INTERFACES 0xFFU
+
+/** @} */ /* nwk_multi_mac */
 
 /** @addtogroup nwk_common_constants NWK common constants
  * @{
  */
+
+/**
+ * @name Network coordinator address
+*/
+#define ZB_NWK_COORDINATOR_ADDR 0x0000U
 
 /**
  * @name Network broadcast addresses types
@@ -85,7 +128,7 @@
 /**
  * @name Network device type
  * @anchor nwk_device_type
- */
+*/
 /** @{ */
 #define ZB_NWK_DEVICE_TYPE_COORDINATOR 0U /*!< Device - Coordinator */
 #define ZB_NWK_DEVICE_TYPE_ROUTER      1U /*!< Device - Router */
@@ -455,10 +498,15 @@ zb_nlme_status_indication_t;
                                               ZB_PAGE0_2_4_GHZ_START_CHANNEL_NUMBER  + 1U)
 /** @cond DOXYGEN_SE_SECTION */
 /**
-   Maximal number of channels for all pages
+   Maximal number of ed scan channels for all pages
 */
 #define ZB_ED_SCAN_MAX_CHANNELS_COUNT                                   \
   ((ZB_IO_BUF_SIZE - sizeof(zb_uint8_t)) / sizeof(zb_energy_detect_channel_info_t))
+/**
+   Max # of network descriptors which can fit into a single buffer.
+*/
+#define ZB_ACTIVE_SCAN_MAX_NETWORK_COUNT                                   \
+  ((ZB_IO_BUF_SIZE - sizeof(zb_nlme_network_discovery_confirm_t)) / sizeof(zb_nlme_network_descriptor_t))
 
 #define ZB_CHANNEL_PAGE_MAX_CHANNELS_COUNT ZB_PAGE28_SUB_GHZ_MAX_CHANNELS_COUNT
 /** @endcond */ /* DOXYGEN_SE_SECTION */
@@ -605,77 +653,115 @@ void zb_nlme_permit_joining_request(zb_uint8_t param);
  *  @{
  */
 
-#define ZB_PAN_ID_CONFLICT_INFO_MAX_PANIDS_COUNT  16U
-
-/** Structure describing a detected PAN ID conflict */
-typedef ZB_PACKED_PRE struct zb_pan_id_conflict_info_s
-{
-  zb_uint16_t panid_count;      /* <! Count of neighboring PAN IDs. */
-  zb_uint16_t panids[ZB_PAN_ID_CONFLICT_INFO_MAX_PANIDS_COUNT];
-                                /* <! Array of such PAN IDs.
-                                 *  Only values at indices 0..(panid_count - 1) will be taken
-                                 *  into consideration. */
-} ZB_PACKED_STRUCT zb_pan_id_conflict_info_t;
-
 /**
-   Allow/disallow network joining
-
-   @param param - pointer to a structure containing PAN ID conflict
-   information - @see zb_pan_id_conflict_info_t
-
- * @b Example:
- ZB_ZDO_SIGNAL_CUT_HEADER macro may be used to remove from the buffer everything but the signal parameter (zb_pan_id_conflict_info_t structure in this case)
-   @code
-
-void zboss_signal_handler(zb_uint8_t param)
+   @brief Callback parameters for zb_prepare_network_for_channel_change() and zb_prepare_network_for_panid_change()
+   Stack sends set_configuration_req to the all devices and count responses with incorrect status
+  */
+typedef struct zb_channel_panid_change_preparation_s
 {
-  zb_pan_id_conflict_info_t *info = NULL;
-  zb_zdo_app_signal_hdr_t *sg_p = NULL;
-  zb_zdo_app_signal_type_t sig = zb_get_app_signal(param, &sg_p);
-
-  if (ZB_GET_APP_SIGNAL_STATUS(param) == 0)
-  {
-    switch (sig)
-    {
-      case ZB_NWK_SIGNAL_PANID_CONFLICT_DETECTED:
-        info = ZB_ZDO_SIGNAL_GET_PARAMS(sg_p, zb_pan_id_conflict_info_t);
-        ZB_ZDO_SIGNAL_CUT_HEADER(ZB_BUF_FROM_REF(param));
-        zb_start_pan_id_conflict_resolution(param);
-        break;
-    }
-  }
-}
-   @endcode
- */
-void zb_start_pan_id_conflict_resolution(zb_uint8_t param);
+  zb_uint16_t error_cnt;  /*!< Number of not OK responses from remote devices for next channel/panid change */
+} zb_channel_panid_change_preparation_t;
 
 
 /**
-   This function must be used for enabling/disabling automatic PAN ID conflict resolution
-   If the automatic resolution is disabled, ZBOSS will issue a ZB_NWK_SIGNAL_PANID_CONFLICT_DETECTED
-   signal each time it receives Network Report about PAN ID conflict or (in case the device is
-   the network manager) each time it detects such conflicts.
+   @brief Parameters for zb_prepare_network_for_channel_change() and zb_start_channel_change()
+  */
+typedef struct zb_channel_change_parameters_s
+{
+  zb_uint32_t next_channel_change; /*!< This field indicates the next channel
+                                        that will be used once a start channel change command is received.
+                                        Only 1 channel page and channel bit shall be set */
+}zb_channel_change_parameters_t;
 
-   By default the automatic PAN ID conflict resolution is disabled.
+/**
+   @brief Parameters for zb_prepare_network_for_panid_change() and zb_start_panid_change()
+  */
+typedef struct zb_panid_change_parameters_s
+{
+  zb_uint16_t next_panid_change; /*!< This field indicates the next PAN ID
+                                      that will be used once a pan id change command is received.
+                                      If value is 0x0000, CURRENT PAN ID or 0xFFFF then will be generate a new random value */
+}zb_panid_change_parameters_t;
 
-   That call also enabled panid conflict resolution - see zb_enable_panid_conflict_resolution();
+#if defined ZB_COORDINATOR_ROLE
 
-   @param status - ZB_TRUE in order to enable automatic PAN ID conflict, ZB_FALSE otherwise
+/**
+   This function set nwkNextChannelChange and sends set_configuration_req  for all remote devices.
+   Parameters zb_channel_change_parameters_t will be using for zb_start_channel_change()
+   @param param - buffer with parameters @ref zb_channel_change_parameters_t
+   @param  cb   - callback function, @ref zb_channel_panid_change_preparation_t
+
+   @snippet r23_new_api/r23_zc.c change_channel_snippet
  */
-void zb_enable_auto_pan_id_conflict_resolution(zb_bool_t status);
+zb_ret_t zb_prepare_network_for_channel_change(zb_uint8_t param, zb_callback_t cb);
+
+/**
+   This function set nwkNextPanId and sends set_configuration_req for all remote devices
+   Parameters zb_panid_change_parameters_t will be using for zb_start_panid_change()
+   @param param - buffer with parameters @ref zb_panid_change_parameters_t
+   @param cb    - callback function, @ref zb_channel_panid_change_preparation_t
+
+   @snippet r23_new_api/r23_zc.c change_panid_snippet
+ */
+zb_ret_t zb_prepare_network_for_panid_change(zb_uint8_t param, zb_callback_t cb);
+#endif /* ZB_COORDINATOR_ROLE */
+
+#if defined ZB_ROUTER_ROLE
+/**
+   Broadcast mgmt_nwk_update_req and change active channel for all devices in network.
+   In centralized network the parameter zb_channel_change_parameters_t
+   will be discarded @see zb_prepare_network_for_channel_change()
+
+   @param param - buffer with parameters @ref zb_channel_change_parameters_t
+
+   @snippet r23_new_api/r23_zc.c change_channel_snippet
+ */
+zb_ret_t zb_start_channel_change(zb_uint8_t param);
 
 
-/** @cond internals_doc */
+/**
+   Broadcast mgmt_nwk_update_req and change PAN ID for all devices in network.
+   In centralized network the parameter zb_channel_change_parameters_t
+   will be discarded @see zb_prepare_network_for_panid_change()
+   This function can be used during pan id conflict resolutions, but R23 specification recommends
+   to ignore the pan id conflicts
+
+   @param param - buffer with parameters @ref zb_panid_change_parameters_t
+
+   @snippet r23_new_api/r23_zc.c change_panid_snippet
+ */
+zb_ret_t  zb_start_panid_change(zb_uint8_t param);
+#endif  /* #ifdef ZB_ROUTER_ROLE */
+
+
 /**
    Toggles panid conflict resolution.
 
-   Call of that function forces linking of panid conflict resolution
-   code and allows switching on/off panid conflict resolution and detection
+   @deprecated Enabling/disabling of panid conflict resolution is deprecated in r23 codebase snd does nothing.
+
+   Call of that function allows switching on/off panid conflict resolution and detection
    logic.
+
+   @deprecated Kept only for backward compatibility.
+   PANID conflict detection is always enabled at R23 and can not be disabled. Application is responsible for starting of conflict resolution.
+
+   @param status - if ZB_TRUE, enable conflict resolution, else disable
  */
 void zb_enable_panid_conflict_resolution(zb_bool_t status);
-/** @endcond */ /* internals_doc */
+
+/**
+   Toggles automatic panid conflict resolution.
+
+   @deprecated Enabling/disabling of automatic panid conflict resolution is deprecated in r23 codebase and does nothing.
+
+   Call of that function allows switching on/off automatic panid conflict resolution.
+
+   @param status - if ZB_TRUE, enable conflict resolution, else disable
+ */
+void zb_enable_auto_pan_id_conflict_resolution(zb_bool_t status);
+
 /** @} */ /* nwk_panid_conflicts */
+
 
 /** @addtogroup nwk_management_service NWK management service
  * @{
@@ -712,7 +798,7 @@ void zb_nwk_set_ieee_policy(zb_bool_t put_always);
  * @{
  */
 
-#ifdef ZB_COORDINATOR_ROLE
+#if defined ZB_COORDINATOR_ROLE || defined DOXYGEN
 /**
    Enable Concentrator mode for the device (disabled by default).
    It's possible to call this function to send MTORR immediately, e.g. after a new device joined the network.
@@ -731,6 +817,14 @@ void zb_start_concentrator_mode(zb_uint8_t radius, zb_uint32_t disc_time);
 */
 void zb_stop_concentrator_mode(void);
 #endif /* ZB_COORDINATOR_ROLE */
+
+
+#if defined(ZB_PRO_STACK) && !defined(ZB_LITE_NO_SOURCE_ROUTING) && defined(ZB_ROUTER_ROLE)
+/**
+   When Concentrator mode is enabled, force single unplanned MTORR
+ */
+void zb_concentrator_force_mtorr(void);
+#endif /* ZB_PRO_STACK && !ZB_LITE_NO_SOURCE_ROUTING && ZB_ROUTER_ROLE */
 /** @} */ /* nwk_mtorr */
 
 /** @cond internals_doc */
@@ -776,6 +870,7 @@ zb_nwk_device_type_t zb_get_device_type(void);
  */
 zb_uint16_t zb_nwk_get_parent(void);
 
+
 #define ZB_NWK_NBR_ITERATOR_INDEX_EOT 0xFFFFU /*! Index, indicating that the iterator reached boundaries of the neighbour table. */
 
 typedef ZB_PACKED_PRE struct zb_nwk_nbr_iterator_cb_params_s {
@@ -815,9 +910,9 @@ typedef ZB_PACKED_PRE struct zb_nwk_nbr_iterator_entry_s
                                          *   This field shall be present in every neighbour table entry.
                                          *   @if DOXYGEN_INTERNAL_DOC See @ref nwk_relationship @endif
                                          */
-  zb_uint8_t      send_via_routing;     /*!< Due to bad link to that device send packets
-                                         *   via NWK routing.
-                                         */
+  zb_uint8_t      send_via_routing;     /*!< That field is deprecated. Removed
+                                         * from zb_neighbor_tbl_ent_t, always 0
+                                         * here. */
 
   zb_uint8_t      keepalive_received;   /*!< This value indicates at least one keepalive
                                          *   has been received from the end device since
@@ -859,13 +954,30 @@ zb_ret_t zb_nwk_nbr_iterator_next(zb_uint8_t bufid, zb_callback_t cb);
 
 /** @} */ /* nwk_management_service */
 
-zb_ret_t zb_mac_enable_interface(zb_uint8_t iface_id);
-zb_ret_t zb_mac_disable_interface(zb_uint8_t iface_id);
+#if defined ZB_ROUTER_ROLE
 
-zb_bool_t zb_mac_is_interface_active(zb_uint8_t iface_id);
+/**
+   Set the number of end device a device is allow to have.
 
-void zb_nwk_mm_set_channel_mask(zb_uint8_t iface_id, zb_uint8_t page_index, zb_uint32_t channel_mask);
+   @return RET_OK if successful
+ */
+zb_ret_t zb_nwk_set_max_ed_capacity(zb_uint8_t value);
 
+/**
+   Get the number of end devices a device is allow to have.
+
+   @return number of end devices
+ */
+zb_uint8_t zb_nwk_get_max_ed_capacity(void);
+
+/**
+   Get the maximum number of siblings and children that a device can have.
+
+   @return Size of neighbor table
+ */
+zb_uint8_t zb_nwk_get_total_capacity(void);
+
+#endif /* ZB_ROUTER_ROLE */
 /** @} */ /* nwk_api */
 
 #endif /*#ifndef ZB_ZBOSS_API_NWK_H*/

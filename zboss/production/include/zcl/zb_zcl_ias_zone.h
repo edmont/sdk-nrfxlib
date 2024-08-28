@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -38,7 +38,7 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* PURPOSE: IAS Zone cluster defintions
+/* PURPOSE: IAS Zone cluster definitions
 */
 
 #ifndef ZB_ZCL_IAS_ZONE_H
@@ -336,7 +336,7 @@ enum zb_zcl_ias_zone_zonestatus_e
   attr_list, zone_state, zone_type, zone_status,ias_cie_address,                             \
   cie_short_addr, cie_ep)                                                                    \
   zb_uint8_t cie_addr_is_set_##attr_list;                                                    \
-  ZB_ZCL_START_DECLARE_ATTRIB_LIST_CLUSTER_REVISION(attr_list, ZB_ZCL_IAS_ZONE)              \
+  ZB_ZCL_START_DECLARE_ATTRIB_LIST(attr_list)                                                \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_IAS_ZONE_ZONESTATE_ID, (zone_state))                      \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_IAS_ZONE_ZONETYPE_ID, (zone_type))                        \
   ZB_ZCL_SET_ATTR_DESC(ZB_ZCL_ATTR_IAS_ZONE_ZONESTATUS_ID, (zone_status))                    \
@@ -823,7 +823,7 @@ zb_zcl_ias_zone_notification_param_t;
    the current implementation.
    @param ep - local endpoint number
    @param new_val - new value for ZoneStatus
-   @param delay - delay in quater seconds (actual only for HA ZCL
+   @param delay - delay in quarter seconds (actual only for HA ZCL
    version, is ignored for pure ZCL implementation)
    @param buf_param - reference to a buffer that will be used for
    sending notification. If buffer reference is not specified,

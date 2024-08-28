@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2020 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -52,7 +52,7 @@
  */
 #define ZB_CONFIG_ROLE_ZC
 
-#ifdef DOXYGEN 
+#ifdef DOXYGEN
 /**
    Configure memory sizes for ZED device role
  */
@@ -61,7 +61,7 @@
    Configure memory sizes for ZR device role
  */
 #define ZB_CONFIG_ROLE_ZR
-#endif 
+#endif
 
 /*#define ZB_CONFIG_ROLE_ZR*/
 /*#define ZB_CONFIG_ROLE_ZED*/
@@ -70,7 +70,10 @@
 
    From 2 to 200.
  */
-#define ZB_CONFIG_OVERALL_NETWORK_SIZE 200U
+#ifdef ZB_CONFIG_OVERALL_NETWORK_SIZE
+#undef ZB_CONFIG_OVERALL_NETWORK_SIZE
+#endif
+#define ZB_CONFIG_OVERALL_NETWORK_SIZE ZB_NWK_CONFIGURABLE_MEM_MAX_NETWORK_SIZE
 /*#define ZB_CONFIG_OVERALL_NETWORK_SIZE 16*/
 /*#define ZB_CONFIG_OVERALL_NETWORK_SIZE 32*/
 

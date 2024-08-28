@@ -41,7 +41,7 @@
 /* PURPOSE: ZCL WWAH cluster specific commands handling
 */
 
-#define ZB_TRACE_FILE_ID 12084
+#define ZB_TRACE_FILE_ID 14084
 
 #include "zb_common.h"
 
@@ -53,6 +53,7 @@
 #include "zdo_wwah_parent_classification.h"
 #include "zb_bdb_internal.h"
 #include "zdo_hubs.h"
+#include "zb_error_indication.h"
 
 /* #include "zb_mac_globals.h" */
 /* #include "mac_internal.h" */
@@ -228,6 +229,8 @@ zb_ret_t check_value_wwah(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_uint8_t *
  */
 void zb_zcl_wwah_invoke_user_app(zb_uint8_t param, zb_uint16_t endpoint16)
 {
+  /* Unused without trace. */
+  ZVUNUSED(endpoint16);
 
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_invoke_user_app %hx endpoint %d",
       (FMT__H_D, param, endpoint16));
@@ -870,6 +873,7 @@ zb_ret_t zb_zcl_wwah_request_time_handler(zb_uint8_t param)
 {
   zb_ret_t ret;
 
+  ZVUNUSED(param);
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_request_time_handler %hd", (FMT__H, param));
 
   ret = zb_zcl_wwah_update_time(0);
@@ -920,6 +924,8 @@ zb_ret_t zb_zcl_wwah_disable_wwah_rejoin_algorithm_handler(zb_uint8_t param)
 {
   zb_ret_t ret = RET_OK;
   zb_bool_t enable_bool = ZB_FALSE;
+
+  ZVUNUSED(param);
 
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_disable_wwah_rejoin_algorithm_handler %hd", (FMT__H, param));
 
@@ -994,7 +1000,7 @@ zb_ret_t zb_zcl_wwah_get_rejoin_tmo(zb_uint16_t attempt, zb_time_t *tmo)
           backoff_attempt %= WWAH_CTX().rejoin_alg.max_backoff_iterations;
         }
 
-        *tmo = (WWAH_CTX().rejoin_alg.fast_rejoin_first_backoff_in_seconds * (1l << backoff_attempt));
+        *tmo = (zb_time_t)(WWAH_CTX().rejoin_alg.fast_rejoin_first_backoff_in_seconds * (1l << backoff_attempt));
         if (*tmo > WWAH_CTX().rejoin_alg.rejoin_max_backoff_time_in_seconds)
         {
           *tmo = WWAH_CTX().rejoin_alg.rejoin_max_backoff_time_in_seconds;
@@ -1141,6 +1147,7 @@ zb_ret_t zb_zcl_wwah_set_mac_poll_cca_wait_time_handler(zb_uint8_t param){
                          ZB_ZCL_ATTR_WWAH_MAC_POLL_FAILURE_WAIT_TIME_ID,
                          &payload,
                          ZB_FALSE);
+    zb_zdo_pim_set_mac_poll_failure_wait_time(payload);
     /* If we fail, trace is given and assertion is triggered */
     ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
   }
@@ -1148,7 +1155,71 @@ zb_ret_t zb_zcl_wwah_set_mac_poll_cca_wait_time_handler(zb_uint8_t param){
   return ret;
 }
 
-zb_ret_t zb_zcl_wwah_set_pending_network_update_handler(zb_uint8_t param){
+
+zb_ret_t zb_zcl_wwah_set_pending_channel(zb_uint32_t channel_mask)
+{
+  zb_ret_t ret = RET_OK;
+  zb_zcl_attr_t *attr_desc;
+  /* Suppose we at the page 0 */
+  zb_uint8_t n_channel = zb_high_bit_number(channel_mask);
+  zb_uint8_t o_channel;
+
+  /* WWAH is valid for 2.4 only */
+  ZB_ASSERT(ZB_CHANNEL_PAGE_GET_PAGE(channel_mask) == 0u);
+
+  attr_desc = zb_zcl_get_attr_desc_a(wwah_endpoint, ZB_ZCL_CLUSTER_ID_WWAH,
+                                     ZB_ZCL_CLUSTER_SERVER_ROLE,
+                                     ZB_ZCL_ATTR_WWAH_PENDING_NETWORK_UPDATE_CHANNEL_ID);
+  ZB_ASSERT(attr_desc);
+  o_channel = ZB_ZCL_GET_ATTRIBUTE_VAL_8(attr_desc);
+  TRACE_MSG(TRACE_ZCL1, "zb_zcl_wwah_set_pending_channel mask 0x%x o_channel %d n_channel %d",
+            (FMT__D_D_D, channel_mask, o_channel, n_channel));
+  if (o_channel != n_channel)
+  {
+    ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
+                         ZB_ZCL_CLUSTER_ID_WWAH,
+                         ZB_ZCL_CLUSTER_SERVER_ROLE,
+                         ZB_ZCL_ATTR_WWAH_PENDING_NETWORK_UPDATE_CHANNEL_ID,
+                         &n_channel,
+                         ZB_FALSE);
+    ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
+  }
+
+  return ret;
+}
+
+
+zb_ret_t zb_zcl_wwah_set_pending_panid(zb_uint16_t n_panid)
+{
+  zb_ret_t ret = RET_OK;
+  zb_zcl_attr_t *attr_desc;
+  zb_uint16_t o_panid;
+
+  attr_desc = zb_zcl_get_attr_desc_a(wwah_endpoint, ZB_ZCL_CLUSTER_ID_WWAH,
+                                     ZB_ZCL_CLUSTER_SERVER_ROLE,
+                                     ZB_ZCL_ATTR_WWAH_PENDING_NETWORK_UPDATE_PANID_ID);
+  ZB_ASSERT(attr_desc);
+  o_panid = ZB_ZCL_GET_ATTRIBUTE_VAL_16(attr_desc);
+  TRACE_MSG(TRACE_ZCL1, "zb_zcl_wwah_set_pending_panid o_panid 0x%x n_panid 0x%x",
+            (FMT__D_D, o_panid, n_panid));
+
+  if (o_panid != n_panid)
+  {
+    ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
+                         ZB_ZCL_CLUSTER_ID_WWAH,
+                         ZB_ZCL_CLUSTER_SERVER_ROLE,
+                         ZB_ZCL_ATTR_WWAH_PENDING_NETWORK_UPDATE_PANID_ID,
+                         (zb_uint8_t *)&n_panid,
+                         ZB_FALSE);
+    ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
+  }
+
+  return ret;
+}
+
+
+zb_ret_t zb_zcl_wwah_set_pending_network_update_handler(zb_uint8_t param)
+{
   zb_ret_t ret = RET_OK;
   zb_zcl_wwah_set_pending_network_update_t payload;
   zb_zcl_parse_status_t status;
@@ -1167,20 +1238,15 @@ zb_ret_t zb_zcl_wwah_set_pending_network_update_handler(zb_uint8_t param){
   {
     channel = payload.channel;
     pan_id = payload.pan_id;
-    ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
-                         ZB_ZCL_CLUSTER_ID_WWAH,
-                         ZB_ZCL_CLUSTER_SERVER_ROLE,
-                         ZB_ZCL_ATTR_WWAH_PENDING_NETWORK_UPDATE_CHANNEL_ID,
-                         &channel,
-                         ZB_FALSE);
-    ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
-                         ZB_ZCL_CLUSTER_ID_WWAH,
-                         ZB_ZCL_CLUSTER_SERVER_ROLE,
-                         ZB_ZCL_ATTR_WWAH_PENDING_NETWORK_UPDATE_PANID_ID,
-                         (zb_uint8_t *)&pan_id,
-                         ZB_FALSE);
-    /* If we fail, trace is given and assertion is triggered */
-    ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
+    ret = zb_zcl_wwah_set_pending_channel((zb_uint32_t)(1ul << channel));
+    if (ret == RET_OK)
+    {
+      ret = zb_zcl_wwah_set_pending_panid(pan_id);
+    }
+    /* Note that in WWAH this is a channel number for 2.4 (page 0) while in r23
+     * this is the page/channel mask. */
+    zb_wwah_set_pending_channel((zb_uint32_t)(1ul << channel));
+    zb_wwah_set_pending_panid(pan_id);
   }
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_wwah_set_pending_network_update_handler, ret %d", (FMT__D, ret));
   return ret;
@@ -1322,16 +1388,18 @@ zb_ret_t zb_zcl_wwah_debug_report_query_handler(zb_uint8_t param)
 zb_ret_t zb_zcl_wwah_survey_beacons_handler(zb_uint8_t param)
 {
   zb_ret_t ret = RET_OK;
+
+#if !(defined ZB_BEACON_SURVEY && defined ZB_ZCL_ENABLE_WWAH_SERVER)
+  ZVUNUSED(param);
+  TRACE_MSG(TRACE_ZCL1, "beacon survey is disabled", (FMT__0));
+  ret = RET_ERROR;
+#else
   zb_bool_t need_standard_beacons;
   zb_zcl_parse_status_t status;
   zb_zcl_parsed_hdr_t cmd_info;
 
   TRACE_MSG(TRACE_ZCL1, ">>zb_zcl_wwah_survey_beacons_handler", (FMT__0));
 
-#if !(defined ZB_BEACON_SURVEY && defined ZB_ZCL_ENABLE_WWAH_SERVER)
-  TRACE_MSG(TRACE_ZCL1, "beacon survey is disabled", (FMT__0));
-  ret = RET_ERROR;
-#else
   if (WWAH_CTX().survey_beacons_in_progress)
   {
     ret = RET_BUSY;
@@ -1362,7 +1430,7 @@ zb_ret_t zb_zcl_wwah_survey_beacons_handler(zb_uint8_t param)
       ZB_BUF_GET_PARAM(param, zb_zdo_beacon_survey_configuration_t);
 
     conf->params.channel_page = zb_get_current_page();
-    conf->params.channel_mask = (1l << zb_get_current_channel());
+    conf->params.channel_mask = (zb_uint32_t)(1l << zb_get_current_channel());
     conf->params.scan_type = (zb_uint8_t)(((zb_uint8_t)need_standard_beacons) ? ACTIVE_SCAN : ENHANCED_ACTIVE_SCAN);
 
     ret = zdo_wwah_start_survey_beacons(param);
@@ -1377,12 +1445,11 @@ zb_ret_t zb_zcl_wwah_survey_beacons_handler(zb_uint8_t param)
   }
 #endif  /* ZB_BEACON_SURVEY */
 
-  TRACE_MSG(TRACE_ZCL1, "<<zb_zcl_wwah_survey_beacons_handler", (FMT__0));
+  TRACE_MSG(TRACE_ZCL1, "<<zb_zcl_wwah_survey_beacons_handler %d", (FMT__D, ret));
 
   return ret;
 }
 
-#if defined ZB_BEACON_SURVEY && defined ZB_ZCL_ENABLE_WWAH_SERVER
 void zb_zcl_wwah_send_survey_beacons_response(zb_bufid_t obuf, zb_uint16_t buf)
 {
   if (obuf == 0)
@@ -1398,8 +1465,7 @@ void zb_zcl_wwah_send_survey_beacons_response(zb_bufid_t obuf, zb_uint16_t buf)
     zb_zdo_beacon_survey_resp_params_t *resp_params =
       zb_buf_get_tail(
         buf,
-        (sizeof(zb_zdo_beacon_survey_resp_params_t)
-         + ZDO_WWAH_MAX_BEACON_SURVEY_BYTES()));
+        sizeof(zb_zdo_beacon_survey_resp_params_t));
 
     ZB_ZCL_WWAH_SEND_SURVEY_BEACONS_RESPONSE_START(
       obuf, WWAH_CTX().survey_beacons_seq_number);
@@ -1413,7 +1479,7 @@ void zb_zcl_wwah_send_survey_beacons_response(zb_bufid_t obuf, zb_uint16_t buf)
 
     ZB_ZCL_WWAH_SEND_SURVEY_BEACONS_RESPONSE_ADD_ALL(
       ptr,
-      resp_params->parents.parents_info_ptr,
+      resp_params->parents.parent_list,
       resp_params->parents.count_potential_parents);
 
     ZB_ZCL_WWAH_SEND_SURVEY_BEACONS_RESPONSE_END(
@@ -1430,7 +1496,6 @@ void zb_zcl_wwah_send_survey_beacons_response(zb_bufid_t obuf, zb_uint16_t buf)
     TRACE_MSG(TRACE_ZCL1, "<< zb_zcl_wwah_send_survey_beacons_response", (FMT__0));
   }
 }
-#endif
 
 zb_ret_t zb_zcl_wwah_disable_ota_downgrades_handler(zb_uint8_t param)
 {
@@ -1450,22 +1515,39 @@ zb_ret_t zb_zcl_wwah_disable_ota_downgrades_handler(zb_uint8_t param)
   return ret;
 }
 
+zb_ret_t zb_zcl_wwah_set_leave_without_rejoin(zb_bool_t n_enabled)
+{
+  zb_ret_t ret = RET_OK;
+  zb_zcl_attr_t *attr_desc;
+  zb_bool_t o_enabled;
+  attr_desc = zb_zcl_get_attr_desc_a(wwah_endpoint, ZB_ZCL_CLUSTER_ID_WWAH,
+                                     ZB_ZCL_CLUSTER_SERVER_ROLE,
+                                     ZB_ZCL_ATTR_WWAH_MGMT_LEAVE_WITHOUT_REJOIN_ENABLED_ID);
+  o_enabled = ZB_ZCL_GET_ATTRIBUTE_VAL_8(attr_desc);
+  TRACE_MSG(TRACE_ZCL1, "zb_zcl_wwah_set_leave_without_rejoin o_enabled %d n_enabled %d",
+            (FMT__D_D, o_enabled, n_enabled));
+
+  if (o_enabled != n_enabled)
+  {
+    ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
+                         ZB_ZCL_CLUSTER_ID_WWAH,
+                         ZB_ZCL_CLUSTER_SERVER_ROLE,
+                         ZB_ZCL_ATTR_WWAH_MGMT_LEAVE_WITHOUT_REJOIN_ENABLED_ID,
+                         (zb_uint8_t *)&n_enabled,
+                         ZB_FALSE);
+    ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
+  }
+  return ret;
+}
+
+
 zb_ret_t zb_zcl_wwah_disable_mgmt_leave_without_rejoin_handler(zb_uint8_t param)
 {
   zb_ret_t ret;
-  zb_bool_t disable_bool = ZB_FALSE;
   ZVUNUSED(param);
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_disable_mgmt_leave_without_rejoin_handler %hd", (FMT__H, param));
-
-  ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
-                       ZB_ZCL_CLUSTER_ID_WWAH,
-                       ZB_ZCL_CLUSTER_SERVER_ROLE,
-                       ZB_ZCL_ATTR_WWAH_MGMT_LEAVE_WITHOUT_REJOIN_ENABLED_ID,
-                       (zb_uint8_t *)&disable_bool,
-                       ZB_FALSE);
-  zb_wwah_set_leave_without_rejoin_allowed(disable_bool);
-  /* If we fail, trace is given and assertion is triggered */
-  ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
+  ret = zb_zcl_wwah_set_leave_without_rejoin(ZB_FALSE);
+  zb_wwah_set_leave_without_rejoin_allowed(ZB_FALSE);
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_wwah_disable_mgmt_leave_without_rejoin_handler, ret %d", (FMT__D, ret));
   return ret;
 }
@@ -1578,36 +1660,64 @@ zb_ret_t zb_zcl_wwah_disable_wwah_parent_classification_handler(zb_uint8_t param
   return ret;
 }
 
+
+zb_ret_t zb_zcl_wwah_set_require_lk_encryption(zb_bool_t n_require)
+{
+  zb_ret_t ret = RET_OK;
+  zb_zcl_attr_t *attr_desc;
+  zb_bool_t o_require;
+  TRACE_MSG(TRACE_ZCL1, "zb_zcl_wwah_set_require_lk_encryption %d", (FMT__D, n_require));
+
+  attr_desc = zb_zcl_get_attr_desc_a(wwah_endpoint, ZB_ZCL_CLUSTER_ID_WWAH,
+                                     ZB_ZCL_CLUSTER_SERVER_ROLE,
+                                     ZB_ZCL_ATTR_WWAH_TC_SECURITY_ON_NWK_KEY_ROTATION_ENABLED_ID);
+  ZB_ASSERT(attr_desc);
+  o_require = ZB_ZCL_GET_ATTRIBUTE_VAL_8(attr_desc);
+  TRACE_MSG(TRACE_ZCL1, "zb_zcl_wwah_set_require_lk_encryption o_require %d n_require %d",
+            (FMT__D_D, o_require, n_require));
+
+  if (o_require != n_require)
+  {
+    ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
+                         ZB_ZCL_CLUSTER_ID_WWAH,
+                         ZB_ZCL_CLUSTER_SERVER_ROLE,
+                         ZB_ZCL_ATTR_WWAH_TC_SECURITY_ON_NWK_KEY_ROTATION_ENABLED_ID,
+                         (zb_uint8_t *)&n_require,
+                         ZB_FALSE);
+    ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
+  }
+  return ret;
+}
+
 zb_ret_t zb_zcl_wwah_enable_tc_security_on_nwk_key_rotation_handler(zb_uint8_t param)
 {
   zb_ret_t ret;
-  zb_bool_t enable_bool = ZB_TRUE;
   ZVUNUSED(param);
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_enable_tc_security_on_nwk_key_rotation_handler %hd", (FMT__H, param));
-  ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
-                       ZB_ZCL_CLUSTER_ID_WWAH,
-                       ZB_ZCL_CLUSTER_SERVER_ROLE,
-                       ZB_ZCL_ATTR_WWAH_TC_SECURITY_ON_NWK_KEY_ROTATION_ENABLED_ID,
-                       (zb_uint8_t *)&enable_bool,
-                       ZB_FALSE);
 
   /* WWAH ZCL Cluster Definition:
    * If TCSecurityOnNwkKeyRotationEnabled Attribute is set to TRUE,
    * the node SHALL only process network key rotation commands,
    * specifically APS Transport Key (command identifier 0x05),
    * which are sent via unicast and are encrypted by the Trust Center Link Key. */
-  zb_wwah_set_nwk_key_commands_broadcast_allowed(ZB_FALSE);
-  /* If we fail, trace is given and assertion is triggered */
-  ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
+  ret = zb_zcl_wwah_set_require_lk_encryption(ZB_TRUE);
+  zb_wwah_set_require_lk_encryption(ZB_TRUE);
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_wwah_enable_tc_security_on_nwk_key_rotation_handler, ret %d", (FMT__D, ret));
   return ret;
 }
 
 /* ----------------------- BAD PARENT RECOVERY ----------------------- */
 
-void zb_zcl_wwah_bad_parent_recovery_tmo(zb_zcl_wwah_bad_parent_recovery_signal_t sig);
+/**
+ * @param sig variable of type @ref zb_zcl_wwah_bad_parent_recovery_signal_t
+ */
+void zb_zcl_wwah_bad_parent_recovery_tmo(zb_bufid_t sig);
 
-void zb_zcl_wwah_restart_bad_parent_recovery(zb_zcl_wwah_bad_parent_recovery_signal_t sig)
+
+/**
+ * @param sig variable of type @ref zb_zcl_wwah_bad_parent_recovery_signal_t
+ */
+void zb_zcl_wwah_restart_bad_parent_recovery(zb_bufid_t sig)
 {
   TRACE_MSG(TRACE_ZCL1, ">> zb_zcl_wwah_restart_bad_parent_recovery: sig %hd", (FMT__H, sig));
 
@@ -1619,15 +1729,15 @@ void zb_zcl_wwah_restart_bad_parent_recovery(zb_zcl_wwah_bad_parent_recovery_sig
     }
     else
     {
-      ZB_SCHEDULE_ALARM_CANCEL((zb_callback_t)zb_zcl_wwah_bad_parent_recovery_tmo, sig);
-      ZB_SCHEDULE_ALARM((zb_callback_t)zb_zcl_wwah_bad_parent_recovery_tmo, sig, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_TIMEOUT);
+      ZB_SCHEDULE_ALARM_CANCEL(zb_zcl_wwah_bad_parent_recovery_tmo, sig);
+      ZB_SCHEDULE_ALARM(zb_zcl_wwah_bad_parent_recovery_tmo, sig, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_TIMEOUT);
     }
   }
 
   TRACE_MSG(TRACE_ZCL1, "<< zb_zcl_wwah_restart_bad_parent_recovery", (FMT__0));
 }
 
-void zb_zcl_wwah_bad_parent_recovery_signal(zb_zcl_wwah_bad_parent_recovery_signal_t sig)
+void zb_zcl_wwah_bad_parent_recovery_signal(zb_bufid_t sig)
 {
   TRACE_MSG(TRACE_ZCL1, ">> zb_zcl_wwah_bad_parent_recovery_signal sig %hd", (FMT__H, sig));
 
@@ -1665,8 +1775,8 @@ void zb_zcl_wwah_bad_parent_recovery_signal(zb_zcl_wwah_bad_parent_recovery_sign
 
 void zb_zcl_wwah_stop_bad_parent_recovery(void)
 {
-  ZB_SCHEDULE_ALARM_CANCEL((zb_callback_t)zb_zcl_wwah_bad_parent_recovery_tmo, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_RSSI_WITH_PARENT_BAD);
-  ZB_SCHEDULE_ALARM_CANCEL((zb_callback_t)zb_zcl_wwah_bad_parent_recovery_tmo, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_APS_ACK_FAILED);
+  ZB_SCHEDULE_ALARM_CANCEL(zb_zcl_wwah_bad_parent_recovery_tmo, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_RSSI_WITH_PARENT_BAD);
+  ZB_SCHEDULE_ALARM_CANCEL(zb_zcl_wwah_bad_parent_recovery_tmo, ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_APS_ACK_FAILED);
   WWAH_CTX().bad_parent_recovery.poll_control_checkin_failed_cnt = 0;
   WWAH_CTX().bad_parent_recovery.started = ZB_FALSE;
 }
@@ -1700,7 +1810,7 @@ void zb_zcl_wwah_start_bad_parent_recovery(void)
   TRACE_MSG(TRACE_ZCL1, "<< zb_zcl_wwah_start_bad_parent_recovery", (FMT__0));
 }
 
-void zb_zcl_wwah_bad_parent_recovery_tmo(zb_zcl_wwah_bad_parent_recovery_signal_t sig)
+void zb_zcl_wwah_bad_parent_recovery_tmo(zb_bufid_t sig)
 {
   TRACE_MSG(TRACE_ZCL1, "zb_zcl_wwah_start_bad_parent_recovery_tmo: sig %hd", (FMT__H, sig));
   zb_zcl_wwah_stop_bad_parent_recovery();
@@ -1755,22 +1865,48 @@ zb_ret_t zb_zcl_wwah_disable_wwah_bad_parent_recovery_handler(zb_uint8_t param)
   return ret;
 }
 
+
+zb_ret_t zb_zcl_wwah_set_configuration_mode(zb_bool_t n_allowed)
+{
+  zb_ret_t ret = RET_OK;
+  zb_zcl_attr_t *attr_desc;
+  zb_bool_t o_allowed;
+
+  attr_desc = zb_zcl_get_attr_desc_a(wwah_endpoint, ZB_ZCL_CLUSTER_ID_WWAH,
+                                     ZB_ZCL_CLUSTER_SERVER_ROLE,
+                                     ZB_ZCL_ATTR_WWAH_CONFIGURATION_MODE_ENABLED_ID);
+  ZB_ASSERT(attr_desc);
+  o_allowed = ZB_ZCL_GET_ATTRIBUTE_VAL_8(attr_desc);
+  TRACE_MSG(TRACE_ZCL1, "zb_zcl_wwah_set_configuration_mode o_allowed %d n_allowed %d",
+            (FMT__D_D, o_allowed, n_allowed));
+  if (o_allowed != n_allowed)
+  {
+    /* We can be here either from zb_zcl_wwah_enable_configuration_mode_handler,
+       or from zb_wwah_set_configuration_mode. To make a decision about saving
+       to NVRAM let s compare. */
+
+    ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
+                         ZB_ZCL_CLUSTER_ID_WWAH,
+                         ZB_ZCL_CLUSTER_SERVER_ROLE,
+                         ZB_ZCL_ATTR_WWAH_CONFIGURATION_MODE_ENABLED_ID,
+                         (zb_uint8_t *)&n_allowed,
+                         ZB_FALSE);
+    ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
+  }
+
+  return ret;
+}
+
+
 zb_ret_t zb_zcl_wwah_enable_configuration_mode_handler(zb_uint8_t param)
 {
   zb_ret_t ret = RET_OK;
-  zb_bool_t enable_bool = ZB_TRUE;
   ZVUNUSED(param);
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_enable_configuration_mode_handler %hd", (FMT__H, param));
 
-  ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
-                       ZB_ZCL_CLUSTER_ID_WWAH,
-                       ZB_ZCL_CLUSTER_SERVER_ROLE,
-                       ZB_ZCL_ATTR_WWAH_CONFIGURATION_MODE_ENABLED_ID,
-                       (zb_uint8_t *)&enable_bool,
-                       ZB_FALSE);
-  zb_wwah_set_configuration_mode(enable_bool);
+  ret = zb_zcl_wwah_set_configuration_mode(ZB_TRUE);
+  zb_wwah_set_configuration_mode(ZB_TRUE);
   /* If we fail, trace is given and assertion is triggered */
-  ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_wwah_enable_configuration_mode_handler, ret %d", (FMT__D, ret));
   return ret;
 }
@@ -1778,19 +1914,12 @@ zb_ret_t zb_zcl_wwah_enable_configuration_mode_handler(zb_uint8_t param)
 zb_ret_t zb_zcl_wwah_disable_configuration_mode_handler(zb_uint8_t param)
 {
   zb_ret_t ret = RET_OK;
-  zb_bool_t disable_bool = ZB_FALSE;
   ZVUNUSED(param);
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_wwah_disable_configuration_mode_handler %hd", (FMT__H, param));
 
-  ZB_ZCL_SET_ATTRIBUTE(wwah_endpoint,
-                       ZB_ZCL_CLUSTER_ID_WWAH,
-                       ZB_ZCL_CLUSTER_SERVER_ROLE,
-                       ZB_ZCL_ATTR_WWAH_CONFIGURATION_MODE_ENABLED_ID,
-                       (zb_uint8_t *)&disable_bool,
-                       ZB_FALSE);
-  zb_wwah_set_configuration_mode(disable_bool);
+  ret = zb_zcl_wwah_set_configuration_mode(ZB_FALSE);
+  zb_wwah_set_configuration_mode(ZB_FALSE);
   /* If we fail, trace is given and assertion is triggered */
-  ret = zb_nvram_write_dataset(ZB_NVRAM_ZCL_WWAH_DATA);
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_wwah_disable_configuration_mode_handler, ret %d", (FMT__D, ret));
   return ret;
 }
@@ -1985,6 +2114,9 @@ void zb_zcl_wwah_periodic_checkin_match_desc_req(zb_uint8_t param)
         break;
     }
 
+    /* Verify ep_desc assignment. It will unrecoverably fail if ep_desc is NULL */
+    ZB_VERIFY(ep_desc != NULL, RET_UNINITIALIZED);
+
     req->profile_id = ep_desc->simple_desc->app_profile_id;
 
     TRACE_MSG(TRACE_ZCL1, "send match descr for cluster 0x%x", (FMT__D, req->cluster_list[0]));
@@ -2071,7 +2203,7 @@ void zb_zcl_wwah_stop_periodic_checkin(void)
   WWAH_CTX().periodic_checkins.poll_method = ZB_ZCL_WWAH_PERIODIC_CHECKINS_NOT_SUPPORTED;
   ZB_SCHEDULE_ALARM_CANCEL(zb_zcl_wwah_periodic_checkin_countdown, ZB_ALARM_ALL_CB);
 
-#if defined ZB_PARENT_CLASSIFICATION && defined ZB_ROUTER_ROLE
+#if defined ZB_ROUTER_ROLE
   nwk_set_tc_connectivity(0);
 #endif
 }
@@ -2177,7 +2309,7 @@ void zb_zcl_wwah_periodic_checkin_tc_poll(zb_uint8_t param)
   else
   {
     WWAH_CTX().periodic_checkins.tsn = ZCL_CTX().seq_number - 1;
-    /* Need to wait some time for the answer (unicast). Minumum border is
+    /* Need to wait some time for the answer (unicast). Minimum border is
      * ZB_N_APS_ACK_WAIT_DURATION_FROM_NON_SLEEPY * ZB_N_APS_MAX_FRAME_RETRIES, but intermediate
      * hops may add some additional delay. */
     ZB_SCHEDULE_ALARM(zb_zcl_wwah_periodic_checkin_timeout, 0, ZB_N_APS_ACK_WAIT_DURATION_FROM_NON_SLEEPY * ZB_N_APS_MAX_FRAME_RETRIES);
@@ -2256,7 +2388,7 @@ zb_bool_t zb_zcl_wwah_periodic_checkin_read_attr_handle(zb_uint8_t param)
   {
     zb_zcl_wwah_recounter_checkin();
     /* restore hub connectivity */
-#if defined ZB_PARENT_CLASSIFICATION && defined ZB_ROUTER_ROLE
+#if defined ZB_ROUTER_ROLE
     nwk_set_tc_connectivity(1);
 #endif
   }
@@ -2329,172 +2461,172 @@ zb_bool_t zb_zcl_process_wwah_specific_commands(zb_uint8_t param)
     /* Update WWAH endpoint value. */
     WWAH_CTX().wwah_hub_endpoint = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).src_endpoint;
 
-    switch (cmd_info.cmd_id)
-    {
-      case ZB_ZCL_CMD_WWAH_ENABLE_APS_LINK_KEY_AUTHORIZATION_ID:
-        ret = zb_zcl_wwah_enable_aps_link_key_authorization_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Enable APS Link Key Authorization command", (FMT__0));
-        break;
+  switch (cmd_info.cmd_id)
+  {
+    case ZB_ZCL_CMD_WWAH_ENABLE_APS_LINK_KEY_AUTHORIZATION_ID:
+      ret = zb_zcl_wwah_enable_aps_link_key_authorization_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Enable APS Link Key Authorization command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_APS_LINK_KEY_AUTHORIZATION_ID:
-        ret = zb_zcl_wwah_disable_aps_link_key_authorization_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable APS Link Key Authorization command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_APS_LINK_KEY_AUTHORIZATION_ID:
+      ret = zb_zcl_wwah_disable_aps_link_key_authorization_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable APS Link Key Authorization command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_APS_LINK_KEY_AUTHORIZATION_QUERY_ID:
-        ret = zb_zcl_wwah_aps_link_key_authorization_query_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed APS Link Key Authorization Query command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_APS_LINK_KEY_AUTHORIZATION_QUERY_ID:
+      ret = zb_zcl_wwah_aps_link_key_authorization_query_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed APS Link Key Authorization Query command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_REQUEST_NEW_APS_LINK_KEY_ID:
-        ret = zb_zcl_wwah_request_new_aps_link_key_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Request New APS Link Key command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_REQUEST_NEW_APS_LINK_KEY_ID:
+      ret = zb_zcl_wwah_request_new_aps_link_key_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Request New APS Link Key command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_ENABLE_WWAH_APP_EVENT_RETRY_ALGORITHM_ID:
-        ret = zb_zcl_wwah_enable_wwah_app_event_retry_algorithm_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Enable WWAH App Event Retry Algorithm command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_ENABLE_WWAH_APP_EVENT_RETRY_ALGORITHM_ID:
+      ret = zb_zcl_wwah_enable_wwah_app_event_retry_algorithm_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Enable WWAH App Event Retry Algorithm command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_WWAH_APP_EVENT_RETRY_ALGORITHM_ID:
-        ret = zb_zcl_wwah_disable_wwah_app_event_retry_algorithm_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable WWAH App Event Retry Algorithm command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_WWAH_APP_EVENT_RETRY_ALGORITHM_ID:
+      ret = zb_zcl_wwah_disable_wwah_app_event_retry_algorithm_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable WWAH App Event Retry Algorithm command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_REQUEST_TIME_ID:
-        ret = zb_zcl_wwah_request_time_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Request Time command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_REQUEST_TIME_ID:
+      ret = zb_zcl_wwah_request_time_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Request Time command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_ENABLE_WWAH_REJOIN_ALGORITHM_ID:
-        ret = zb_zcl_wwah_enable_wwah_rejoin_algorithm_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Enable WWAH Rejoin Algorithm command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_ENABLE_WWAH_REJOIN_ALGORITHM_ID:
+      ret = zb_zcl_wwah_enable_wwah_rejoin_algorithm_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Enable WWAH Rejoin Algorithm command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_WWAH_REJOIN_ALGORITHM_ID:
-        ret = zb_zcl_wwah_disable_wwah_rejoin_algorithm_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable WWAH Rejoin Algorithm command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_WWAH_REJOIN_ALGORITHM_ID:
+      ret = zb_zcl_wwah_disable_wwah_rejoin_algorithm_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable WWAH Rejoin Algorithm command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_SET_IAS_ZONE_ENROLLMENT_METHOD_ID:
-        ret = zb_zcl_wwah_set_ias_zone_enrollment_method_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Set IAS Zone Enrollment Method command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_SET_IAS_ZONE_ENROLLMENT_METHOD_ID:
+      ret = zb_zcl_wwah_set_ias_zone_enrollment_method_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Set IAS Zone Enrollment Method command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_CLEAR_BINDING_TABLE_ID:
-        ret = zb_zcl_wwah_clear_binding_table_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Clear Binding Table command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_CLEAR_BINDING_TABLE_ID:
+      ret = zb_zcl_wwah_clear_binding_table_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Clear Binding Table command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_ENABLE_PERIODIC_ROUTER_CHECK_INS_ID:
-        ret = zb_zcl_wwah_enable_periodic_router_check_ins_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Enable Periodic Router Check Ins command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_ENABLE_PERIODIC_ROUTER_CHECK_INS_ID:
+      ret = zb_zcl_wwah_enable_periodic_router_check_ins_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Enable Periodic Router Check Ins command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_PERIODIC_ROUTER_CHECK_INS_ID:
-        ret = zb_zcl_wwah_disable_periodic_router_check_ins_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable Periodic Router Check Ins command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_PERIODIC_ROUTER_CHECK_INS_ID:
+      ret = zb_zcl_wwah_disable_periodic_router_check_ins_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable Periodic Router Check Ins command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_SET_MAC_POLL_CCA_WAIT_TIME_ID:
-        ret = zb_zcl_wwah_set_mac_poll_cca_wait_time_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Set MAC Poll CCA Wait Time command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_SET_MAC_POLL_CCA_WAIT_TIME_ID:
+      ret = zb_zcl_wwah_set_mac_poll_cca_wait_time_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Set MAC Poll CCA Wait Time command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_SET_PENDING_NETWORK_UPDATE_ID:
-        ret = zb_zcl_wwah_set_pending_network_update_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Set Pending Network Update command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_SET_PENDING_NETWORK_UPDATE_ID:
+      ret = zb_zcl_wwah_set_pending_network_update_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Set Pending Network Update command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_REQUIRE_APS_ACKS_ON_UNICASTS_ID:
-        ret = zb_zcl_wwah_require_aps_acks_on_unicasts_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Require APS ACKs on Unicasts command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_REQUIRE_APS_ACKS_ON_UNICASTS_ID:
+      ret = zb_zcl_wwah_require_aps_acks_on_unicasts_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Require APS ACKs on Unicasts command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_REMOVE_APS_ACKS_ON_UNICASTS_REQUIREMENT_ID:
-        ret = zb_zcl_wwah_remove_aps_acks_on_unicasts_requirement_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Remove APS ACKs on Unicasts Requirement command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_REMOVE_APS_ACKS_ON_UNICASTS_REQUIREMENT_ID:
+      ret = zb_zcl_wwah_remove_aps_acks_on_unicasts_requirement_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Remove APS ACKs on Unicasts Requirement command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_APS_ACK_REQUIREMENT_QUERY_ID:
-        ret = zb_zcl_wwah_aps_ack_requirement_query_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed APS ACK Requirement Query command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_APS_ACK_REQUIREMENT_QUERY_ID:
+      ret = zb_zcl_wwah_aps_ack_requirement_query_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed APS ACK Requirement Query command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DEBUG_REPORT_QUERY_ID:
-        ret = zb_zcl_wwah_debug_report_query_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Debug Report Query command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DEBUG_REPORT_QUERY_ID:
+      ret = zb_zcl_wwah_debug_report_query_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Debug Report Query command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_SURVEY_BEACONS_ID:
-        ret = zb_zcl_wwah_survey_beacons_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Survey Beacons command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_SURVEY_BEACONS_ID:
+      ret = zb_zcl_wwah_survey_beacons_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Survey Beacons command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_OTA_DOWNGRADES_ID:
-        ret = zb_zcl_wwah_disable_ota_downgrades_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable OTA Downgrades command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_OTA_DOWNGRADES_ID:
+      ret = zb_zcl_wwah_disable_ota_downgrades_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable OTA Downgrades command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_MGMT_LEAVE_WITHOUT_REJOIN_ID:
-        ret = zb_zcl_wwah_disable_mgmt_leave_without_rejoin_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable MGMT Leave Without Rejoin command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_MGMT_LEAVE_WITHOUT_REJOIN_ID:
+      ret = zb_zcl_wwah_disable_mgmt_leave_without_rejoin_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable MGMT Leave Without Rejoin command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_TOUCHLINK_INTERPAN_MESSAGE_SUPPORT_ID:
-        ret = zb_zcl_wwah_disable_touchlink_interpan_message_support_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable Touchlink Interpan Message Support command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_TOUCHLINK_INTERPAN_MESSAGE_SUPPORT_ID:
+      ret = zb_zcl_wwah_disable_touchlink_interpan_message_support_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable Touchlink Interpan Message Support command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_ENABLE_WWAH_PARENT_CLASSIFICATION_ID:
-        ret = zb_zcl_wwah_enable_wwah_parent_classification_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Enable WWAH Parent Classification command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_ENABLE_WWAH_PARENT_CLASSIFICATION_ID:
+      ret = zb_zcl_wwah_enable_wwah_parent_classification_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Enable WWAH Parent Classification command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_WWAH_PARENT_CLASSIFICATION_ID:
-        ret = zb_zcl_wwah_disable_wwah_parent_classification_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable WWAH Parent Classification command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_WWAH_PARENT_CLASSIFICATION_ID:
+      ret = zb_zcl_wwah_disable_wwah_parent_classification_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable WWAH Parent Classification command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_ENABLE_TC_SECURITY_ON_NWK_KEY_ROTATION_ID:
-        ret = zb_zcl_wwah_enable_tc_security_on_nwk_key_rotation_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Enable TC Security On Nwk Key Rotation command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_ENABLE_TC_SECURITY_ON_NWK_KEY_ROTATION_ID:
+      ret = zb_zcl_wwah_enable_tc_security_on_nwk_key_rotation_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Enable TC Security On Nwk Key Rotation command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_ENABLE_WWAH_BAD_PARENT_RECOVERY_ID:
-        ret = zb_zcl_wwah_enable_wwah_bad_parent_recovery_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Enable WWAH Bad Parent Recovery command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_ENABLE_WWAH_BAD_PARENT_RECOVERY_ID:
+      ret = zb_zcl_wwah_enable_wwah_bad_parent_recovery_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Enable WWAH Bad Parent Recovery command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_WWAH_BAD_PARENT_RECOVERY_ID:
-        ret = zb_zcl_wwah_disable_wwah_bad_parent_recovery_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable WWAH Bad Parent Recovery command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_WWAH_BAD_PARENT_RECOVERY_ID:
+      ret = zb_zcl_wwah_disable_wwah_bad_parent_recovery_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable WWAH Bad Parent Recovery command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_ENABLE_CONFIGURATION_MODE_ID:
-        ret = zb_zcl_wwah_enable_configuration_mode_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Enable Configuration Mode command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_ENABLE_CONFIGURATION_MODE_ID:
+      ret = zb_zcl_wwah_enable_configuration_mode_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Enable Configuration Mode command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_DISABLE_CONFIGURATION_MODE_ID:
-        ret = zb_zcl_wwah_disable_configuration_mode_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Disable Configuration Mode command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_DISABLE_CONFIGURATION_MODE_ID:
+      ret = zb_zcl_wwah_disable_configuration_mode_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Disable Configuration Mode command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_USE_TRUST_CENTER_FOR_CLUSTER_ID:
-        ret = zb_zcl_wwah_use_trust_center_for_cluster_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Use Trust Center for Cluster command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_USE_TRUST_CENTER_FOR_CLUSTER_ID:
+      ret = zb_zcl_wwah_use_trust_center_for_cluster_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Use Trust Center for Cluster command", (FMT__0));
+      break;
 
-      case ZB_ZCL_CMD_WWAH_TRUST_CENTER_FOR_CLUSTER_SERVER_QUERY_ID:
-        ret = zb_zcl_wwah_trust_center_for_cluster_server_query_handler(param);
-        TRACE_MSG(TRACE_ZCL3, "Processed Trust Center for Cluster Server Query command", (FMT__0));
-        break;
+    case ZB_ZCL_CMD_WWAH_TRUST_CENTER_FOR_CLUSTER_SERVER_QUERY_ID:
+      ret = zb_zcl_wwah_trust_center_for_cluster_server_query_handler(param);
+      TRACE_MSG(TRACE_ZCL3, "Processed Trust Center for Cluster Server Query command", (FMT__0));
+      break;
 
-      default:
-        processed = ZB_FALSE;
-        break;
-    }
+    default:
+      processed = ZB_FALSE;
+      break;
+  }
   }
 
   if (ret == RET_BUSY)
@@ -2736,6 +2868,8 @@ void zb_nvram_read_wwah_dataset(
                                        ZB_ZCL_ATTR_WWAH_MAC_POLL_FAILURE_WAIT_TIME_ID);
     ZB_ASSERT(attr_desc);
     ZB_ZCL_SET_DIRECTLY_ATTR_VAL8(attr_desc, ds.mac_poll_failure_wait_time);
+    /* Sync with ZDO PIM */
+    zb_zdo_pim_set_mac_poll_failure_wait_time(ds.mac_poll_failure_wait_time);
     //
     attr_desc = zb_zcl_get_attr_desc_a(endpoint, ZB_ZCL_CLUSTER_ID_WWAH,
                                        ZB_ZCL_CLUSTER_SERVER_ROLE,
@@ -2755,7 +2889,7 @@ void zb_nvram_read_wwah_dataset(
                                        ZB_ZCL_ATTR_WWAH_TC_SECURITY_ON_NWK_KEY_ROTATION_ENABLED_ID);
     ZB_ASSERT(attr_desc);
     ZB_ZCL_SET_DIRECTLY_ATTR_VAL8(attr_desc, ds.tc_security_on_nwk_key_rotation_enabled);
-    zb_wwah_set_nwk_key_commands_broadcast_allowed(ds.tc_security_on_nwk_key_rotation_enabled);
+    zb_wwah_set_require_lk_encryption(ds.tc_security_on_nwk_key_rotation_enabled);
     //
     attr_desc = zb_zcl_get_attr_desc_a(endpoint, ZB_ZCL_CLUSTER_ID_WWAH,
                                        ZB_ZCL_CLUSTER_SERVER_ROLE,
