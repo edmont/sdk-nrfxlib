@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -46,9 +46,15 @@
 
 #include "zb_config.h"
 #include "zb_common.h"
+#include "zdo_wwah_stubs.h"
+
+typedef ZB_PACKED_PRE struct zb_zdo_beacon_survey_configuration_t
+{
+  zb_nlme_beacon_survey_scan_request_t params;
+}
+ZB_PACKED_STRUCT zb_zdo_beacon_survey_configuration_t;
 
 /* 2019-02-26: CR:MINOR TODO:Split WWAH-specific and non-WWAH-specific parts of Survey Beacons. */
-#if defined ZB_BEACON_SURVEY && defined ZB_ZCL_ENABLE_WWAH_SERVER
 
 /** @cond DOXYGEN_ZCL_SECTION */
 
@@ -61,82 +67,6 @@
  *  @addtogroup ZDO_WWAH_SURVEY_BEACONS
  *  @{
  */
-
-typedef zb_zcl_wwah_beacon_survey_t zb_zdo_beacon_survey_parent_info_t;
-
-/**
- *  @brief R23, I.3.3 Beacon Survey Configuration TLV
- *
- *  This TLV is 5-bytes in length and contains information
- *  about the channels and scan configuration that is used
- *  when performing a beacon survey.
- */
-typedef ZB_PACKED_PRE struct zb_zdo_beacon_survey_configuration_t
-{
-  zb_nlme_beacon_survey_scan_request_t params;
-}
-ZB_PACKED_STRUCT zb_zdo_beacon_survey_configuration_t;
-
-/**
- *  @brief R23, I.3.4 Beacon Survey Results TLV
- *
- *  This TLV is 4-bytes in length and contains information about the
- *  channels, scan configuration, and counted devices or beacons.
- */
-typedef ZB_PACKED_PRE struct zb_zdo_beacon_survey_results_t
-{
-  /*!< Number of potential parents from the current Zigbee Network */
-  zb_uint8_t num_potential_parents_current_zbn;
-
-  /*!< Number of detected non-Zigbee networks */
-  zb_uint8_t num_non_zbn;
-
-  /*!< Number of detected ZigBee networks */
-  zb_uint8_t num_zbn;
-
-  /*!< Total Beacons Surveyed */
-  zb_uint8_t total_beacons_surveyed;
-}
-ZB_PACKED_STRUCT zb_zdo_beacon_survey_results_t;
-
-/**
- *  @brief R23, I.3.5 Potential Parents TLV
- *
- *  This TLV is 3 to 13 bytes in length and indicates the number
- *  of available parents in radio range. A maximum number of 5
- *  parents is supported for this TLV. The list of potential
- *  parents SHALL be ordered as described in 3.6.1.3.2.
- */
-typedef ZB_PACKED_PRE struct zb_zdo_beacon_survey_potential_parents_t
-{
-  /*!< Pointer to the @zb_zdo_beacon_survey_parent_info_t list */
-  zb_uint8_t *parents_info_ptr;
-  /*!< Short address of the our parent (0xffff for Routers) */
-  zb_uint16_t current_parent;
-  /*!< Count of potential parents (valid range [0;5]) */
-  zb_uint8_t count_potential_parents;
-}
-ZB_PACKED_STRUCT zb_zdo_beacon_survey_potential_parents_t;
-
-/**
- *  @brief Structure to store information when 'Beacon Survey' procedure is executing
- *
- *  We reuse a buffer which contain 'Beacon Survey Request' command
- *  and store all necessary information into it. Format of the
- *  'Beacon Survey Response' command is different between ZCL WWAH
- *  and r23, so we need to use two functions to parse results and
- *  send response
- */
-typedef ZB_PACKED_PRE struct zb_zdo_beacon_survey_resp_params_s
-{
-  /*!< R23, I.3.5 Potential Parents TLV */
-  zb_zdo_beacon_survey_potential_parents_t parents;
-  /*!< I.3.3 Beacon Survey Configuration TLV */
-  zb_zdo_beacon_survey_configuration_t configuration;
-  /*!< R23, I.3.4 Beacon Survey Results TLV */
-  zb_zdo_beacon_survey_results_t results;
-}
-ZB_PACKED_STRUCT zb_zdo_beacon_survey_resp_params_t;
 
 /**
  *  @brief Start Survey Beacons procedure
@@ -165,40 +95,50 @@ void zdo_wwah_process_beacon_info(
 /**
  *  @brief Send 'Survey Beacons Response' command
  *
- *  @todo need to implement in r23
  */
-void zdo_send_survey_beacons_response(void);
+void zdo_send_survey_beacons_response(zb_uint8_t param);
 
-#if (defined ZB_ZCL_SUPPORT_CLUSTER_WWAH && defined ZB_ZCL_ENABLE_WWAH_SERVER)
 
-/* 4 bytes for: fcf, seq_num, command_type and beacons_number */
-#define ZDO_WWAH_MAX_BEACON_SURVEY() \
-  ((ZB_ZCL_HI_WO_IEEE_MAX_PAYLOAD_SIZE - 4)     \
-   / sizeof(zb_zdo_beacon_survey_parent_info_t))
+void zb_tlv_put_potential_parents(zb_uint8_t param,
+                                  zb_uint16_t current_parent,
+                                  zb_uint8_t potent_parents_cnt,
+                                  zb_zcl_wwah_beacon_survey_t *potent_parents_list);
 
-#define ZDO_WWAH_MAX_BEACON_SURVEY_BYTES()    \
-  (sizeof(zb_zdo_beacon_survey_parent_info_t) \
-   * (ZDO_WWAH_MAX_BEACON_SURVEY()))          \
 
-void zb_zcl_wwah_send_survey_beacons_response(zb_bufid_t buf, zb_uint16_t zcl_buf);
+void zb_zdo_beacon_survey_put_configuration_tlv (zb_uint8_t param,
+                                                 zb_uint8_t channel_page_cnt,
+                                                 zb_uint32_t *channel_page_list,
+                                                 zb_uint8_t conf_mask);
 
-#define ZDO_SEND_SURVEY_BEACONS_RESPONSE_FUNC(buf) \
-  zb_zcl_wwah_send_survey_beacons_response(0, buf)
 
-#else /* ZB_ZCL_SUPPORT_CLUSTER_WWAH */
+void zb_zdo_beacon_survey_put_results_tlv (zb_uint8_t param,
+                                           zb_uint8_t total_beacon_surv,
+                                           zb_uint8_t num_cur_zbn,
+                                           zb_uint8_t num_potent_parents_cur_zbn,
+                                           zb_uint8_t num_other_zbn);
 
-/* see R23, I.3.5 Potential Parents TLV, 'Count of Potential Parents' field */
-#define ZDO_WWAH_MAX_BEACON_SURVEY() 5U
 
-#define ZDO_WWAH_MAX_BEACON_SURVEY_BYTES() \
-  (ZDO_WWAH_MAX_BEACON_SURVEY() * sizeof(zb_uint16_t))
+zb_ret_t zb_zdo_beacon_survey_process_configuration_tlv (zb_uint8_t *tlv_ptr,
+                                                         zb_uint8_t tlv_data_len,
+                                                         zb_uint8_t *channel_page_cnt,
+                                                         zb_uint32_t *channel_page_list,
+                                                         zb_uint8_t *conf_mask);
 
-#define ZDO_SEND_SURVEY_BEACONS_RESPONSE_FUNC() \
-  zdo_send_survey_beacons_response(buf)
+zb_ret_t zb_tlv_parse_beacon_survey_results_tlv(zb_uint8_t *tlv_ptr,
+                                                zb_uint8_t tlv_data_len,
+                                                zb_zdo_beacon_survey_results_t *results);
 
-#endif /* (defined ZB_ZCL_SUPPORT_CLUSTER_WWAH && defined ZB_ZCL_ENABLE_WWAH_SERVER) */
+zb_ret_t zb_tlv_parse_beacon_survey_parents_tlv(zb_uint8_t *tlv_ptr,
+                                                zb_uint8_t tlv_data_len,
+                                                zb_zdo_beacon_survey_potential_parents_t *parents);
 
-#endif /* defined ZB_BEACON_SURVEY && defined ZB_ZCL_ENABLE_WWAH_SERVER */
+zb_ret_t zb_tlv_parse_panid_conflict_report_tlv(zb_uint8_t *tlv_ptr,
+                                                zb_uint8_t tlv_data_len,
+                                                zb_uint16_t *panid_conflict_count);
+
+
+
+
 
 /** @} */ /* @addtogroup ZDO_WWAH_SURVEY_BEACONS */
 

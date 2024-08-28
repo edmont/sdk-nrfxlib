@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -50,6 +50,23 @@
 #include "zcl/zb_zcl_common.h"
 #include "zcl/zb_zcl_commands.h"
 
+#if defined (ZB_NO_SINGLE_PRECISION_DATA_TYPE)
+
+/*
+ * The following ZCL clusters use zb_single_t, which is not supported
+ * if ZB_NO_SINGLE_PRECISION_DATA_TYPE is defined.
+ */
+
+// TODO: Analog Input (Basic) also uses zb_single_t
+#undef ZB_ZCL_SUPPORT_CLUSTER_ANALOG_VALUE
+#undef ZB_ZCL_SUPPORT_CLUSTER_MULTISTATE_VALUE
+
+/* All 4.13 Concentration Measurement clusters */
+#undef ZB_ZCL_SUPPORT_CLUSTER_PM2_5_MEASUREMENT
+#undef ZB_ZCL_SUPPORT_CLUSTER_CARBON_DIOXIDE_MEASUREMENT
+
+#endif /* ZB_NO_SINGLE_PRECISION_DATA_TYPE */
+
 #if !(defined ZB_ZCL_DISABLE_REPORTING)
 #include "zcl/zb_zcl_reporting.h"
 #endif
@@ -81,8 +98,29 @@
 #if defined (ZB_ZCL_SUPPORT_CLUSTER_DOOR_LOCK)
 #include "zcl/zb_zcl_door_lock.h"
 #endif
+#if defined (ZB_ZCL_SUPPORT_CLUSTER_ANALOG_INPUT)
+#include "zcl/zb_zcl_analog_input.h"
+#endif
+#if defined (ZB_ZCL_SUPPORT_CLUSTER_ANALOG_VALUE)
+#include "zcl/zb_zcl_analog_value.h"
+#endif
 #if defined (ZB_ZCL_SUPPORT_CLUSTER_BINARY_INPUT)
 #include "zcl/zb_zcl_binary_input.h"
+#endif
+#if defined (ZB_ZCL_SUPPORT_CLUSTER_MULTISTATE_INPUT)
+#include "zcl/zb_zcl_multistate_input.h"
+#endif
+#if defined (ZB_ZCL_SUPPORT_CLUSTER_MULTISTATE_VALUE)
+#include "zcl/zb_zcl_multistate_value.h"
+#endif
+#if defined (ZB_ZCL_SUPPORT_CLUSTER_CARBON_DIOXIDE_MEASUREMENT)
+#include "zcl/zb_zcl_carbon_dioxide_measurement.h"
+#endif
+#if defined (ZB_ZCL_SUPPORT_CLUSTER_PM2_5_MEASUREMENT)
+#include "zcl/zb_zcl_pm2_5_measurement.h"
+#endif
+#if defined (ZB_ZCL_SUPPORT_CLUSTER_DEVICE_TEMP_CONFIG)
+#include "zcl/zb_zcl_device_temp_config.h"
 #endif
 #if defined (ZB_ZCL_SUPPORT_CLUSTER_LEVEL_CONTROL)
 #ifndef ZB_CVC_FEATURE_SUPPORT
@@ -226,6 +264,10 @@
 
 #if defined ZB_ENABLE_ZGP_CLUSTER
 //#include "zgp/zgp_internal.h"
+#endif
+
+#if defined (ZB_ZCL_SUPPORT_CLUSTER_DIRECT_CONFIGURATION)
+#include "zcl/zb_zcl_direct_configuration.h"
 #endif
 
 #include "zcl/zb_zcl_grpw_bed_sensor.h"
@@ -382,6 +424,18 @@
 #define ZB_ZCL_SET_DISC_MANUFACTURE_COMMAND_CB(func_ptr) ZCL_CTX().disc_manuf_cmd_cb = (func_ptr)
 
 #endif /* ZB_ENABLE_HA */
+
+/**
+ *  @brief Set user callback to notify an application a broadcast EP command received.
+ *  @param func_ptr - callback to set (of type @ref zb_device_handler_t).
+ *  @return processing status (see @ref zb_bool_t)
+ *  Value of ZB_TRUE means that the application successfully processed a command - ZBOSS stack
+ *  will do nothing in this case and will free a buffer automatically.
+ *  If set to ZB_FALSE, default stack processing will be performed.
+ *  @note Do not use this callback unless you are sure you need it.
+ *  ZBOSS stack performs additional command checks that can be skipped by an application.
+ */
+#define ZB_ZCL_SET_BROADCAST_EP_CB(func_ptr) ZCL_CTX().broadcast_ep_cb = (func_ptr)
 
 /** @cond internals_doc */
 /**
@@ -1804,7 +1858,27 @@ typedef enum zb_zcl_device_callback_id_e
    *                  Default Response will be send.
    */
   ZB_ZCL_WWAH_SET_IAS_ZONE_ENROLLMENT_METHOD_CB_ID,
-
+  /** @cond DOXYGEN_DIRECT_FEATURE */
+  /** @b Server. Inform user about Zigbee Direct Configure Interface command.
+   *
+   * User's application callback is initialized by RET_OK status of device
+   * callback parameters.
+   * @param[in] param_in
+   * @cond DOXYGEN_ZB_DIRECT_SECTION
+   * @ref zb_zcl_direct_configuration_configure_interface_req_t
+   * @endcond
+   *
+   * One of the following statuses must be returned:
+   * @return RET_OK - successfully handle command.
+   *                  Send
+   * @cond DOXYGEN_ZB_DIRECT_SECTION
+   * @ref ZB_ZCL_CMD_DIRECT_CONFIGURATION_CONFIGURE_ZBD_INTERFACE_ID
+   * @endcond
+   *                  "Configure Interface Response" command.
+   * @return RET_ERROR - command is handled with errors.
+   */
+  ZB_ZCL_DIRECT_CONFIGURATION_CONFIGURE_INTERFACE_CB_ID,
+  /** @endcond */ /* DOXYGEN_DIRECT_FEATURE */
 } zb_zcl_device_callback_id_t;
 
 /** @cond internals_doc */
@@ -2041,7 +2115,8 @@ enum zb_bdb_error_codes_e
   ZB_BDB_STATUS_TCLK_EX_FAILURE,             /*!< The Trust Center link key exchange procedure has failed attempting to join a centralized security network.*/
   ZB_BDB_STATUS_NOT_ON_A_NETWORK,            /*!< A commissioning procedure was forbidden since the node was not currently on a network.*/
   ZB_BDB_STATUS_ON_A_NETWORK,                /*!< A commissioning procedure was forbidden since the node was currently on a network.*/
-  ZB_BDB_STATUS_CANCELLED                    /*!< The current operation (steering or formation) was cancelled by an app */
+  ZB_BDB_STATUS_CANCELLED,                    /*!< The current operation (steering or formation) was cancelled by an app */
+  ZB_BDB_STATUS_DEV_ANNCE_SEND_FAILURE        /*!< A device announce sending has been failed (e.g. device announce haven't acked by parent router). */
 };
 /** @endcond */ /* internals_doc */
 /** @} */
@@ -2120,6 +2195,8 @@ typedef enum zb_bdb_commissioning_mode_mask_e
   */
 zb_bool_t bdb_start_top_level_commissioning(zb_uint8_t mode_mask);
 
+#if defined ZB_BDB_MODE && !defined BDB_OLD
+
 /**
    @brief Cancel Steering procedure for a node not on a network started with
    bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING).
@@ -2139,6 +2216,7 @@ zb_bool_t bdb_start_top_level_commissioning(zb_uint8_t mode_mask);
 */
 void bdb_cancel_joining(zb_bufid_t buf);
 
+#endif /* ZB_BDB_MODE && !BDB_OLD */
 
 /**
    @brief Cancel Formation procedure started with bdb_start_top_level_commissioning(ZB_BDB_NETWORK_FORMATION).
@@ -2183,7 +2261,7 @@ void bdb_set_scan_duration(zb_uint8_t duration);
  * @param buf - a ZBOSS buffer, if zero is passed, a new buffer will be allocated
  * @return RET_OK if broadcast was successful
  * @return RET_NO_MEMORY if buffer allocation failed
- * @return RET_ERROR if any error occured
+ * @return RET_ERROR if any error occurred
  *
  * @snippet thermostat/thermostat_zr/thermostat_zr.c close_network_example
  */
@@ -2295,8 +2373,17 @@ typedef zb_bool_t (ZB_CODE * zb_bdb_comm_binding_callback_t)(
  */
 zb_ret_t zb_bdb_finding_binding_initiator(zb_uint8_t endpoint, zb_bdb_comm_binding_callback_t user_binding_cb);
 
-/** Cancel previously started finding and binding procedure on target */
+/**
+ *  @brief Cancel previously started finding and binding procedure on all target endpoints
+ */
 void zb_bdb_finding_binding_target_cancel(void);
+
+/**
+ *  @brief  Cancel previously started finding and binding procedure on particular target endpoint
+ *
+ *  @param endpoint - target endpoint. The ZB_ZCL_BROADCAST_ENDPOINT(0xFF) value is treated as cancel on all target endpoints
+ */
+void zb_bdb_finding_binding_target_cancel_ep(zb_uint8_t endpoint);
 
 /** Cancel previously started finding and binding procedure on initiator */
 void zb_bdb_finding_binding_initiator_cancel(void);
@@ -2416,6 +2503,17 @@ typedef struct zcl_cluster_handlers_s
 #define ZB_ZCL_NON_VALUE_INT16 ((zb_int16_t)0x8000)
 /** ZCL8 non-value for int8 type, see subclause 2.6.2.8 */
 #define ZB_ZCL_NON_VALUE_INT8 ((zb_int8_t)0x80)
+/** ZCL8 non-value for int24 type, see subclause 2.6.2.8 */
+#define ZB_ZCL_NON_VALUE_INT24  ((zb_int24_t)  { .low = 0x0000U, .high = 0x80U })
+
+/** ZCL8 non-value for uint8 type, see subclause 2.6.2.7 */
+#define ZB_ZCL_NON_VALUE_UINT8  ((zb_uint8_t)0xff)
+/** ZCL8 non-value for uint16 type, see subclause 2.6.2.7 */
+#define ZB_ZCL_NON_VALUE_UINT16 ((zb_uint16_t)0xffff)
+/** ZCL8 non-value for uint32 type, see subclause 2.6.2.7 */
+#define ZB_ZCL_NON_VALUE_UINT32 ((zb_uint32_t)0xffffffff)
+/** ZCL8 non-value for uint24 type, see subclause 2.6.2.7 */
+#define ZB_ZCL_NON_VALUE_UINT24 ((zb_uint24_t) { .low = 0xffffU, .high = 0xffU })
 
 typedef struct zb_discover_cmd_list
 {
@@ -2524,10 +2622,7 @@ typedef struct zb_zcl_globals_s
 #if defined ZB_ENABLE_SE || defined ZB_BDB_ENABLE_FINDING_BINDING || defined ZB_ZCL_SUPPORT_CLUSTER_WWAH
   zb_zcl_func_selector_t selector;
 #endif /* ZB_ENABLE_SE || ZB_BDB_ENABLE_FINDING_BINDING || ZB_ZCL_SUPPORT_CLUSTER_WWAH */
-} zb_zcl_globals_t;
 
-typedef struct zb_zcl8_globals_s
-{
   /** @internal ZCL backward compatibility mode for ZCL8 support, packets format depends on the mode */
   zb_uint8_t backward_comp_mode;
 
@@ -2536,7 +2631,10 @@ typedef struct zb_zcl8_globals_s
 
   /** @internal Backward compatible status values mode. When enabled if diversifies some common statuses as it was in zcl6 and zcl7*/
   zb_uint8_t backward_compatible_statuses_mode;
-} zb_zcl8_globals_t;
+
+  /** User callback to notify an application a broadcast EP command received */
+  zb_device_handler_t broadcast_ep_cb;
+} zb_zcl_globals_t;
 
 #define ZCL_SELECTOR() ZG->zcl.selector
 
@@ -2550,15 +2648,6 @@ zb_zcl_globals_t *zb_zcl_get_ctx(void);
 
 /** Returns pointer to ZCL context */
 #define ZCL_CTX() (*zb_zcl_get_ctx())
-
-/**
-   Returns ZCL8 context.
-   @return pointer ZCL8 context
-  */
-zb_zcl8_globals_t *zb_zcl8_get_ctx(void);
-
-/** Returns pointer to ZCL8 context */
-#define ZCL8_CTX() (*zb_zcl8_get_ctx())
 
 /*! @} */ /* ZB_ZCL_INITIALIZATION */
 

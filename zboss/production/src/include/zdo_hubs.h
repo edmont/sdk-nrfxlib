@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -44,14 +44,17 @@
 #ifndef ZDO_HUBS_H
 #define ZDO_HUBS_H
 
-#if defined ZB_ZCL_SUPPORT_CLUSTER_WWAH && defined ZB_ZCL_ENABLE_WWAH_SERVER
+zb_bool_t zb_is_wwah_server(void);
 
-zb_bool_t zb_wwah_check_nwk_key_commands_broadcast_allowed(void);
-void zb_wwah_set_nwk_key_commands_broadcast_allowed(zb_bool_t allowed);
+zb_bool_t zb_wwah_check_nwk_upd_bcast_allowed(void);
+zb_bool_t zb_wwah_check_require_lk_encryption(void);
+void zb_wwah_set_require_lk_encryption(zb_bool_t require);
 
 zb_bool_t zb_wwah_in_configuration_mode(void);
 void zb_wwah_set_configuration_mode(zb_bool_t allowed);
-zb_bool_t zb_wwah_check_zdo_command(zb_apsde_data_indication_t *di);
+zb_ret_t zb_wwah_check_zdo_command(zb_apsde_data_indication_t *di);
+void zb_zcl_wwah_update_tc_connection(zb_uint16_t short_addr);
+
 
 zb_bool_t zb_wwah_check_if_leave_without_rejoin_allowed(void);
 void zb_wwah_set_leave_without_rejoin_allowed(zb_bool_t allowed);
@@ -59,6 +62,23 @@ void zb_wwah_set_leave_without_rejoin_allowed(zb_bool_t allowed);
 zb_bool_t zb_wwah_check_if_interpan_supported(void);
 void zb_wwah_set_interpan_supported(zb_bool_t enabled);
 
-#endif /* ZB_ZCL_SUPPORT_CLUSTER_WWAH && ZB_ZCL_ENABLE_WWAH_SERVER */
+#ifdef ZB_CERTIFICATION_HACKS
+void zb_wwah_overwrite_hub_connectivity(zb_bool_t overwrite, zb_bool_t val);
+#endif
+
+void zb_wwah_set_pending_channel(zb_uint32_t channel_mask);
+
+void zb_wwah_set_pending_panid(zb_uint16_t next_pan_id);
+
+void zdo_schedule_set_long_uptime(zb_uint8_t param);
+void zdo_schedule_cancel_long_uptime(zb_uint8_t param);
+
+#ifdef ZB_ZCL_ENABLE_WWAH_SERVER
+zb_ret_t zb_zcl_wwah_set_pending_channel(zb_uint32_t channel_mask);
+zb_ret_t zb_zcl_wwah_set_pending_panid(zb_uint16_t next_pan_id);
+zb_ret_t zb_zcl_wwah_set_leave_without_rejoin(zb_bool_t allowed);
+zb_ret_t zb_zcl_wwah_set_configuration_mode(zb_bool_t allowed);
+zb_ret_t zb_zcl_wwah_set_require_lk_encryption(zb_bool_t require);
+#endif
 
 #endif  /* ZDO_HUBS_H */

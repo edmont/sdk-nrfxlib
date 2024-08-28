@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -44,45 +44,95 @@
 #ifndef HW_CRYPTO_API_H
 #define HW_CRYPTO_API_H 1
 
-#ifndef ZB_SOFT_SECURITY
+#include "zb_common.h"
 
-extern zb_ret_t
-hw_encrypt_n_auth(
-  zb_uint8_t *key,
-  zb_uint8_t *nonce,
-  zb_uint8_t *string_a,
-  zb_ushort_t string_a_len,
-  zb_uint8_t *string_m,
-  zb_ushort_t string_m_len,
-  zb_bufid_t crypted_text);
-
-extern zb_ret_t
-hw_decrypt_n_auth(
-  zb_uint8_t *key,
-  zb_uint8_t *nonce,
-  zb_bufid_t  buf,
-  zb_ushort_t string_a_len,
-  zb_ushort_t string_c_len);
-
-
-#define zb_ccm_encrypt_n_auth hw_encrypt_n_auth
-
-#define zb_ccm_decrypt_n_auth hw_decrypt_n_auth
-
-#define zb_ccm_decrypt_n_auth_stdsecur zb_ccm_decrypt_n_auth
-
-#endif  /* ZB_SOFT_SECURITY */
+/**
+ * If ZB_HW_XXXX macro is defined, then hardware implementation is ALWAYS used instead of software
+ *
+ * @note  When ZB_USE_CORTEX_SW_SECURITY is defined, then software implementation optimized for cortex is used if it is possible.
+ *        ZB_USE_CORTEX_SW_SECURITY is more weak, than ZB_HW_XXXX
+ */
 
 #ifdef ZB_HW_ZB_AES128
-void hw_aes128(zb_uint8_t *key, zb_uint8_t *msg, zb_uint8_t *c);
-
-#define zb_aes128 hw_aes128
+void hw_aes128(const zb_uint8_t *key, const zb_uint8_t *msg, zb_uint8_t *c);
+#define ZB_AES128 hw_aes128
+#else
+#define ZB_AES128 zb_sw_aes128
 #endif
 
 #ifdef ZB_HW_ZB_AES128_DEC
-void hw_aes128_dec(zb_uint8_t *key, zb_uint8_t *msg, zb_uint8_t *c);
+void hw_aes128_dec(const zb_uint8_t *key, const zb_uint8_t *msg, zb_uint8_t *c);
 
-#define zb_aes128_dec hw_aes128_dec
+#define ZB_AES128_DEC hw_aes128_dec
+#else
+#define ZB_AES128_DEC zb_sw_aes128_dec
+#endif
+
+#ifdef ZB_HW_ECDH_P256_PUBLIC_KEY
+zb_ret_t zb_hw_ecdh_p256_public_key(const zb_uint8_t prv_key[32], zb_uint8_t pub_key[64]);
+
+#define ZB_ECDH_P256_PUBLIC_KEY zb_hw_ecdh_p256_public_key
+#else
+#define ZB_ECDH_P256_PUBLIC_KEY zb_sw_ecdh_p256_public_key
+#endif
+
+#ifdef ZB_HW_ECDH_P256_SHARED_SECRET
+zb_ret_t zb_hw_ecdh_p256_shared_secret(zb_uint8_t s[32],
+                                       const zb_uint8_t *prv_key,
+                                       const zb_uint8_t *pub_key);
+
+#define ZB_ECDH_P256_SHARED_SECRET zb_hw_ecdh_p256_shared_secret
+#else
+#define ZB_ECDH_P256_SHARED_SECRET zb_sw_ecdh_p256_shared_secret
+#endif
+
+#if defined(ZB_HW_HMAC_SHA_256) && defined(ZB_DIRECT_ENABLED)
+zb_ret_t zb_hw_hmac_sha_256(const zb_uint8_t *key, const zb_size_t key_len,
+                         const zb_uint8_t *input, const zb_size_t input_len, zb_uint8_t *output);
+
+#define ZB_HMAC_SHA_256 zb_hw_hmac_sha_256
+#else
+#define ZB_HMAC_SHA_256 zb_sw_hmac_sha_256
+#endif /* ZB_HW_HMAC_SHA_256 && ZB_DIRECT_ENABLED */
+
+#ifdef ZB_HW_CCM_ENCRYPT_N_AUTH_RAW
+zb_ret_t zb_hw_ccm_encrypt_n_auth_raw(zb_uint8_t *key,
+                                      const zb_uint8_t *nonce,
+                                      const zb_uint8_t *string_a,
+                                      zb_uint32_t string_a_len,
+                                      const zb_uint8_t *string_m,
+                                      zb_uint32_t string_m_len,
+                                      zb_uint8_t *dest_buf,
+                                      zb_uint16_t dest_len);
+
+#define ZB_CCM_ENCRYPT_N_AUTH_RAW zb_hw_ccm_encrypt_n_auth_raw
+#else
+#define ZB_CCM_ENCRYPT_N_AUTH_RAW zb_sw_ccm_encrypt_n_auth_raw
+#endif
+
+#ifdef ZB_HW_CCM_DECRYPT_N_AUTH_RAW
+zb_ret_t zb_hw_ccm_decrypt_n_auth_raw(zb_uint8_t *key,
+                                      const zb_uint8_t *nonce,
+                                      const zb_uint8_t *string_a,
+                                      zb_uint32_t string_a_len,
+                                      const zb_uint8_t *string_c_u,
+                                      zb_uint16_t string_c_u_len,
+                                      zb_uint8_t *string_dest,
+                                      zb_uint16_t *string_dest_len);
+
+#define ZB_CCM_DECRYPT_N_AUTH_RAW zb_hw_ccm_decrypt_n_auth_raw
+#else
+#define ZB_CCM_DECRYPT_N_AUTH_RAW zb_sw_ccm_decrypt_n_auth_raw
+#endif
+
+#ifdef ZB_HW_CRYPTO_SCALARMULT
+zb_int_t zb_hw_crypto_scalarmult(zb_uint8_t *result_point,
+                                 const zb_uint8_t *scalar,
+                                 const zb_uint8_t *point);
+
+#define ZB_CRYPTO_SCALARMULT zb_hw_crypto_scalarmult
+#else
+#define ZB_CRYPTO_SCALARMULT zb_sw_crypto_scalarmult
 #endif
 
 #endif  /* HW_CRYPTO_API_H */

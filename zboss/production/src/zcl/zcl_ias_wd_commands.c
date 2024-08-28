@@ -143,10 +143,12 @@ void zb_zcl_ias_wd_start_warning_invoke_user_app(zb_uint8_t param)
   }
   else
   {
-    result = RET_NOT_IMPLEMENTED;
+    result = RET_ERROR;
   }
 
-  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, zb_zcl_get_zcl_status_from_ret(result));
+  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, result==RET_OK ? ZB_ZCL_STATUS_SUCCESS :
+                               (zb_zcl_get_backward_compatible_statuses_mode() == ZB_ZCL_STATUSES_ZCL8_MODE) ?
+                                ZB_ZCL_STATUS_FAIL : ZB_ZCL_STATUS_HW_FAIL);
 
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_ias_wd_start_warning_invoke_user_app", (FMT__0));
 }
@@ -223,10 +225,10 @@ void zb_zcl_ias_wd_squawk_invoke_user_app(zb_uint8_t param)
   }
   else
   {
-    result = RET_NOT_IMPLEMENTED;
+    result = RET_ERROR;
   }
 
-  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, zb_zcl_get_zcl_status_from_ret(result));
+  ZB_ZCL_PROCESS_COMMAND_FINISH(param, &cmd_info, result==RET_OK ? ZB_ZCL_STATUS_SUCCESS : ZB_ZCL_STATUS_FAIL);
 
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_ias_wd_squawk_invoke_user_app", (FMT__0));
 }

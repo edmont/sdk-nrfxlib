@@ -721,8 +721,8 @@ static zb_bool_t zb_zcl_metering_process_request_fast_poll_mode(zb_uint8_t param
                                       param, cmd_info, &pl_out, 0, NULL);
       break;
     case RET_ERROR:
-      TRACE_MSG(TRACE_ZCL1, "ERROR during command processing: "
-                "User callback failed with err=%d.",
+      TRACE_MSG(TRACE_ZCL1,
+                "ERROR during command processing: User callback failed with err=%d.",
                 (FMT__D, ZB_ZCL_DEVICE_CMD_PARAM_STATUS(param)));
       /* FALLTHRU */
     default:
@@ -774,8 +774,8 @@ static zb_bool_t zb_zcl_metering_process_get_snapshot(zb_uint8_t param,
       zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_NOT_FOUND);
       break;
     case RET_ERROR:
-      TRACE_MSG(TRACE_ZCL1, "ERROR during command processing: "
-                "User callback failed with err=%d.",
+      TRACE_MSG(TRACE_ZCL1,
+                "ERROR during command processing:  User callback failed with err=%d.",
                 (FMT__D, ZB_ZCL_DEVICE_CMD_PARAM_STATUS(param)));
       /* FALLTHRU */
     default:
@@ -826,8 +826,8 @@ static zb_bool_t zb_zcl_metering_process_get_sampled_data(zb_uint8_t param,
       zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_NOT_FOUND);
       break;
     case RET_ERROR:
-      TRACE_MSG(TRACE_ZCL1, "ERROR during command processing: "
-                "User callback failed with err=%d.",
+      TRACE_MSG(TRACE_ZCL1,
+                "ERROR during command processing: User callback failed with err=%d.",
                 (FMT__D, ZB_ZCL_DEVICE_CMD_PARAM_STATUS(param)));
       /* FALLTHRU */
     default:
@@ -875,8 +875,8 @@ static zb_bool_t zb_zcl_metering_process_get_profile(zb_uint8_t param,
                                       param, cmd_info, &pl_out, 0, NULL);
       break;
     case RET_ERROR:
-      TRACE_MSG(TRACE_ZCL1, "ERROR during command processing: "
-                "User callback failed with err=%d.",
+      TRACE_MSG(TRACE_ZCL1,
+                "ERROR during command processing: User callback failed with err=%d.",
                 (FMT__D, ZB_ZCL_DEVICE_CMD_PARAM_STATUS(param)));
       /* FALLTHRU */
     default:

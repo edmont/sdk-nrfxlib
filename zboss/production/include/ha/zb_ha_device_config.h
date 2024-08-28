@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -233,6 +233,16 @@ enum zb_ha_standard_devs_e
  */
 #define ZB_ZCL_SUPPORT_CLUSTER_DEHUMIDIFICATION_CONTROL 1
 #define ZB_ZCL_SUPPORT_CLUSTER_OCCUPANCY_SENSING        1
+#define ZB_ZCL_SUPPORT_CLUSTER_ANALOG_VALUE             1
+#define ZB_ZCL_SUPPORT_CLUSTER_MULTISTATE_VALUE         1
+#define ZB_ZCL_SUPPORT_CLUSTER_DEVICE_TEMP_CONFIG       1
+
+#define ZB_ZCL_SUPPORT_CLUSTER_CARBON_DIOXIDE_MEASUREMENT 1
+#define ZB_ZCL_SUPPORT_CLUSTER_PM2_5_MEASUREMENT          1
+
+#ifdef ZB_DIRECT_ENABLED
+#define ZB_ZCL_SUPPORT_CLUSTER_DIRECT_CONFIGURATION
+#endif /* ZB_DIRECT_ENABLED */
 
 #endif /* ZB_ALL_DEVICE_SUPPORT */
 

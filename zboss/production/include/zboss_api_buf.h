@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -77,13 +77,14 @@ typedef ZB_PACKED_PRE struct zb_buf_hdr_s
                                     * encrypted by */
   zb_bitfield_t zdo_cmd_no_resp:1; /*!< if 1, this is ZDO command with no
                                     * response - call callback at confirm  */
-  zb_bitfield_t is_rx_buf:1;        /*!< if 1, this is buffer with received packet and
-                                     * nwk_mac_addrs_t is at buffer tail */
+  zb_bitfield_t is_rx_buf:1;    /*!< if 1, this is buffer with received packet and
+                                 * nwk_mac_addrs_t is at buffer tail */
   zb_bitfield_t has_aps_payload:1;  /*!< if 1, than packet comes from APS, the flag is needed
                                      * to increase APS packets counter in diagnostic data on packet sending
                                      */
   zb_bitfield_t has_aps_user_payload:1;   /*!< if 1, than packet comes with APS user's payload */
-  zb_uint8_t reserved:7;
+
+  zb_bitfield_t tail_len:7;    /*!< the length of the perameters section  */
 } ZB_PACKED_STRUCT zb_buf_hdr_t;
 
 /* if there is a platform with failed assertion, ZB_RESERVED_BUF_TO_ALIGN_HDR_SIZE
@@ -115,7 +116,7 @@ zb_buf_usage_t;
 typedef struct zb_mult_buf_s
 {
 #ifdef ZB_BUF_SHIELD
-  zb_uint8_t hdr_signature;
+  zb_uint32_t hdr_signature;
 #endif
 /* 07/12/2019 EE CR:MINOR Lagecy code will access u.hdr, so need to keep u as union or structure
    AN: Legacy code inside ZBOSS will use zb_leg_buf_t instead of zb_mult_buf_t.
@@ -128,9 +129,14 @@ typedef struct zb_mult_buf_s
   zb_buf_usage_t buf_usages[ZB_DEBUG_BUFFERS_EXT_USAGES_COUNT];
 #endif
 #ifdef ZB_BUF_SHIELD
+  /* It is not necessary to make sure a whole structure size is aligned.
+  The structure itself is not packet, so, every it's item will be aligned in an array */
   zb_uint8_t tail_signature;
 #endif
 } zb_mult_buf_t;
+
+/* This assertion checks if a buffer is properly aligned. */
+ZB_ASSERT_COMPILE_DECL((ZB_OFFSETOF(zb_mult_buf_t, buf) % sizeof(zb_uint32_t)) == 0);
 
 /**
    Packet buffer (legacy)
@@ -236,6 +242,7 @@ void zb_buf_cut_right_func(TRACE_PROTO zb_bufid_t buf, zb_uint_t size);
 void *zb_buf_cut_left_func(TRACE_PROTO zb_bufid_t buf, zb_uint_t size);
 void *zb_buf_alloc_right_func(TRACE_PROTO zb_bufid_t buf, zb_uint_t size);
 void *zb_buf_alloc_left_func(TRACE_PROTO zb_bufid_t buf, zb_uint_t size);
+
 /** @endcond */ /* internals_doc */
 
 /**
@@ -315,7 +322,9 @@ void *zb_buf_alloc_left_func(TRACE_PROTO zb_bufid_t buf, zb_uint_t size);
  * Depending on the specific value, the buffer pool may decide to use a fraction
  * of buffer or long buffers. If the value is set to 0, the payload size will be equal
  * to the size of a single default buffer.
- * @return RET_OK or error code.
+ * @return RET_OK if allocation has successfully scheduled.
+ *         RET_ERROR if there is no room to schedule buffer allocation.
+ *         RET_OUT_OF_RANGE if buffer with such payload size can't be allocated.
  */
 #ifndef zb_buf_get_out_delayed_ext
 #define zb_buf_get_out_delayed_ext(callback,arg,max_size) zb_buf_get_out_delayed_ext_func(TRACE_CALL (callback),(arg),(max_size))
@@ -335,7 +344,9 @@ void *zb_buf_alloc_left_func(TRACE_PROTO zb_bufid_t buf, zb_uint_t size);
  * Depending on the specific value, the buffer pool may decide to use a fraction
  * of buffer or long buffers. If the value is set to 0, the payload size will be equal
  * to the size of a single default buffer.
- * @return RET_OK or error code.
+ * @return RET_OK if allocation has successfully scheduled.
+ *         RET_ERROR if there is no room to schedule buffer allocation.
+ *         RET_OUT_OF_RANGE if buffer with such payload size can't be allocated.
  */
 #ifndef zb_buf_get_in_delayed_ext
 #define zb_buf_get_in_delayed_ext(callback,arg,max_size) zb_buf_get_in_delayed_ext_func(TRACE_CALL (callback),(arg),(max_size))
@@ -382,7 +393,6 @@ void *zb_buf_alloc_left_func(TRACE_PROTO zb_bufid_t buf, zb_uint_t size);
 
 /**
    Copy one buffer to another
-
    @param dst_buf - destination buffer
    @param src_buf - source buffer
  */
@@ -500,7 +510,6 @@ void *zb_buf_alloc_left_func(TRACE_PROTO zb_bufid_t buf, zb_uint_t size);
  */
 #define zb_buf_alloc_left(buf,size) zb_buf_alloc_left_func(TRACE_CALL (buf),(size))
 
-
 /**
  * @name Buffer's internals flags bitmask
  * @anchor buf_flags_bm
@@ -517,6 +526,7 @@ void *zb_buf_alloc_left_func(TRACE_PROTO zb_bufid_t buf, zb_uint_t size);
 #define ZB_BUF_ZDO_CMD_NO_RESP  (1U << 5)
 #define ZB_BUF_HAS_APS_PAYLOAD  (1U << 6) /*!< Flag to indicate whether the buffer contains any APS payload */
 #define ZB_BUF_HAS_APS_USER_PAYLOAD  (1U << 7) /*!< Flag to indicate whether the buffer contains APS user payload */
+
 /** @} */
 
 /**
@@ -656,17 +666,17 @@ zb_bool_t zb_buf_get_mac_rx_need(void);
 
 zb_bool_t zb_buf_have_rx_bufs(void);
 
-#define ZB_BUF_COPY_FLAG_APS_PAYLOAD(dst, src)                          \
+#define ZB_BUF_COPY_FLAG_APS_PAYLOAD(dst, src)                   \
   do {                                                                  \
     if ((zb_buf_flags_get((src)) & ZB_BUF_HAS_APS_PAYLOAD) != 0U)       \
-    {                                                                   \
-      zb_buf_flags_or((dst), ZB_BUF_HAS_APS_PAYLOAD);                   \
+    {                                                            \
+      zb_buf_flags_or((dst), ZB_BUF_HAS_APS_PAYLOAD);            \
                                                                         \
       if ((zb_buf_flags_get((src)) & ZB_BUF_HAS_APS_USER_PAYLOAD) != 0U)\
       {                                                                 \
         zb_buf_flags_or((dst), ZB_BUF_HAS_APS_USER_PAYLOAD);            \
       }                                                                 \
-    }                                                                   \
+    }                                                            \
   } while(0)
 
 /*! @} */

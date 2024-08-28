@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2023 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -203,7 +203,7 @@ enum zb_zcl_electrical_measurement_attr_e
   /** Represents the single phase or Phase A, current demand of apparent (Square root
    *  of active and reactive power) power, in @e VA. */
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_APPARENT_POWER_ID                            = 0x050F,
-  /** Contains the single phase or PhaseA, Power Factor ratio in 1/100ths. */
+  /** Contains the single phase or PhaseA, Power Factor ratio in 1/100th. */
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_FACTOR_ID                              = 0x0510,
   /** The Period in seconds that the RMS voltage is averaged over. */
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AVERAGE_RMSVOLTAGE_MEASUREMENT_PERIOD_ID     = 0x0511,
@@ -308,7 +308,7 @@ enum zb_zcl_electrical_measurement_attr_e
   /** Represents the Phase B, current demand of apparent (Square root of active and
    *  reactive power) power, in @e VA. */
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_APPARENT_POWER_PHB_ID                        = 0x090F,
-  /** Contains the PhaseB, Power Factor ratio in 1/100ths. */
+  /** Contains the PhaseB, Power Factor ratio in 1/100th. */
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_FACTOR_PH_B_ID                         = 0x0910,
   /** The number of times the average RMS voltage, has been above the
    *  @e AverageRMS @e OverVoltage threshold since last reset. */
@@ -361,7 +361,7 @@ enum zb_zcl_electrical_measurement_attr_e
   /** Represents the Phase C, current demand of apparent (Square root of active and
    *  reactive power) power, in @e VA. */
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_APPARENT_POWER_PHC_ID                        = 0x0A0F,
-  /** Contains the Phase C, Power Factor ratio in 1/100ths. */
+  /** Contains the Phase C, Power Factor ratio in 1/100th. */
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_FACTOR_PH_C_ID                         = 0x0a10,
   /** The Period in seconds that the RMS voltage is averaged over*/
   ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_AVERAGE_RMSVOLTAGE_MEASUREMENT_PERIOD_PHC_ID = 0x0A11,
@@ -908,6 +908,10 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
     prfl_id, ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, cb);                                       \
 }
 
+/**
+ *  @deprecated This function will be removed in the next Major release
+ *              Use @ref ZB_ZCL_ELECTRICAL_MEASUREMENT_SEND_GET_MEASUREMENT_PROFILE_RESP() instead
+*/
 #define ZB_ZCL_ELECTRICAL_MEASUREMENT_SEND_GET_MEASUREMENT_PROFILE_INFO_RESP(                     \
   buffer, addr, dst_addr_mode, dst_ep, ep, prfl_id, def_resp, cb,                                 \
   start_time, status, profile_interval_period, number_of_intervals_delivered, attr_id,            \
@@ -931,6 +935,31 @@ enum zb_zcl_electrical_measurement_cli_cmd_e
   ZB_ZCL_SEND_COMMAND_SHORT(buffer, addr, dst_addr_mode, dst_ep, ep,                              \
     prfl_id, ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, cb);                                       \
 }
+
+#define ZB_ZCL_ELECTRICAL_MEASUREMENT_SEND_GET_MEASUREMENT_PROFILE_RESP(                          \
+  buffer, addr, dst_addr_mode, dst_ep, ep, prfl_id, def_resp, cb,                                 \
+  start_time, status, profile_interval_period, number_of_intervals_delivered, attr_id,            \
+  attr_type, list_of_intervals)                                                                   \
+{                                                                                                 \
+  zb_uint8_t ind;                                                                                 \
+  zb_uint8_t* ptr = ZB_ZCL_START_PACKET(buffer)                                                   \
+  ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_RES_FRAME_CONTROL(ptr, def_resp)                              \
+  ZB_ZCL_CONSTRUCT_COMMAND_HEADER(ptr, ZB_ZCL_GET_SEQ_NUM(),                                      \
+    ZB_ZCL_CMD_ELECTRICAL_MEASUREMENT_GET_MEASUREMENT_PROFILE_RESPONSE_COMMAND);                  \
+  ZB_ZCL_PACKET_PUT_DATA32_VAL(ptr, (start_time));                                                \
+  ZB_ZCL_PACKET_PUT_DATA8(ptr, (status));                                                         \
+  ZB_ZCL_PACKET_PUT_DATA8(ptr, (profile_interval_period));                                        \
+  ZB_ZCL_PACKET_PUT_DATA8(ptr, (number_of_intervals_delivered));                                  \
+  ZB_ZCL_PACKET_PUT_DATA16_VAL(ptr, (attr_id));                                                   \
+  for (ind=0; ind < number_of_intervals_delivered; ind++)                                         \
+  {                                                                                               \
+    (ptr) = zb_zcl_put_value_to_packet((ptr), (attr_type), list_of_intervals[ind]);               \
+  }                                                                                               \
+  ZB_ZCL_FINISH_PACKET(buffer, ptr)                                                               \
+  ZB_ZCL_SEND_COMMAND_SHORT(buffer, addr, dst_addr_mode, dst_ep, ep,                              \
+    prfl_id, ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, cb);                                       \
+}
+
 /*! @}
     @endcond */ /* Electrical Measurement cluster internals */
 

@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -316,6 +316,8 @@ ZB_DECLARE_SIMPLE_DESC(8,9);
 #define ZB_AF_SE_PROFILE_ID       0x0109U
 /** ZLL profile identifier. */
 #define ZB_AF_ZLL_PROFILE_ID      0xC05EU
+/** Test profile id */
+#define ZB_AF_TEST_PROFILE_ID     0x7F01U
 /** Wildcard profile identifier. */
 #define ZB_AF_WILDCARD_PROFILE_ID 0xFFFFU
 /** GreenPower profile ID */
@@ -364,6 +366,9 @@ typedef ZB_PACKED_PRE struct zb_af_endpoint_desc_s
 
       If set, will be called on identification start and stop indicating start
       event with a non-zero argument
+
+      @deprecated will be removed after June 2023. Use @ref ZB_ZCL_REGISTER_DEVICE_CB
+      with @ref ZB_ZCL_SET_ATTR_VALUE_CB_ID instead of it.
   */
   zb_callback_t identify_handler;
   zb_uint8_t reserved_size; /*!< Unused parameter (reserved for future use) */

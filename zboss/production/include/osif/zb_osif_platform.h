@@ -46,7 +46,7 @@ void zb_osif_serial_flush(void);
 #define ZB_HW_ZB_AES128
 
 #ifdef ZB_HW_ZB_AES128
-void zb_osif_aes128_hw_encrypt(zb_uint8_t *key, zb_uint8_t *msg, zb_uint8_t *c);
+void zb_osif_aes128_hw_encrypt(const zb_uint8_t *key, const zb_uint8_t *msg, zb_uint8_t *c);
 #define hw_aes128                       zb_osif_aes128_hw_encrypt
 #endif /* ZB_HW_ZB_AES128 */
 
@@ -312,6 +312,10 @@ zb_bool_t zb_osif_is_sleeping(void);
 #ifdef CONFIG_ZB_HAVE_SERIAL
 #define ZB_HAVE_SERIAL
 #define ZB_HAVE_ASYNC_SERIAL
+#define ZB_HAVE_SERIAL_SINGLE
+#ifndef ZB_TRACE_SERIAL_BAUDRATE
+#define ZB_TRACE_SERIAL_BAUDRATE 115200U
+#endif /* ZB_TRACE_SERIAL_BAUDRATE */
 #endif  /* CONFIG_ZB_HAVE_SERIAL */
 
 #ifdef CONFIG_ZB_USE_LEDS

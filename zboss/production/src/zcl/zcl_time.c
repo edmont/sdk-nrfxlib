@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -55,9 +55,7 @@
 zb_ret_t check_value_time_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_uint8_t *value);
 void zb_zcl_time_write_attr_hook_server(zb_uint8_t endpoint, zb_uint16_t attr_id, zb_uint8_t *new_value, zb_uint16_t manuf_code);
 
-#ifdef THAT_CB_IS_NEVER_USED_CAUSING_WARNING
 static zb_zcl_time_set_real_time_clock_t       zb_zcl_set_real_time_clock_cb;
-#endif
 static zb_zcl_time_sync_time_server_found_cb_t zb_zcl_time_server_found_cb = NULL;
 static zb_bool_t                               zb_zcl_search_in_process = ZB_FALSE;
 static zb_uint8_t                              zb_zcl_src_search_endpoint   = 0;
@@ -173,6 +171,8 @@ zb_bool_t zb_zcl_time_server_read_attr_handle(zb_uint8_t param)
     TRACE_MSG(TRACE_ZCL1, "Mallformed Read Time Status attribute response", (FMT__H, param));
   }
 
+  zb_zcl_send_default_handler(param, cmd_info, ZB_ZCL_STATUS_SUCCESS);
+
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_time_server_read_attr_handle", (FMT__0));
 
   return ZB_TRUE;
@@ -185,8 +185,8 @@ static void zb_zcl_time_server_start_search_cb(zb_uint8_t param)
   zb_uint8_t dst_endpoint;
   zb_uint16_t short_addr;
   zb_uint8_t *match_ep;
-  zb_uint8_t *cmd_ptr;
   zb_apsde_data_indication_t *ind = ZB_BUF_GET_PARAM(param, zb_apsde_data_indication_t);
+  zb_uint8_t *cmd_ptr;
 
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_time_server_start_search_cb %hd", (FMT__H, param));
 
@@ -204,6 +204,7 @@ static void zb_zcl_time_server_start_search_cb(zb_uint8_t param)
     /* ZB_BUF_CLEAR_PARAM(ZB_BUF_FROM_REF(param)); */
 
     /* Send Read time status and time attributes */
+
     ZB_ZCL_GENERAL_INIT_READ_ATTR_REQ(param, cmd_ptr, ZB_ZCL_ENABLE_DEFAULT_RESPONSE);
     ZB_ZCL_GENERAL_ADD_ID_READ_ATTR_REQ(cmd_ptr, (ZB_ZCL_ATTR_TIME_TIME_STATUS_ID));
     ZB_ZCL_GENERAL_ADD_ID_READ_ATTR_REQ(cmd_ptr, (ZB_ZCL_ATTR_TIME_TIME_ID));
@@ -211,17 +212,13 @@ static void zb_zcl_time_server_start_search_cb(zb_uint8_t param)
         param, cmd_ptr, short_addr, ZB_APS_ADDR_MODE_16_ENDP_PRESENT, dst_endpoint, zb_zcl_src_search_endpoint,
          ZB_AF_HA_PROFILE_ID, (ZB_ZCL_CLUSTER_ID_TIME), NULL);
 
-
     TRACE_MSG(TRACE_ZCL2, "find_time cluster addr %d ep %hd",
               (FMT__D_H, short_addr, dst_endpoint));
-
-
   }
   else
   {
     zb_buf_free(param);
   }
-
 
   TRACE_MSG(TRACE_ZCL1, "> zb_zcl_time_server_start_search_cb", (FMT__0));
 }
@@ -243,7 +240,6 @@ static void zb_zcl_time_server_start_search(zb_uint8_t param)
   req->cluster_list[0] = ZB_ZCL_CLUSTER_ID_TIME;
 
   zb_zdo_match_desc_req(param, zb_zcl_time_server_start_search_cb);
-
 
   TRACE_MSG(TRACE_ZCL1, "< zb_zcl_time_server_start_search", (FMT__0));
 }
@@ -281,9 +277,12 @@ void zb_zcl_time_init_server()
 void zb_zcl_set_real_time_clock_callback(zb_zcl_time_set_real_time_clock_t cb)
 {
   ZVUNUSED(cb);
-#ifdef THAT_CB_IS_NEVER_USED_CAUSING_WARNING
   zb_zcl_set_real_time_clock_cb = cb;
-#endif
+}
+
+zb_bool_t zb_zcl_call_real_time_clock_callback(zb_uint32_t time)
+{
+  return zb_zcl_set_real_time_clock_cb(time);
 }
 
 void zb_zcl_time_init_client()
@@ -351,9 +350,8 @@ zb_ret_t check_value_time_server(zb_uint16_t attr_id, zb_uint8_t endpoint, zb_ui
     }
     else if (ZB_ZCL_TIME_TIME_INVALID_VALUE == ZB_ZCL_ATTR_GET32(value))
     {
-      zb_uint32_t val = ZB_ZCL_ATTR_GET32(value);
       TRACE_MSG(TRACE_ZCL1, "Invalid attribute value! attr_id == 0x%x, value == 0x%lx",
-                (FMT__D_L, attr_id, val));
+                (FMT__D_L, attr_id, ZB_ZCL_ATTR_GET32(value)));
       return RET_ERROR;
     }
   }

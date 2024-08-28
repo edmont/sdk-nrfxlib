@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -48,17 +48,22 @@
 /*! \addtogroup ZB_NWK */
 /*! @{ */
 
-/* to be able to limit addr_ref size to 7 bits, limit address translation table
- * size to 127  */
+/* to be able to limit addr_ref size to 1 byte, limit address translation table
+ * size to 255  */
 #ifndef ZB_CONFIGURABLE_MEM
-ZB_ASSERT_COMPILE_DECL(ZB_IEEE_ADDR_TABLE_SIZE < 128);
+ZB_ASSERT_COMPILE_DECL(ZB_IEEE_ADDR_TABLE_SIZE < 255);
 #endif
 ZB_ASSERT_COMPILE_DECL(ZB_NWK_ROUTER_AGE_LIMIT < 4);
 
+#ifdef ZB_ROUTER_ROLE
+#define ZB_MAX_CHILDREN ZB_NEIGHBOR_TABLE_SIZE
+#define ZB_MAX_ED_CAPACITY_DEFAULT ((ZB_NEIGHBOR_TABLE_SIZE)/2u)
+#endif
+
 /* zb_neighbor_tbl_ent_t moved to zboss_api_internal.h for configurable memory feature. */
 
-/* Ext neighbor as an alias to the neighbor entry */
-typedef zb_neighbor_tbl_ent_t zb_ext_neighbor_tbl_ent_t;
+/* use nwkDiscoveryTable instead of old ext neighbor */
+typedef zb_nwk_disc_tbl_ent_t zb_ext_neighbor_tbl_ent_t;
 
 typedef struct zb_nbr_iterator_data_s {
   /*! Stores the neighbour table update counter. */
@@ -76,9 +81,11 @@ typedef struct zb_neighbor_tbl_s
   zb_neighbor_tbl_ent_t     neighbor[ZB_NEIGHBOR_TABLE_SIZE];
   /*! array for addressing neighbor table by network address ref */
   zb_uint8_t                addr_to_neighbor[ZB_IEEE_ADDR_TABLE_SIZE];
+  zb_nwk_disc_tbl_ent_t     disc_table[ZB_NWK_DISC_TABLE_SIZE];
 #else
   zb_neighbor_tbl_ent_t     *neighbor;
   zb_uint8_t                *addr_to_neighbor;
+  zb_nwk_disc_tbl_ent_t     *disc_table;
 #endif
   zb_nbr_iterator_data_t    iterator_data;
   /*! clock pointer for incoming_frame_counter expire */
@@ -88,6 +95,9 @@ typedef struct zb_neighbor_tbl_s
 #ifdef ZB_ROUTER_ROLE
 /*NBT element to start parent_annce from */
   zb_uint8_t parent_annce_position;
+  zb_uint8_t max_ed_capacity; /*!< The number of ED children a device is allowed to have */
+  zb_uint8_t ed_child_num;    /*!< Number of child ed devices */
+  zb_uint8_t r_sibling_num;   /*!< Number of sibling router devices */
 #endif
   zb_uint8_t transmit_failure_threshold;
   zb_uint8_t transmit_failure_timeout;
@@ -158,7 +168,7 @@ zb_ret_t zb_nwk_neighbor_get(zb_address_ieee_ref_t addr_ref, zb_bool_t create_if
    @param short_addr - address
    @param nbt - (out) neighbor table entry
 
-   @return RET_OK if forund, else RET_NOT_FOUND
+   @return RET_OK if found, else RET_NOT_FOUND
    if error
  */
 zb_ret_t zb_nwk_neighbor_get_by_short(zb_uint16_t short_addr, zb_neighbor_tbl_ent_t **nbt);
@@ -169,7 +179,7 @@ zb_ret_t zb_nwk_neighbor_get_by_short(zb_uint16_t short_addr, zb_neighbor_tbl_en
    @param long_addr - address
    @param nbt - (out) neighbor table entry
 
-   @return RET_OK if forund, else RET_NOT_FOUND
+   @return RET_OK if found, else RET_NOT_FOUND
    if error
  */
 zb_ret_t zb_nwk_neighbor_get_by_ieee(const zb_ieee_addr_t long_addr, zb_neighbor_tbl_ent_t **nbt);
@@ -200,12 +210,12 @@ void zb_nwk_neighbor_remove_non_extnbrs(void);
 /**
    Copy ext entry to base, to be able to send packet to it.
 
-   @param ext_ent - pointer to external table entry
-   @param do_cp - if ZB_TRUE, create new entry, else convert ext to base neighbor
+   @param eent - pointer to extended table entry
+   @param nent - OUT pointer to pointer to the result - just created nbt entry. If NULL, caller don't care.
 
    @return RET_OK if success, error code if error
  */
-zb_ret_t zb_nwk_neighbor_ext_to_base(zb_ext_neighbor_tbl_ent_t *ent, zb_bool_t do_cp);
+zb_ret_t zb_nwk_neighbor_ext_to_base(zb_ext_neighbor_tbl_ent_t *eent, zb_neighbor_tbl_ent_t **nent);
 
 
 /**
@@ -247,20 +257,6 @@ zb_ushort_t zb_nwk_nbr_next_ze_children_i(zb_uint16_t addr, zb_ushort_t i);
  */
 zb_ushort_t zb_nwk_nbr_next_ze_children_rx_off_i(zb_ushort_t i);
 
-#if defined ZB_NWK_STOCHASTIC_ADDRESS_ASSIGN && defined ZB_ROUTER_ROLE     /* Zigbee pro */
-
-/**
-   Get neighbor table entry with flag need_rejoin==1
-
-   @param nbt - (out) neighbor table entry
-
-   @return RET_OK if found, else RET_NOT_FOUND
-   if error
- */
-zb_ret_t zb_nwk_neighbor_with_need_rejoin(zb_neighbor_tbl_ent_t **nbt);
-
-#endif
-
 /**
    Get neighbor table size
 */
@@ -290,8 +286,13 @@ zb_uint8_t zb_nwk_neighbour_get_path_cost(zb_neighbor_tbl_ent_t *nbt);
 
 #endif /* ZB_ROUTER_ROLE */
 
+zb_uint8_t zb_nwk_neighbor_update_lqa(zb_neighbor_tbl_ent_t *nbt, zb_uint8_t raw_lqa);
+
+void zb_nwk_neighbor_update_lqa_rssi(zb_neighbor_tbl_ent_t *nbt, zb_uint8_t lqi, zb_int8_t rssi);
 
 #if !defined ZB_ED_ROLE && defined ZB_MAC_DUTY_CYCLE_MONITORING
+zb_uint8_t zb_nwk_neighbor_get_subghz_count(void);
+zb_address_ieee_ref_t zb_nwk_neighbor_get_top_ith_device(zb_uint8_t i);
 /** @fn zb_uint8_t zb_nwk_neighbor_get_subghz_list(zb_uint8_t *ref_list, zb_uint8_t max_records)
  *  @brief Builds list of Sub-GHz devices
  *  @details Returns list of references to Sub-GHz devices entries in neighbor table sorted by
@@ -315,7 +316,35 @@ void zb_nwk_nbr_iterator_update_counter(void);
 #define EXN_START_I 1U
 
 #ifdef ZB_ROUTER_ROLE
-zb_bool_t zb_nwk_ed_is_our_child(zb_uint16_t addr);
+zb_bool_t zb_nwk_ed_or_zvd_is_our_child(zb_uint16_t addr);
+#endif /* ZB_ROUTER_ROLE */
+
+void zb_nwk_nbt_print(void);
+
+#ifdef ZB_ROUTER_ROLE
+
+#define ZB_ROUTER_ACTIVITY_THRESHOLD 2u
+
+void zb_nwk_nbt_inc_child_num(zb_bool_t is_router);
+
+void zb_nwk_nbt_dec_child_num(zb_bool_t is_router);
+
+void zb_nwk_nbt_reset_child_num(void);
+
+zb_bool_t zb_nwk_nbt_have_space_for_device(zb_bool_t is_router);
+
+zb_bool_t zb_nwk_nbt_have_space_for_ed(void);
+
+zb_bool_t zb_nwk_nbt_have_space_for_r(void);
+
+zb_bool_t zb_nwk_nbt_capacity_is_full(void);
+
+zb_bool_t zb_nwk_nbt_have_ed_children(void);
+
+zb_uint16_t zb_nwk_nbt_get_rank_of_router(zb_neighbor_tbl_ent_t *nbt);
+
+zb_neighbor_tbl_ent_t* zb_nwk_nbt_get_entry_for_substitution(void);
+
 #endif /* ZB_ROUTER_ROLE */
 
 #endif /* ZB_NWK_NEIGHBOR_H */

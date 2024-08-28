@@ -47,6 +47,8 @@
 #include "zcl/zb_zcl_common.h"
 #include "zcl/zb_zcl_commands.h"
 
+#ifdef ZB_ZCL_SUPPORT_CLUSTER_WWAH
+
 /** @cond DOXYGEN_ZCL_SECTION */
 
 /* Cluster ZB_ZCL_CLUSTER_ID_WWAH */
@@ -225,7 +227,7 @@ enum zb_zcl_wwah_attr_e
 #define ZB_ZCL_WWAH_OTA_MAX_OFFLINE_DURATION_MAX_VALUE 0xFFFF
 
 /** @brief Additional MAC Poll retry count */
-#define ZB_ZCL_WWAH_MAC_POLL_RETRY_COUNT 2
+#define ZB_ZCL_WWAH_MAC_POLL_RETRY_COUNT 3
 
 /*! @} */ /* WWAH cluster attributes */
 
@@ -414,15 +416,6 @@ typedef ZB_PACKED_PRE struct zb_zcl_wwah_debug_report_s
   zb_char_t *report;     /**< Pointer to report data*/
 }
 ZB_PACKED_STRUCT zb_zcl_wwah_debug_report_t;
-
-typedef ZB_PACKED_PRE struct zb_zcl_wwah_classification_mask_s
-{
-  zb_bitfield_t tc_connectivity  :1; /**< TC Connectivity value */
-  zb_bitfield_t long_uptime :1; /**< Long Uptime value */
-  zb_bitfield_t reserved :6; /**< Reserved */
-}
-ZB_PACKED_STRUCT
-zb_zcl_wwah_classification_mask_t;
 
 #define ZB_ZCL_WWAH_PERIODIC_CHECKINS_CLUSTER_MATCH_DESC_TIME (ZB_TIME_ONE_SECOND * 20)
 #define ZB_ZCL_WWAH_PERIODIC_CHECKINS_MAX_FAILURE_CNT 3
@@ -643,13 +636,13 @@ typedef enum zb_zcl_wwah_behavior_e
   (void*) data_ptr                                                                                   \
 }
 
-typedef struct zb_zcl_wwah_cluster_list_s
+typedef ZB_PACKED_PRE struct zb_zcl_wwah_cluster_list_s
 {
-  zb_uint8_t number_of_clusters;                              /**< Number of Clusters */
+  zb_uint8_t number_of_clusters; /**< Number of Clusters */
   zb_uint8_t alignment[3];                                    /**< Alignment */
   zb_uint16_t cluster_id[ZB_ZCL_WWAH_CLUSTER_LIST_MAX_SIZE];  /**< Cluster list */
 }
-zb_zcl_wwah_cluster_list_t;
+ZB_PACKED_STRUCT zb_zcl_wwah_cluster_list_t;
 
 /*!
   @brief Parses various commands with cluster list variable length payload and fills data request structure.
@@ -1185,7 +1178,9 @@ typedef struct zb_zcl_wwah_attr_s
   zb_uint16_t ota_max_offline_duration;
 } zb_zcl_wwah_attr_t;
 
+#ifdef ZB_ZCL_ENABLE_WWAH_SERVER
 extern zb_zcl_wwah_attr_t wwah_attr;
+#endif /* ZB_ZCL_ENABLE_WWAH_SERVER */
 
 /** @internal @brief Declare attribute list for WWAH cluster
     @param attr_list - attribute list name
@@ -1229,47 +1224,6 @@ extern zb_zcl_wwah_attr_t wwah_attr;
 #define ZB_ZCL_WWAH_REPORT_ATTR_COUNT 0
 
 /***************************** commands *****************************/
-
-/** @internal Structure for beaconSurvey data type
- */
-
-/**
- *  @brief Determine a parent choose priority (WWAH-Requirements C-20)
- *
- *  End Devices examine all beacons in the Good Link Quality group
- *  (if received beacon with an RSSI above @see minRssiForReceivingPackets
- *  +30 dbm) and choose the parent with highest parent priority, as shown below.
- *  If no suitable parents exist in the Good Link Quality group, then the End
- *  Device shall examine all beacons in the Marginal Link Quality group.
- */
-typedef enum zb_zcl_wwah_parent_priority_e
-{
-  /*! Invalid value for parent priority */
-  ZB_ZCL_WWAH_PARENT_PRIORITY_INVALID   = 0,
-
-  /*! 0b00 - no TC connectivity and Short Uptime or no WWAH parent */
-  ZB_ZCL_WWAH_PARENT_PRIORITY_VERY_LOW  = 1,
-
-  /*! 0b01 - no TC connectivity and Long Uptime */
-  ZB_ZCL_WWAH_PARENT_PRIORITY_LOW       = 2,
-
-  /*! 0b10 - TC connectivity and Short Uptime */
-  ZB_ZCL_WWAH_PARENT_PRIORITY_HIGH      = 3,
-
-  /*! 0b11 - TC connectivity and Long Uptime */
-  ZB_ZCL_WWAH_PARENT_PRIORITY_VERY_HIGH = 4
-}
-zb_zcl_wwah_parent_priority_t;
-
-typedef ZB_PACKED_PRE struct zb_zcl_wwah_beacon_survey_s
-{
-  /*! The DeviceShort field contains the 16 bit short address of the beaconing device. */
-  zb_uint16_t device_short;
-  /*! This is the RSSI of the beacon, expressed in dBm. */
-  zb_int8_t rssi;
-  /*! This is the parent classification mask. */
-  zb_uint8_t classification_mask;
-} ZB_PACKED_STRUCT zb_zcl_wwah_beacon_survey_t;
 
 /*! @brief The PowerNotificationReason field is an enum containing all possible reasons for the power notification.
  */
@@ -2534,7 +2488,8 @@ enum zb_zcl_wwah_enrollment_mode_e
   ZB_ZCL_SEND_COMMAND_SHORT(                                                          \
     buffer, addr, dst_addr_mode, dst_ep, ep, prfl_id, ZB_ZCL_CLUSTER_ID_WWAH, NULL);  \
 }
-zb_bool_t zb_is_wwah_server(void);
+
+#ifdef ZB_ZCL_SUPPORT_CLUSTER_WWAH
 void wwah_post_commissioning_actions(void);
 zb_bool_t zb_zcl_wwah_check_new_channel(zb_uint32_t new_channel_mask);
 zb_bool_t zb_zcl_wwah_check_new_panid(zb_uint16_t new_panid);
@@ -2548,7 +2503,6 @@ zb_bool_t zb_zcl_wwah_check_cluster_permission(zb_uint16_t nwk_addr, zb_uint16_t
 zb_bool_t zb_zcl_wwah_check_if_leave_without_rejoin_allowed(void);
 zb_bool_t zb_zcl_wwah_check_if_wwah_rejoin_enabled(void);
 void zb_zcl_wwah_schedule_send_power_descriptor_change(void);
-zb_bool_t zb_zcl_wwah_check_zdo_command(zb_apsde_data_indication_t *di);
 zb_bool_t zb_zcl_wwah_check_if_interpan_supported(void);
 zb_bool_t zb_zcl_wwah_check_if_downgrade_disabled(void);
 zb_bool_t zb_zcl_wwah_periodic_checkin_read_attr_handle(zb_uint8_t param);
@@ -2567,6 +2521,8 @@ void zb_zcl_wwah_start_bad_parent_recovery(void);
 #ifdef ZB_JOIN_CLIENT
 zb_ret_t zb_zcl_wwah_get_rejoin_tmo(zb_uint16_t attempt, zb_time_t *tmo);
 #endif
+
+#endif /* ZB_ZCL_SUPPORT_CLUSTER_WWAH */
 
 /** @endcond */ /* DOXYGEN_ZCL_SECTION */
 
@@ -2624,7 +2580,9 @@ typedef ZB_PACKED_PRE struct zb_zcl_wwah_context_s
 #define ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_POLL_CONTROL_CHECK_IN_FAILED_CNT 3
 /* FIXME: Is it defined somewhere in WWAH spec? */
 #define ZB_ZCL_WWAH_BAD_PARENT_RECOVERY_RSSI_IS_GOOD(rssi) (rssi >= -100)
-void zb_zcl_wwah_bad_parent_recovery_signal(zb_zcl_wwah_bad_parent_recovery_signal_t sig);
+
+#ifdef ZB_ZCL_SUPPORT_CLUSTER_WWAH
+void zb_zcl_wwah_bad_parent_recovery_signal(zb_bufid_t sig);
 
 zb_ret_t zb_zcl_wwah_request_new_aps_link_key_handler(zb_uint8_t param);
 zb_ret_t zb_zcl_wwah_enable_wwah_app_event_retry_algorithm_handler(zb_uint8_t param);
@@ -2637,7 +2595,11 @@ void zb_zcl_wwah_init_server(void);
 void zb_zcl_wwah_init_server_attr(void);
 void zb_zcl_wwah_init_client(void);
 zb_ret_t zb_zcl_wwah_update_time(zb_uint8_t param);
+#endif /* ZB_ZCL_SUPPORT_CLUSTER_WWAH */
+
 #define ZB_ZCL_CLUSTER_ID_WWAH_SERVER_ROLE_INIT zb_zcl_wwah_init_server
 #define ZB_ZCL_CLUSTER_ID_WWAH_CLIENT_ROLE_INIT zb_zcl_wwah_init_client
+
+#endif /* ZB_ZCL_SUPPORT_CLUSTER_WWAH */
 
 #endif /* ZB_ZCL_WWAH_H */

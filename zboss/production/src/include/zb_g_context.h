@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -102,6 +102,9 @@ extern zb_uint_t gc_child_hash_table_size;
 extern zb_uint_t gc_neighbor_table_size;
 #define ZB_NEIGHBOR_TABLE_SIZE gc_neighbor_table_size
 
+extern zb_uint_t gc_nwk_disc_table_size;
+#define ZB_NWK_DISC_TABLE_SIZE gc_nwk_disc_table_size
+
 extern zb_uint_t gc_routing_table_size;
 #define ZB_NWK_ROUTING_TABLE_SIZE gc_routing_table_size
 
@@ -125,6 +128,13 @@ extern zb_uint_t gc_sched_stack_unprotected_q_size;
 
 extern zb_uint8_t gc_nwk_max_source_routes;
 #define ZB_NWK_MAX_SRC_ROUTES gc_nwk_max_source_routes
+
+extern zb_uint8_t gc_zdo_key_negotiations_num;
+#define ZB_ZDO_KEY_NEGOTIATIONS_NUM gc_zdo_key_negotiations_num
+
+extern zb_uint8_t gc_nwk_route_disc_table_size;
+#define ZB_NWK_ROUTE_DISCOVERY_TABLE_SIZE gc_nwk_route_disc_table_size
+
 
 /**
  @}
@@ -178,6 +188,7 @@ extern zb_intr_globals_t g_izb;
  */
 #include "zb_scheduler.h"
 #include "zb_sleep.h"
+#include "zb_signals.h"
 #include "zb_bufpool_globals.h"
 #if (!(defined ZB_MACSPLIT_DEVICE)) || (defined ZB_TH_ENABLED)
 #include "zb_addr_globals.h"
@@ -209,9 +220,7 @@ extern zb_intr_globals_t g_izb;
 #include "zb_led_button.h"
 #endif
 
-#ifdef ZB_USE_ERROR_INDICATION
 #include "zb_error_indication.h"
-#endif
 
 #ifdef USE_ZB_WATCHDOG
 #include "zb_watchdog.h"
@@ -244,6 +253,15 @@ extern zb_intr_globals_t g_izb;
 #include "zb_tcswap.h"
 #endif
 
+#include "zb_direct_globals.h"
+
+#if !(defined ZB_CONFIGURABLE_MEM || defined ZB_MAC_PENDING_QUEUE_SIZE)
+#ifndef ZB_ALIEN_MAC
+#include "zb_mac_globals.h" /* for ZB_MAC_PENDING_QUEUE_SIZE */
+#elif !defined ZB_MAC_PENDING_QUEUE_SIZE
+#define ZB_MAC_PENDING_QUEUE_SIZE (ZB_IOBUF_POOL_SIZE / 4U)
+#endif
+#endif
 
 typedef struct zb_sec_globals_s
 {
@@ -265,7 +283,8 @@ typedef struct zb_sec_globals_s
 
 #define SEC_CTX() ZG->sec
 
-
+#define SEC_CTX_ENCRYPTION_BUF(iface_id) SEC_CTX().encryption_buf[(iface_id)]
+#define SEC_CTX_ENCRYPTION_BUF2(iface_id) SEC_CTX().encryption_buf2[(iface_id)]
 
 /* CR: 04/13/2016 CR:MINOR EE: change comments documenting this structure and
  * its fields to be used by Doxygen */
@@ -316,6 +335,16 @@ typedef zb_bool_t (*zb_req_call_cb_t) (zb_uint8_t param);
              ZB_FALSE otherwise
 */
 typedef zb_bool_t (*zb_zdo_af_handler_cb) (zb_uint8_t param, zb_uint16_t cb_param);
+
+#ifdef ZB_MAC_MONOLITHIC
+/**
+ * @brief Called on pending data confirm on mac (mnlt build only) before passing it to upper layers.
+ * @param param - buffer index
+ * @returns ZB_TRUE if confirm should be dropped before processing on upper layers
+ *          ZB_FALSE otherwise
+ */
+typedef zb_bool_t (*zb_mac_pending_data_confirm_cb) (zb_uint8_t param);
+#endif /* ZB_MAC_MONOLITHIC */
 
 /**
    Flags, callbacks and attributes for tests, allows to switch stack behavior in run-time.
@@ -386,6 +415,16 @@ typedef struct zb_cert_hacks_s
                                                                  Pass buffer param and Cluster_Id
                                                                  in arguments.
                                                                  @see fb-pre-tc-03a */
+
+  zb_callback_t mcps_data_confirm_handler_cb; /*!< Callback that will be called
+                                                                    when handling confirmation after
+                                                                    completion of request.
+                                                                    @see rtp_bdb_23 */
+
+#ifdef ZB_MAC_MONOLITHIC
+  zb_mac_pending_data_confirm_cb pending_data_conf_handler_cb; /*!< Callback that will be handle confirm on data req.
+                                                                  It will replace default callback, so this confirm won't be handled on upper layers. */
+#endif /* ZB_MAC_MONOLITHIC */
 
   zb_bitfield_t override_tc_significance_flag: 1;              /*!< Allows to override default value
                                                                     of tc_significance in MgmtPermitJoin;
@@ -512,18 +551,26 @@ typedef struct zb_cert_hacks_s
 							 *   @see TP/R22/SGMB-9*/
   zb_bitfield_t extended_beacon_send_jitter:1;          /*!< If set to 1, a larger jitter will be
                                                          *    used when handling a beacon request. */
-  zb_bitfield_t aps_mcast_addr_overridden:1;             /*!< If set to 1, the value for NWK destination
-                                                          * address will be overridden with the value
-                                                          * of aps_mcast_nwk_dst_addr field  */
   zb_bitfield_t aps_disable_addr_update_on_update_device:1; /*!< Disable updating nwkAddressMap with
                                                              64bit address received via UPDATE-DEVICE. */
   zb_bitfield_t nwk_disable_passive_acks:1;              /*!< If set to 1, the device will not keep track of
                                                               received passive acks */
-  zb_uint16_t aps_mcast_nwk_dst_addr; /* CCB2469: Broadcast NWK address for
-                                       * APS groupcast (multicast) */
-  zb_uint8_t frag_block_size; /*!< If set to a nonzero value, APS will use it as a size of block
-                                payload. */
-  zb_bitfield_t allow_cbke_from_zc_ncp_dev:1; /*Allow ZC/TC NCP to perform CBKE */
+  zb_uint8_t frag_block_size;                            /*!< If set to a nonzero value, APS will use it
+                                                          * as a size of block payload. */
+  zb_bitfield_t zdo_disable_auth_token_req:1;            /*!< Disable sending authentication token req */
+  zb_bitfield_t zdo_disable_auth_token_rsp:1;            /*!< Disable sending authentication token rsp
+                                                          *   and failure when rsp is absent */
+  zb_bitfield_t tlv_disable_frag_param_tlv:1;            /*!< Disable fragmentation parameter tlv
+                                                          *   into node desc rsp */
+  zb_bitfield_t retransmit_check:1;
+  zb_uint8_t    retransmit_counter;
+  zb_uint8_t    zdo_custom_selected_kn_method;           /*!< Set custom value into selected key negotiation
+                                                          *   method of Start Key Negotiation Request */
+  zb_uint8_t    zdo_custom_selected_kn_secret;           /*!< Set custom value into selected key negotiation
+                                                          *   secret of Start Key Negotiation Request */
+  zb_bitfield_t allow_cbke_from_zc_ncp_dev:1; /*!< Allow ZC/TC NCP to perform CBKE */
+  zb_bitfield_t overwrite_hub_connectivity:1; /*!< if 1, ignore ZB_NIB().nwk_hub_connectivity  */
+  zb_bitfield_t hub_connectivity:1;           /*!< value to be used if overwrite_hub_connectivity is 1 */
   zb_bitfield_t break_nwk_fcf_counter:1;      /*!< Flag to break the NWK FC failure counter once */
   zb_bitfield_t break_aps_fcf_counter:1;      /*!< Flag to break the APS FC failure counter once */
   zb_bitfield_t break_nwk_key:1;              /*!< NWK key distortion flag for one encryption operation */
@@ -535,27 +582,85 @@ typedef struct zb_cert_hacks_s
                                                            1. from cert db (NVRAM);
                                                            2. from production configuration.
                                                          In a normal situation, vice versa. */
+  zb_bitfield_t disable_tp_aps_encryption:1; /*!< Disables APS Encryption for Test Profile requests
+                                               *  like a Buffer Test Request */
+  zb_bitfield_t disable_tp_aps_ack:1; /*!< Disables APS ACK for Test Profile requests/resp
+                                               *  like a Buffer Test Request */
   zb_bitfield_t use_preconfigured_aps_link_key:1; /*!< Use preconfigured in application APS Link Key
                                                    *   Used into TP_R20_BV-01 */
   zb_bitfield_t nwk_leave_from_unknown_addr:1; /*!< Send all nwk leave_req with src ieee addr=<nwk_leave_unknown_addr>
                                                     and short=<nwk_leave_unknown_short> */
+  zb_bitfield_t disable_support_kn_tlv_in_beacon:1; /*!< Support kn methods TLV will not be placed in beacon apx (only for ZR)*/
+  zb_bitfield_t disable_update_hub_connectivity:1; /*!< */
+
+  zb_bitfield_t nwk_use_local_ieee:1; /*!< Force usong local ieee in nwk hdr */
+
   zb_bitfield_t low_ram_concentrator:1;       /*!< Forces coordinator to send no route cache in mtorr */
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_SUBGHZ
   zb_bitbool_t zcl_subghz_cluster_test:1;          /*!< If ZCL cluster needs APS encryption - ignore it; MAC duty cycle substituted mode */
 #endif
 
+  zb_bitfield_t challenge_req_add_extra_tlv:1; /*!< Add extra TLV for challenge request (for aps_cnt test) */
+  zb_bitfield_t challenge_rsp_wrong_mic:1; /*!< Spoils MIC for challenge_resp (for aps_cnt test) */
   zb_bitfield_t tc_rejoin_mac_cap_wrong_dev_type:1; /* Toggle FFD bit in MAC capabilities for rejoin req */
   zb_bitfield_t tc_rejoin_mac_cap_wrong_rx_on_when_idle:1; /* Toggle FFD bit in MAC capabilities for rejoin req */
+
+  zb_bitfield_t aps_drop_ack:1; /* Drop APS acks */
   zb_bitfield_t aps_drop_next_ack:1; /* Drop next APS ack */
   zb_bitfield_t aps_send_dup_tunneled_frame:1;
+  zb_bitfield_t aps_send_dup_next_aps_command:1;
+  zb_bitfield_t aps_dup_relayed_frames:1;
 
+  zb_bitfield_t force_secure_rejoin:1;
+
+  zb_bitfield_t key_neg_req_truncated_tlv:1;
+  zb_bitfield_t key_neg_req_no_tlv:1;
+  zb_bitfield_t key_neg_req_add_extra_tlv:1;
+
+  zb_bitfield_t key_neg_rsp_not_autho:1;
+  zb_bitfield_t key_neg_rsp_truncated_tlv:1;
+  zb_bitfield_t key_neg_rsp_no_tlv:1;
+  zb_bitfield_t key_neg_rsp_add_extra_tlv:1;
+
+  zb_bitfield_t skip_addr_conflict_check:1;
+  zb_bitfield_t disable_aps_sec_for_all_zdo_cmd:1;        /*!< disable APS Enc for all zdo commands*/
+
+  zb_bitfield_t disable_rejoin_resp_timeout:1; /* Disable zb_nlme_rejoin_response_timeout() alarm for rejoin */
   zb_bitfield_t tc_rejoin_aps_decrypt_error:1; /* Simulate TC rejoin without known aps key */
+  zb_bitfield_t send_rejoin_rsp_wo_secur:1;
   zb_ieee_addr_t nwk_leave_from_unknown_ieee_addr; /*!< IEEE source address used in nwk_leave if `nwk_leave_from_unknown_addr` is set */
   zb_uint16_t nwk_leave_from_unknown_short_addr; /*!< Short source address used in nwk_leave if `nwk_leave_from_unknown_addr` is set */
+#ifdef ZB_CERT_MULTITEST_MANUAL_RUN
+  zb_bitfield_t nwk_parent_information_bit_reset_on_rejoin_rsp:1; /*!< Reset nwkParentInformation on rejoin response so the next packets until End Device Timeout response have End Device Initiator to 0 */
+#endif /* ZB_CERT_MULTITEST_MANUAL_RUN */
+  zb_uint8_t joins_ctr; /*!< count of joins to our device */
+  zb_uint8_t max_joins; /*!< max number of successful joins */
+  zb_bitfield_t nwk_seq_number_prev:1; /*!< Use previous NWK sequency number, once */
+  zb_bitfield_t aps_counter_prev:1; /*!< Use previous APS counter, once */
+  zb_bitfield_t reset_beacon_end_device_capacity:1; /*!< Disable End device capacity bit in beacon frame, once */
+  zb_bitfield_t zbd_delay_tc_rejoin_on_enhanced_provisioning_session:1; /*!< Enable 10 seconds delay before ZVD TC rejoin
+                                                                           in case of enhanced provisioning session */
+  zb_bitfield_t override_zbd_outgoing_fc:1; /*!< Use specified outgoing frame counter for BLE packets from ZDD */
+  zb_bitfield_t zbd_allow_unprovisioned_admin_key_auth:1; /*!< Allow admin key authorization for unprovisioned ZDD */
+  zb_bitfield_t always_send_rrec_prior:1; /*!< Send Route Record before each packet */
+  zb_bitfield_t zbd_zvd_lock_mac_tx:1; /*!< Lock packets transmission on ZVD BLE MAC layer (to fill queue) */
+  zb_bitfield_t require_aps_ack_for_tclk_transport_key:1; /*!< Require APS Acknowledgment for Transport Key with TCLK */
+  zb_bitfield_t zvd_use_wrong_public_point:1; /*!< Use wrong public point to send [SE1] message from ZVD */
+  zb_bitfield_t allow_aps_unencrypted_transport_key:1; /*!< Allow receiving of unencrypted Transport Key on joiner's side */
+  zb_bitfield_t zvd_use_zdd_nwk_src_as_mac_src:1; /*!< Use ZDD network address from Network Header as MAC source address */
+  zb_bitfield_t restart_nwk_broadcast_delivery_time_after_reset:1; /*!< Restart nwk_broadcast_delivery_time_passed_cb alarm after NWK resetting  */
+  zb_bitfield_t disable_nbt_iface_update_after_init:1; /*!< Disable updating of MAC iface id in neighbor entry after entry creation */
+  zb_bitfield_t place_extra_item_for_bv_37_b:1; /*!< Added extra channel-page item for mgmt_nwk_enhanced_update_req  */
+  zb_bitfield_t keep_provisional_key_for_16_3:1; /*!< Don't delete provisional key in zb_legacy_device_auth_signal_alarm */
+  zb_uint8_t    zbd_outgoing_fc; /*!< Specified outgoing frame counter for BLE packets from ZDD */
+  zb_bitfield_t disable_link_power_negotiation:1; /*!< Disable power negotiation */
 } zb_cert_hacks_t;
 
 #define ZB_CERT_HACKS() ZG->cert_hacks
-#endif
+
+/* Value that means that ZB_CERT_HACKS().max_joins is uninitialized */
+#define ZB_MAX_JOINS_UNINITIALIZED ZB_UINT8_MAX
+#endif /* ZB_CERTIFICATION_HACKS */
 
 #ifdef ZB_STACK_REGRESSION_TESTING_API
 
@@ -567,7 +672,6 @@ typedef struct zb_cert_hacks_s
  * Used to simulate legacy device behavior, error behavior e.t.c.
  * By default set to zero and does not affect stack behavior.
  */
-
 typedef struct zb_reg_api_s
 {
   zb_uint8_t zcl_ota_custom_query_jitter;		/*!< Custom value of ota query jitter instead of
@@ -592,7 +696,7 @@ typedef struct zb_reg_api_s
                                                          *   on NVRAM write */
   zb_bool_t disable_sending_nwk_key;                    /*!< Do not send nwk key during association to
                                                          *   the next device which attempts to associate.
-                                                         *   After one first usage flag will be resetted. */
+                                                         *   After one first usage flag will be reset. */
   zb_bool_t extended_beacon_send_delay;                 /*!< If set to 1, a larger delay will be
                                                          *    used when handling a beacon request. */
   zb_bool_t enable_custom_best_parent;                  /*!< Enable custom short address for the first
@@ -608,6 +712,32 @@ typedef struct zb_reg_api_s
                                                          *   from Trust Center */
   zb_bool_t disable_aps_acknowledgements;               /*!< Disable APS ACKs for incoming
                                                          *   APS packets. */
+  zb_bool_t disable_auto_security_for_zbd_conf_cluster; /*!< Disable automatic APS encryption requirement
+                                                         * for ZBD configuration cluster and delegate configuration
+                                                         * to application. */
+  zb_bool_t send_leave_instead_of_tclk;                 /*!< Send leave instead of tclk on every second request for a TCLK */
+  zb_bool_t send_rejoin_instead_of_tclk;                /*!< Send leave with rejoin set to true
+                                                          *   instead of tclk */
+  zb_uint8_t num_of_link_key_req_packets;               /*!< The Leave command will be send
+                                                         *   on every N request for a TCLK */
+  zb_bool_t drop_link_key_req;                          /*!< Drop Link Key request packets
+                                                         *   until num_of_link_key_req_packets
+                                                         *   will be received */
+  zb_uint32_t zcl_ota_custom_file_version;               /*!< Custom value of ota file version instead of
+                                                          *   value from a Query Next Image Response packet
+                                                          */
+  zb_bool_t disable_mac_ack_for_data_packets;            /*!< Disable MAC ACKs for incoming
+                                                          *   MAC data packets. */
+  zb_bool_t disable_mac_ack_for_data_packets_after_confirm_key; /*!< Disable MAC ACKs for incoming
+                                                                 *   MAC data packets after Confirm key command. */
+  zb_bool_t check_cluster_list_always_success;           /*!< zb_zcl_check_cluster_list will always return ZB_TRUE */
+
+  zb_bool_t fail_mcps_data_request;                      /*!< Do not send packet in fail_mcps_data_request
+                                                          *   and indicate MAC_DENIED to sender */
+  zb_uint16_t alter_beacon_source;                      /*!< This variable will be added to the beacon source address
+                                                         *   and it will be incremented on each send */
+  zb_bool_t beacon_association_permit_always_true;       /*!< Send every beacon with association permit set to true*/
+  zb_uint32_t postpone_nwk_data_processing_delay_ms;    /*!< NWK data processing will be postponed once */
 } zb_reg_api_t;
 
 #define ZB_REGRESSION_TESTS_API() ZG->reg_api
@@ -619,11 +749,15 @@ typedef struct zb_reg_api_s
 #define ZB_NWK_KEY_DISABLE() (ZB_REGRESSION_TESTS_API().disable_sending_nwk_key)
 #define ZB_NWK_KEY_DISABLE_RESET() ZB_REGRESSION_TESTS_API().disable_sending_nwk_key = ZB_FALSE
 
+/* To use from platform */
+zb_reg_api_t *zb_get_regression_tests_api(void);
+
 #else
 
 #define ZB_NWK_KEY_DISABLE() 0
 #define ZB_NWK_KEY_DISABLE_RESET()
 
+#define zb_get_regression_tests_api()
 
 #endif  /* ZB_STACK_REGRESSION_TESTING_API */
 
@@ -653,6 +787,7 @@ struct zb_globals_s
 {
   zb_sched_globals_t      sched;    /*!< Global schedule context */
   zb_buf_pool_t           bpool;    /*!< Global buffer pool context */
+  zb_signals_globals_t    signals;  /*!< Global structure for signal handling */
 #if (!(defined ZB_MACSPLIT_DEVICE)) || (defined ZB_TH_ENABLED)
   zb_addr_globals_t       addr;     /*!< Global address context */
 #endif /* (!(defined ZB_MACSPLIT_DEVICE)) || (defined ZB_TH_ENABLED) */
@@ -685,9 +820,7 @@ struct zb_globals_s
 #ifdef ZB_USE_BUTTONS
   zb_buttons_global_t    button;
 #endif
-#ifdef ZB_USE_ERROR_INDICATION
   zb_error_indication_ctx_t err_ind;
-#endif /* ZB_USE_ERROR_INDICATION */
 #ifdef USE_ZB_WATCHDOG
   zb_watchdog_t watchdog[ZB_N_WATCHDOG];
 #endif
@@ -709,6 +842,10 @@ struct zb_globals_s
 #if defined NCP_MODE && !defined NCP_MODE_HOST
   zb_ncp_globals_t ncp; /* Part of NCP device context. */
 #endif
+
+#ifdef ZB_DIRECT_ENABLED
+  zb_direct_context_t zb_direct;
+#endif /* ZB_DIRECT_ENABLED */
 };
 
 #if defined ENABLE_USB_SERIAL_IMITATOR || defined DOXYGEN
@@ -738,6 +875,14 @@ struct zb_intr_globals_s
   zb_usbc_ctx_t           usbctx; /*!< USB imitator IO context. */
 #endif /* defined( ENABLE_USB_SERIAL_IMITATOR ) */
   zb_timer_t              time;
+  
+#ifdef ZB_COMPILE_MAC_MONOLITHIC
+#ifndef ZB_CONFIGURABLE_MEM
+  zb_mac_pending_data_t pending_data_queue[ZB_MAC_PENDING_QUEUE_SIZE];
+#else
+  zb_mac_pending_data_t* pending_data_queue;
+#endif
+#endif
 };
 
 

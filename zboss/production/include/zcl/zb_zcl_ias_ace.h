@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2022 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -38,7 +38,7 @@
  * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* PURPOSE: IAS Ace cluster defintions
+/* PURPOSE: IAS Ace cluster definitions
 */
 
 #ifndef ZB_ZCL_IAS_ACE_H
@@ -182,7 +182,7 @@ enum zb_zcl_ias_ace_cmd_e
   ZB_ZCL_CMD_IAS_ACE_GET_ZONE_STATUS_ID           = 0x09,
 };
 
-/*! @brief IAS Ace cluster responce command identifiers
+/*! @brief IAS Ace cluster response command identifiers
     @see ZCL spec, IAS Ace Cluster, 8.3.2.5
 */
 enum zb_zcl_ias_ace_resp_cmd_e
