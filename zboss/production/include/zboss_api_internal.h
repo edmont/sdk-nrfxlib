@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -351,9 +351,10 @@ typedef ZB_PACKED_PRE struct zb_neighbor_tbl_ent_s /* not need to pack it at IAR
 
   zb_bitfield_t             need_rejoin:1; 	/*!< Need send rejoin response without receive request */
 
-  zb_bitfield_t             send_via_routing: 1;  /*!< Due to bad link to that device send packets
-                                                   *   via NWK routing.
-                                                   */
+  /* there was send_via_routing field which marked asymmetrical links when we
+   * can head the device but it can't hear us. Now that functionality is
+   * implemented using outgoing_cost field. */
+  zb_bitfield_t             reserved:1;
 
   zb_bitfield_t             keepalive_received:1; /*!< This value indicates at least one keepalive
                                                    *   has been received from the end device since

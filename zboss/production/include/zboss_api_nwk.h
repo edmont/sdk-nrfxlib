@@ -815,9 +815,9 @@ typedef ZB_PACKED_PRE struct zb_nwk_nbr_iterator_entry_s
                                          *   This field shall be present in every neighbour table entry.
                                          *   @if DOXYGEN_INTERNAL_DOC See @ref nwk_relationship @endif
                                          */
-  zb_uint8_t      send_via_routing;     /*!< Due to bad link to that device send packets
-                                         *   via NWK routing.
-                                         */
+  zb_uint8_t      send_via_routing;     /*!< That field is deprecated. Removed
+                                         * from zb_neighbor_tbl_ent_t, always 0
+                                         * here. */
 
   zb_uint8_t      keepalive_received;   /*!< This value indicates at least one keepalive
                                          *   has been received from the end device since

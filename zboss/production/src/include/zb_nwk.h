@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2021 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -2174,12 +2174,14 @@ zb_ret_t zb_nwk_get_neighbor_element(zb_uint16_t addr, zb_bool_t create_if_absen
 zb_ret_t zb_nwk_set_neighbor_element(zb_uint16_t addr, zb_nwk_neighbor_element_t *update);
 
 zb_ret_t zb_nwk_delete_neighbor_by_short(zb_uint16_t addr);
-zb_ret_t zb_nwk_delete_neighbor_by_ieee(zb_ieee_addr_t addr);
 
 void zb_nwk_send_direct_leave_req(zb_uint8_t param, zb_uint16_t dst_addr);
 
 zb_bool_t nwk_is_lq_bad_for_direct(zb_int8_t rssi, zb_uint8_t lqi);
 void nwk_maybe_force_send_via_routing(zb_uint16_t addr);
+void nwk_set_send_via_routing(zb_neighbor_tbl_ent_t *nbt, zb_bool_t set);
+void nwk_reset_send_via_routing_aging(zb_neighbor_tbl_ent_t *nbt);
+zb_bool_t nwk_can_send_via_nbt(zb_neighbor_tbl_ent_t *nbt);
 
 void nwk_internal_lock_in(void);
 void nwk_internal_unlock_in(void);
@@ -2237,5 +2239,15 @@ void zb_enable_control4_emulator();
 #ifndef ZB_MACSPLIT_DEVICE
 zb_ext_neighbor_tbl_ent_t *nwk_choose_parent(zb_address_pan_id_ref_t panid_ref, zb_mac_capability_info_t capability_information);
 #endif /* ZB_MACSPLIT_DEVICE */
+
+void nwk_inc_child_num(zb_bool_t is_router);
+
+void nwk_clear_child_num(void);
+
+void nwk_dec_child_num(zb_bool_t is_router);
+
+zb_bool_t nwk_have_space_for_children(void);
+
+zb_bool_t nwk_have_ed_children(void);
 
 #endif /* ZB_NWK_H */
