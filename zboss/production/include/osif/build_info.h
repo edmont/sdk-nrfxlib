@@ -11,8 +11,8 @@
  * Please use release scripts to update it's contents.
  *
  * Repositories:
- * platform_ncs       83cd749aaa1049c52165573bc4e3ebb4a5b15e52 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/platform_ncs.git
- * zboss-stack-src    edf99e660ce547a91489eed312e415fe59b100c1 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_stable
+ * platform_ncs       356ecbf96988bac16f34b08472590827f335970e https://projecttools.nordicsemi.no/bitbucket/scm/zoi/platform_ncs.git
+ * zboss-stack-src    886535cef517a85959a9d664d884cdb8b7f67b49 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_stable
  * zboss-stack-doc    d185acb78465fce1252453a93635fc4e2aac2a68 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_doc
  * nrf                5cb85570ca43bc344d3145c2338128eacf4b48ec https://github.com/nrfconnect/sdk-nrf
  * zephyr             100befc70c74f7ec83dd8ac3171ee18eeddb4dbd https://github.com/nrfconnect/sdk-zephyr
@@ -69,16 +69,16 @@
 
 
 /** ZBOSS build tag */
-#define ZBOSS_BUILD_TAG "edf99e660"
+#define ZBOSS_BUILD_TAG "886535cef"
 
 /** ZBOSS platform build tag */
-#define ZBOSS_PLATFORM_BUILD_TAG "v3.11.4.26+v5.1.6"
+#define ZBOSS_PLATFORM_BUILD_TAG "v3.11.4.67+v5.1.6"
 
 /** ZBOSS build date (UTC) */
-#define ZBOSS_BUILD_DATE 20241009
+#define ZBOSS_BUILD_DATE 20241016
 
 /** ZBOSS build time (UTC) */
-#define ZBOSS_BUILD_TIME 072920
+#define ZBOSS_BUILD_TIME 141647
 
 
 #endif /* ZBOSS_BUILD_INFO_H__ */

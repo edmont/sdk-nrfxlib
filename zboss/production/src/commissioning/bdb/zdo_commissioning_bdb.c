@@ -75,7 +75,12 @@ static void bdb_precomm_rejoin_over_all_channels(zb_uint8_t param, zb_uint16_t s
 void bdb_network_steering_on_network(zb_uint8_t param);
 #ifdef ZB_JOIN_CLIENT
 void bdb_network_steering_not_on_network(zb_uint8_t param);
-#endif
+static void bdb_force_rejoin_if_not_in_progress(zb_bufid_t param);
+#ifndef NCP_MODE_HOST
+static void bdb_handle_leave_with_rejoin_signal(zb_bufid_t param);
+static void bdb_initiate_key_exchange_if_needed(void);
+#endif /* NCP_MODE_HOST */
+#endif /* ZB_JOIN_CLIENT */
 void bdb_after_mgmt_permit_joining_cb(zb_uint8_t param);
 #ifdef ZB_ZCL_ENABLE_WWAH_SERVER
 static void bdb_rejoin_machine(zb_uint8_t param);
@@ -84,6 +89,9 @@ static void schedule_wwah_rejoin_backoff_attempt(zb_uint8_t param);
 #ifndef NCP_MODE_HOST
 static void nwk_cancel_network_discovery_response(zb_bufid_t buf);
 #endif /* NCP_MODE_HOST */
+static void bdb_handle_leave_done_signal(zb_bufid_t param);
+static zb_ret_t bdb_try_initiate_rejoin(zb_uint8_t param);
+static void bdb_initialization_procedure_for_nfn_devices(zb_uint8_t param);
 
 zb_bool_t bdb_not_ever_joined()
 {
@@ -94,7 +102,7 @@ zb_bool_t bdb_not_ever_joined()
   ret = ZB_EXTPANID_IS_ZERO(curr_ext_pan_id)
                 && !zb_zdo_authenticated();
 
-  if (!ZB_IS_DEVICE_ZC())
+  if (!ZB_IS_DEVICE_ZC() && zb_aib_get_coordinator_version() >= 21)
   {
     ret = ret && !zb_zdo_tclk_valid();
   }
@@ -205,8 +213,7 @@ void bdb_check_fn()
   }
   else
   {
-    /* TODO: recheck this condition */
-    if (bdb_not_ever_joined())
+    if (zb_bdb_is_factory_new())
     {
       TRACE_MSG(TRACE_ZDO1, "Factory new", (FMT__0));
       ZB_ZLL_SET_FACTORY_NEW();
@@ -255,13 +262,9 @@ zb_bool_t bdb_joined(void)
   zb_ext_pan_id_t ext_pan_id = {0};
 
   zb_get_extended_pan_id(ext_pan_id);
-  joined = (zb_bool_t)(!ZB_EXTPANID_IS_ZERO(ext_pan_id) &&
-                       zb_zdo_authenticated());
-
-  if (!ZB_IS_DEVICE_ZC() && zb_aib_get_coordinator_version() >= 21)
-  {
-    joined = (zb_bool_t)(joined && zb_zdo_tclk_valid());
-  }
+  joined = (zb_bool_t)(!ZB_EXTPANID_IS_ZERO(ext_pan_id)
+                       && zb_zdo_authenticated()
+                       && zb_zdo_tclk_valid());
 
   return joined;
 }
@@ -370,84 +373,117 @@ void bdb_preinit(void)
   }
 }
 
+static zb_ret_t bdb_try_initiate_rejoin(zb_uint8_t param)
+{
+  zb_ret_t ret;
+  zb_ext_pan_id_t ext_pan_id = {0};
+
+  zb_get_extended_pan_id(ext_pan_id);
+
+  if (ZB_EXTPANID_IS_ZERO(ext_pan_id))
+  {
+    TRACE_MSG(TRACE_ERROR, "Failed to initiate rejoin, do not know extended PAN ID", (FMT__0));
+    ret = RET_INVALID_STATE;
+  }
+  else
+  {
+    if (zb_zdo_authenticated())
+    {
+      TRACE_MSG(TRACE_ZDO1, "Perform secure rejoin", (FMT__0));
+
+      bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_SECURE_REJOIN, param);
+      ret = RET_OK;
+    }
+    else if (zb_zdo_tclk_valid())
+    {
+      TRACE_MSG(TRACE_ZDO1, "Perform TC rejoin", (FMT__0));
+
+      bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_TC_REJOIN, param);
+      ret = RET_OK;
+    }
+    else
+    {
+      TRACE_MSG(TRACE_ERROR, "Failed to initiate rejoin", (FMT__0));
+      ret = RET_INVALID_STATE;
+    }
+  }
+
+  return ret;
+}
+
+/* not factory new device processing */
+static void bdb_initialization_procedure_for_nfn_devices(zb_uint8_t param)
+{
+  zb_ret_t ret;
+
+#if defined ZB_COORDINATOR_ROLE
+  if (ZB_IS_DEVICE_ZC())
+  {
+    TRACE_MSG(TRACE_ZDO2, "Start ZC without formation", (FMT__0));
+    ZB_SCHEDULE_CALLBACK(zb_nwk_cont_without_formation, param);
+    ret = RET_OK;
+  }
+  else
+#endif /* ZB_COORDINATOR_ROLE */
+#if defined ZB_ROUTER_ROLE
+  /* by BDB specification ZR should continue without rejoin, only ZED can perform rejoin */
+  if (ZB_IS_DEVICE_ZR()
+      && !ZB_BDB().bdb_force_router_rejoin)
+  {
+    TRACE_MSG(TRACE_ZDO2, "Start ZR without rejoin", (FMT__0));
+    ZB_SCHEDULE_CALLBACK(zb_zdo_start_router, param);
+    ret = RET_OK;
+  }
+  else
+#endif /* ZB_ROUTER_ROLE */
+  {
+    /* Now we can try to initiate rejoin.
+     * Device ether ZED or ZR with `bdb_force_router_rejoin` set to `true` */
+    ret = bdb_try_initiate_rejoin(param);
+  }
+
+  if (ret == RET_OK)
+  {
+    /* Common routine for not factory new devices */
+
+    /* Reset steering to avoid network opening
+     * (permit join request command) */
+    ZB_BDB().bdb_commissioning_mode &= ~ZB_BDB_NETWORK_STEERING;
+
+    /* We are NFN - indicate ZB_BDB_SIGNAL_DEVICE_REBOOT */
+    ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_REBOOT;
+  }
+  else
+  {
+    /* Failure for ZC is impossible */
+    ZB_ASSERT(!ZB_IS_DEVICE_ZC());
+
+    TRACE_MSG(TRACE_ERROR, "Strange configuration, leave", (FMT__0));
+
+    zdo_commissioning_leave(param, ZB_FALSE, ZB_FALSE);
+  }
+}
 
 /**
    BDB Initialization procedure according to 7.1 Initialization procedure
  */
 void bdb_initialization_procedure(zb_uint8_t param)
 {
-  zb_ext_pan_id_t ext_pan_id = {0};
-  zb_get_extended_pan_id(ext_pan_id);
-
   bdb_preinit();
-/* Can do rejoin if ZED and if authenticated: only secured rejoin is
-   * allowed by BDB.
-   * Seems, ZR must continue its work without a rejoin (hmm?)
-   */
-  if (bdb_joined())
-  {
-#if defined ZB_COORDINATOR_ROLE
-    if (ZB_IS_DEVICE_ZC())
-    {
-      TRACE_MSG(TRACE_ZDO2, "Start ZC without formation", (FMT__0));
-      ZB_SCHEDULE_CALLBACK(zb_nwk_cont_without_formation, param);
-      param = 0;
-    }
-    else
-#endif
-#if defined ZB_ROUTER_ROLE
-    if (ZB_IS_DEVICE_ZR() && !ZB_BDB().bdb_force_router_rejoin)
-    {
-      TRACE_MSG(TRACE_ZDO2, "Initiate start router for ZR", (FMT__0));
-      ZB_SCHEDULE_CALLBACK(zb_zdo_start_router, param);
-      param = 0;
-    }
-    else
-#endif
-    {
-      /* Perform secure rejoin */
-      TRACE_MSG(TRACE_ZDO2, "Perform secure rejoin", (FMT__0));
-      bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_SECURE_REJOIN, param);
-      param = 0;
-    }
 
-    /* Reset steering to avoid network opening
-     * (permit join request command) */
-    ZB_BDB().bdb_commissioning_mode = ZB_BDB_NETWORK_FORMATION | ZB_BDB_FINDING_N_BINDING;
-
-    /* We are NFN - indicate ZB_BDB_SIGNAL_DEVICE_REBOOT */
-    ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_REBOOT;
-  }
-  else if (bdb_not_ever_joined())
+  if (bdb_not_ever_joined())
   {
-    /* Nothing to do, just continue */
-    TRACE_MSG(TRACE_ERROR, "Nothing to do, just continue", (FMT__0));
+    TRACE_MSG(TRACE_ZDO1, "Newer been on a network, perform cold start", (FMT__0));
+
     ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_FIRST_START;
-  }
-  else if (!ZB_EXTPANID_IS_ZERO(ext_pan_id)
-           && ((zb_aib_get_coordinator_version() < 21) ||
-               ((zb_aib_get_coordinator_version() >= 21) && !ZB_IS_DEVICE_ZC() && zb_zdo_tclk_valid())))
-  {
-    /* Perform TC rejoin */
-    TRACE_MSG(TRACE_ERROR, "Perform TC rejoin", (FMT__0));
-    bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_TC_REJOIN, param);
-
-    ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_REBOOT;
-    param = 0;
-  }
-#ifndef ZB_COORDINATOR_ONLY
-  else
-  {
-    TRACE_MSG(TRACE_ERROR, "Strange configuration, leave", (FMT__0));
-    zdo_commissioning_leave(param, ZB_FALSE, ZB_FALSE);
-    param = 0;
-  }
-#endif  /* #ifndef ZB_COORDINATOR_ONLY */
-
-  if (param)
-  {
     /* No additional actions are needed, finish initialization */
     bdb_commissioning_signal(BDB_COMM_SIGNAL_INIT_FINISH, param);
+  }
+  else
+  {
+    TRACE_MSG(TRACE_ZDO1, "Not a factory new device, check if we can still be on the network", (FMT__0));
+
+    bdb_initialization_procedure_for_nfn_devices(param);
   }
 }
 
@@ -2053,7 +2089,13 @@ static void bdb_handle_initiate_rejoin_signal(zb_bufid_t param)
   if (!zb_zdo_is_rejoin_active())
   {
     zdo_rejoin_clear_prev_join();
+
+    ZB_BDB().bdb_commissioning_step = ZB_BDB_COMMISSIONING_STOP;
+    ZB_BDB().bdb_commissioning_status = ZB_BDB_STATUS_CANCELLED;
+    BDB_COMM_CTX().signal = BDB_COMM_SIGNAL_FINISH;
+
     ZB_BDB().bdb_force_router_rejoin = ZB_TRUE;
+
     bdb_start_top_level_commissioning(ZB_BDB_NETWORK_STEERING);
 
 #ifdef ZB_ZCL_ENABLE_WWAH_SERVER
@@ -2086,6 +2128,17 @@ static void bdb_handle_leave_done_signal(zb_bufid_t param)
 
   /* TODO: Send special ZDO signal (LEAVE_DONE or so) - it will allow to avoid manual join
    * restarting after leave (from application). */
+
+#ifndef NCP_MODE_HOST
+  /* FIXME: this will only work for the monolithic build, generic fix requires refactoring
+            and moving of some logic from that file to some SoC file. See ZBS-1405 for more info */
+  if (zdo_secur_waiting_for_tclk_update())
+  {
+    TRACE_MSG(TRACE_ZDO1, "TC Link Key exchange in progress, stopping it", (FMT__0));
+    bdb_update_tclk_stop();
+  }
+#endif /* NCP_MODE_HOST */
+
   if (ZB_BDB().bdb_commissioning_step == ZB_BDB_COMMISSIONING_STOP)
   {
     TRACE_MSG(TRACE_NWK1, "BDB commissioning machine is already finished, do nothing",
@@ -2103,7 +2156,7 @@ static void bdb_handle_leave_done_signal(zb_bufid_t param)
     else
     {
       /* Will be here after bdb device failed authentication - lets join to
-       * other networks */
+      * other networks */
       ZB_SCHEDULE_CALLBACK(zdo_retry_joining, 0);
     }
   }
@@ -2172,6 +2225,19 @@ static void bdb_handle_leave_with_rejoin_signal(zb_bufid_t param)
      without reset it's logic - then stack silently completes process without notifying application or further join attempts.
      Temporarily fix: use BDB logic for rejoin on receiving leave (locally or remotely).
   */
+
+  TRACE_MSG(TRACE_ZDO1, "bdb_handle_leave_with_rejoin_signal", (FMT__0));
+
+#ifndef NCP_MODE_HOST
+  /* FIXME: this will only work for the monolithic build, generic fix requires refactoring
+            and moving of some logic from that file to some SoC file. See ZBS-1405 for more info */
+  if (zdo_secur_waiting_for_tclk_update())
+  {
+    TRACE_MSG(TRACE_ZDO1, "TC Link Key exchange in progress, stopping it", (FMT__0));
+    bdb_update_tclk_stop();
+  }
+#endif /* NCP_MODE_HOST */
+
   zdo_inform_app_leave(ZB_NWK_LEAVE_TYPE_REJOIN);
 
 #ifndef NCP_MODE_HOST
@@ -2179,6 +2245,7 @@ static void bdb_handle_leave_with_rejoin_signal(zb_bufid_t param)
   *rejoin_reason = ZB_REJOIN_REASON_LEAVE_WITH_REJOIN;
   ZB_SCHEDULE_CALLBACK(zdo_commissioning_initiate_rejoin, param);
 #else
+  ZB_BDB().bdb_application_signal = ZB_BDB_SIGNAL_DEVICE_REBOOT;
   zb_buf_free(param);
 #endif
 
@@ -2437,8 +2504,7 @@ void zb_bdb_initiate_tc_rejoin(zb_uint8_t param)
 
   TRACE_MSG(TRACE_ZDO1, ">> zb_bdb_initiate_tc_rejoin, param %hd", (FMT__H, param));
 
-  if (((!ZB_IS_DEVICE_ZC() && !zb_zdo_tclk_valid()) || (zb_aib_get_coordinator_version() < 21))
-        && !zb_aib_tcpol_get_allow_unsecure_tc_rejoins())
+  if (!zb_zdo_tclk_valid() && !zb_aib_tcpol_get_allow_unsecure_tc_rejoins())
   {
     TRACE_MSG(TRACE_ERROR, "TC rejoin is not allowed", (FMT__0));
     ret = RET_INVALID_STATE;
@@ -2600,7 +2666,7 @@ void zb_set_bdb_commissioning_mode(zb_uint8_t commissioning_mode)
 
 zb_bool_t zb_bdb_is_factory_new()
 {
-  return (zb_bool_t)!bdb_joined();
+  return (zb_bool_t)bdb_not_ever_joined();
 }
 
 
@@ -2867,7 +2933,6 @@ zb_ret_t zb_bdb_close_network(zb_bufid_t buf)
   TRACE_MSG(TRACE_ZDO3, "<< zb_bdb_close_network", (FMT__0));
   return ret;
 }
-
 
 /*! @} */
 

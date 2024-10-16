@@ -1296,6 +1296,8 @@ void bdb_request_tclk_alarm(zb_uint8_t param);
 void bdb_update_tclk_failed(zb_uint8_t param);
 /* CR : 04/19/2016 [VP]: Stop */
 
+void bdb_update_tclk_stop(void);
+
 void zb_secur_delete_link_keys_by_addr_ref(zb_address_ieee_ref_t addr_ref);
 
 void zb_secur_delete_link_keys_by_long_addr(zb_ieee_addr_t ieee_address);
