@@ -75,10 +75,8 @@ static void bdb_precomm_rejoin_over_all_channels(zb_uint8_t param, zb_uint16_t s
 void bdb_network_steering_on_network(zb_uint8_t param);
 #ifdef ZB_JOIN_CLIENT
 void bdb_network_steering_not_on_network(zb_uint8_t param);
-static void bdb_force_rejoin_if_not_in_progress(zb_bufid_t param);
 #ifndef NCP_MODE_HOST
 static void bdb_handle_leave_with_rejoin_signal(zb_bufid_t param);
-static void bdb_initiate_key_exchange_if_needed(void);
 #endif /* NCP_MODE_HOST */
 #endif /* ZB_JOIN_CLIENT */
 void bdb_after_mgmt_permit_joining_cb(zb_uint8_t param);

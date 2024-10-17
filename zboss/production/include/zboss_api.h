@@ -984,6 +984,8 @@ zb_ret_t zb_channel_list_add(zb_channel_list_t channel_list, zb_uint8_t page_num
 */
 void zb_set_max_children(zb_uint8_t max_children);
 
+void zb_set_max_joins(zb_uint8_t max_joins);
+
 /**
  * @name End Device (ED) timeout request
  * @anchor nwk_requested_timeout
