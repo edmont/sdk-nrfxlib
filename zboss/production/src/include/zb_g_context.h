@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2025 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -575,7 +575,7 @@ typedef struct zb_cert_hacks_s
 
 typedef struct zb_reg_api_s
 {
-  zb_uint8_t zcl_ota_custom_query_jitter;		/*!< Custom value of ota query jitter instead of
+  zb_uint8_t zcl_ota_custom_query_jitter;               /*!< Custom value of ota query jitter instead of
                                                          *   randomly chosen
                                                          */
   zb_int8_t osif_interrupts_balance;                    /*!< The difference between
@@ -613,6 +613,8 @@ typedef struct zb_reg_api_s
                                                          *   from Trust Center */
   zb_bool_t disable_aps_acknowledgements;               /*!< Disable APS ACKs for incoming
                                                          *   APS packets. */
+  zb_bool_t send_leave_instead_of_tclk; /*!< Send leave instead of tclk on every second request for a TCLK */
+  zb_bool_t send_rejoin_instead_of_tclk_on_every_second_request; /*!< Send leave with rejoin set to true instead of tclk on every second request for a TCLK */
 } zb_reg_api_t;
 
 #define ZB_REGRESSION_TESTS_API() ZG->reg_api
