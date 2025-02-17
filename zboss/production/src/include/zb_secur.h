@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2025 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -1295,6 +1295,8 @@ void bdb_request_tclk_alarm(zb_uint8_t param);
 
 void bdb_update_tclk_failed(zb_uint8_t param);
 /* CR : 04/19/2016 [VP]: Stop */
+
+void bdb_update_tclk_stop(void);
 
 void zb_secur_delete_link_keys_by_addr_ref(zb_address_ieee_ref_t addr_ref);
 

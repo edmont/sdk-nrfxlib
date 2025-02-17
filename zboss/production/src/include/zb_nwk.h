@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2025 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -854,8 +854,6 @@ typedef ZB_PACKED_PRE struct zb_nlme_leave_request_s
 {
   zb_ieee_addr_t device_address; /**< 64-bit IEEE address of the device to
                                   * remove, zero fill if device itself */
-  zb_uint8_t remove_children; /**< If true - remove child devices from the
-                                    * network */
   zb_uint8_t rejoin; /**< If true - Join after leave */
 } ZB_PACKED_STRUCT
 zb_nlme_leave_request_t;

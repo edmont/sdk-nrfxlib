@@ -11,21 +11,21 @@
  * Please use release scripts to update it's contents.
  *
  * Repositories:
- * platform_ncs       db349cfbf4d32d03bc8ca2b1934c055cedd38746 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/platform_ncs.git
- * zboss-stack-src    527882038813c10bc16c58b3822728f01839f8e4 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_stable
- * zboss-stack-doc    a9e550875d1a486bb829f4be6ab45042cb758e02 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_doc
- * nrf                2dee59af02a114e7fc7856bee2e35fc9f37d7ddd https://github.com/nrfconnect/sdk-nrf
- * zephyr             0a2e205750dc7eff8767afa543b2fd23a1fbb332 https://github.com/nrfconnect/sdk-zephyr
+ * platform_ncs       e6b33d808c4e4065a903655fdc83c076ede6583f https://projecttools.nordicsemi.no/bitbucket/scm/zoi/platform_ncs.git
+ * zboss-stack-src    2f581f40c4a71ce3be7d22ecc6e4e5f8c4e8160c https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_stable
+ * zboss-stack-doc    9e932c7445df637922d8e04f450f5bc56ba95de4 https://projecttools.nordicsemi.no/bitbucket/scm/zoi/zboss_doc
+ * nrf                7787b264984022cda64d9629278942053e6462a5 https://github.com/nrfconnect/sdk-nrf
+ * zephyr             1f8f3dc291420c70cd39e77a5cdc954561d4a08f https://github.com/nrfconnect/sdk-zephyr
  * wfa-qt-control-app af011c8a8d338ba529f17aed2cc2ef4c1c591a58 https://github.com/nrfconnect/sdk-wi-fiquicktrack-controlappc
  * mcuboot            12e5ee106034972b0f1074d6f2261b2b39d1501b https://github.com/nrfconnect/sdk-mcuboot
  * qcbor              751d36583a9ce1a640900c57e13c9b6b8f3a2ba2 https://github.com/laurencelundblade/QCBOR
  * mbedtls            98603a8c91660beac00e0ee1d76198fb7c4ed29b https://github.com/nrfconnect/sdk-mbedtls
  * oberon-psa-crypto  21728cf8402ac567326d0d69eec891a2bfdb8ea3 https://github.com/nrfconnect/sdk-oberon-psa-crypto
- * nrfxlib            1ab292d04974dc97523c00dfa82eb461fd27bdb1 https://github.com/nrfconnect/sdk-nrfxlib
+ * nrfxlib            756bcec432f49aa5def6f47d2d09272f8c4d9192 https://github.com/nrfconnect/sdk-nrfxlib
  * trusted-firmware-m f2bf78452629355e4180dc36756f6c1becc819fa https://github.com/nrfconnect/sdk-trusted-firmware-m
  * psa-arch-tests     3da9313e64806d352c519e3205e81cf959067588 https://github.com/nrfconnect/sdk-psa-arch-tests
- * matter             9a6edcf725a9766e513fe789745da92e0f640cb1 https://github.com/nrfconnect/sdk-connectedhomeip
- * soc-hwmv1          bd39fcf7832b4eb682a9c5ef5ad0e3b2e34cd502 https://github.com/nrfconnect/sdk-soc-hwmv1
+ * matter             684c8128ad203c86d1f058913dcd73fde63e9eaf https://github.com/nrfconnect/sdk-connectedhomeip
+ * soc-hwmv1          be0500992bd8c222118b651b88d1f3714855a3aa https://github.com/nrfconnect/sdk-soc-hwmv1
  * cjson              c6af068b7f05207b28d68880740e4b9ec1e4b50a https://github.com/nrfconnect/sdk-cjson
  * azure-sdk-for-c    308c171cb4b5eed266649012a68406487ec81fb2 https://github.com/nrfconnect/azure-sdk-for-c
  * cirrus             3873a08377d93a479105a75ac390d3bbcd31d690 https://github.com/nrfconnect/sdk-mcu-drivers
@@ -59,7 +59,7 @@
  * mipi-sys-t         71ace1f5caa03e56c8740a09863e685efb4b2360 https://github.com/zephyrproject-rtos/mipi-sys-t
  * net-tools          93acc8bac4661e74e695eb1aea94c7c5262db2e2 https://github.com/zephyrproject-rtos/net-tools
  * nrf_hw_models      3cfca0192ff84da919e9bc7978bcc2239cd6a395 https://github.com/zephyrproject-rtos/nrf_hw_models
- * nrf_wifi           71261e2b719b98500b7741c3398a74a5fb631596 https://github.com/zephyrproject-rtos/nrf_wifi
+ * nrf_wifi           f6b950a3b5c0187fe499b0e518426d5bf88b7e68 https://github.com/zephyrproject-rtos/nrf_wifi
  * open-amp           b735edbc739ad59156eb55bb8ce2583d74537719 https://github.com/zephyrproject-rtos/open-amp
  * picolibc           27746bbc246841852912fc3bb5b45094cd8a505a https://github.com/zephyrproject-rtos/picolibc
  * segger             b011c45b585e097d95d9cf93edf4f2e01588d3cd https://github.com/zephyrproject-rtos/segger
@@ -70,16 +70,16 @@
 
 
 /** ZBOSS build tag */
-#define ZBOSS_BUILD_TAG "ncs_release-3.11.6.0"
+#define ZBOSS_BUILD_TAG "2f581f40c"
 
 /** ZBOSS platform build tag */
-#define ZBOSS_PLATFORM_BUILD_TAG "v3.11.6.0+v5.1.7"
+#define ZBOSS_PLATFORM_BUILD_TAG "v3.11.6.53+v5.1.8"
 
 /** ZBOSS build date (UTC) */
-#define ZBOSS_BUILD_DATE 20241211
+#define ZBOSS_BUILD_DATE 20250217
 
 /** ZBOSS build time (UTC) */
-#define ZBOSS_BUILD_TIME 122248
+#define ZBOSS_BUILD_TIME 091430
 
 
 #endif /* ZBOSS_BUILD_INFO_H__ */

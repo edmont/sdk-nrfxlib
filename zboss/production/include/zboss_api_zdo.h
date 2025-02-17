@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2025 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -2481,7 +2481,7 @@ typedef ZB_PACKED_PRE struct zb_zdo_mgmt_leave_param_s
   zb_uint16_t    dst_addr;         /*!< Destination address. Not defined in
                                     *   the specification - let's it be short address */
   zb_bitfield_t reserved:6;        /*!< Reserve */
-  zb_bitfield_t remove_children:1; /*!< Remove children */
+  zb_bitfield_t remove_children:1; /*!< Obsolete field */
   zb_bitfield_t rejoin:1;          /*!< Rejoin */
 }
 ZB_PACKED_STRUCT

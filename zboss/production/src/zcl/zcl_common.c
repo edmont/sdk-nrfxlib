@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2025 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -1289,6 +1289,7 @@ zb_bool_t cluster_needs_aps_encryption(zb_uint8_t endpoint_id, zb_uint16_t clust
 
 static void ep_process_zcl_cmd(zb_uint8_t param)
 {
+  zb_zcl_parsed_hdr_t* cmd_info_buf_ptr;
   zb_zcl_parsed_hdr_t cmd_info;
   zb_uint8_t ep;
   zb_af_endpoint_desc_t *ep_desc;
@@ -1296,10 +1297,27 @@ static void ep_process_zcl_cmd(zb_uint8_t param)
 
   TRACE_MSG(TRACE_ZCL2, "> ep_process_zcl_cmd, param %hd", (FMT__H, param));
 
-  ZB_MEMCPY(&cmd_info, ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t), sizeof(zb_zcl_parsed_hdr_t));
-  ep = ZB_ZCL_PARSED_HDR_SHORT_DATA(&cmd_info).dst_endpoint;
+  cmd_info_buf_ptr = ZB_BUF_GET_PARAM(param, zb_zcl_parsed_hdr_t);
+
+  TRACE_MSG(TRACE_ZCL2, "cmd_id: %hd, cluster_id: 0x%x, is_common_command: %hd",
+            (FMT__H_D_H, cmd_info_buf_ptr->cmd_id, cmd_info_buf_ptr->cluster_id, cmd_info_buf_ptr->is_common_command));
+
+  ep = ZB_ZCL_PARSED_HDR_SHORT_DATA(cmd_info_buf_ptr).dst_endpoint;
   ep_desc = zb_af_get_endpoint_desc(ep);
   ZB_ASSERT(ep_desc);
+
+  /**
+   * As per Zigbee Specification Revision 22.2, 2.3.3.1
+   * The recipient of the message containing a request using a wild card profile ID
+   * shall respond with the profile ID in its simple descriptor if it is able to process the message
+   *
+   * Replace wildcard profile id with our's here, so all further branches will have correct profile id in the responses they are forming
+   */
+  if (cmd_info_buf_ptr->profile_id == ZB_AF_WILDCARD_PROFILE_ID)
+  {
+    cmd_info_buf_ptr->profile_id = ep_desc->profile_id;
+  }
+  ZB_MEMCPY(&cmd_info, cmd_info_buf_ptr, sizeof(zb_zcl_parsed_hdr_t));
 
 #ifdef ZB_ZCL_SUPPORT_CLUSTER_BASIC
   if(!zb_zcl_check_is_device_enabled(ep, cmd_info.cmd_id, cmd_info.cluster_id, cmd_info.is_common_command))
@@ -1507,6 +1525,7 @@ static void broadcast_endpoint_delivery_step(zb_uint8_t param, zb_uint16_t bc_bu
     ZB_ASSERT(bc_buf_ref <= ZB_UINT8_MAX);
     ZB_SCHEDULE_ALARM(broadcast_endpoint_call_next_delivery_step, (zb_uint8_t)bc_buf_ref, process_command_jitter);
   }
+  TRACE_MSG(TRACE_ZCL2, "< broadcast_endpoint_delivery_step", (FMT__0));
 }
 
 

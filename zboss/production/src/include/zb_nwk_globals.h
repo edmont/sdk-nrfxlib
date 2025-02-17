@@ -1,7 +1,7 @@
 /*
  * ZBOSS Zigbee 3.0
  *
- * Copyright (c) 2012-2024 DSR Corporation, Denver CO, USA.
+ * Copyright (c) 2012-2025 DSR Corporation, Denver CO, USA.
  * www.dsr-zboss.com
  * www.dsr-corporation.com
  * All rights reserved.
@@ -192,8 +192,7 @@ typedef struct zb_leave_context_s
   zb_leave_ind_notify_t leave_ind_zed;                              /*!< */
   zb_uint8_t pending_list_bm;                                       /*!< */
   zb_bitfield_t rejoin_after_leave:1;                               /*!< */
-  zb_bitfield_t remove_children:1;                                  /*!< */
-  zb_bitfield_t reserved:6;
+  zb_bitfield_t reserved:7;
 } zb_leave_context_t;
 
 #define ZB_SET_LEAVE_PENDING(i) ZG->nwk.leave_context.pending_list_bm |= (1U<<(i))
